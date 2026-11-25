@@ -1,6 +1,6 @@
 # Rift Ranger
 
-A one-minute browser arcade battle. Wave to attack, guard when the Riftbeast winds up, or hold both hands overhead to charge a heavy strike. With the optional microphone, a clap or a steady hum triggers a bonus attack.
+A 75-second browser arcade battle. Wave to attack, guard when the Riftbeast winds up, or hold both hands overhead to charge a heavy strike. With the optional microphone, a clap or a steady hum triggers a bonus attack.
 
 ## Play locally
 

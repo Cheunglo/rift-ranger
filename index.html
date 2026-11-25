@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=4">
-  <script type="module" src="./game.mjs?v=4"></script>
+  <link rel="stylesheet" href="./style.css?v=5">
+  <script type="module" src="./game.mjs?v=5"></script>
 </head>
 <body>
   <main>
@@ -23,9 +23,15 @@
     </section>
     <section class="arena" id="arena" aria-label="Battle arena">
       <div class="hud">
-        <div><span class="label">Ranger</span><progress id="player" aria-label="Ranger health" max="100" value="100"></progress></div>
-        <strong id="time" aria-label="Seconds remaining">60</strong>
-        <div class="enemy-health"><span class="label">The Riftbeast</span><progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress></div>
+        <div>
+          <div class="health-heading"><span class="label">Ranger</span><span class="hp" id="player-hp" aria-hidden="true">100 / 100 HP</span></div>
+          <progress id="player" aria-label="Ranger health" max="100" value="100"></progress>
+        </div>
+        <strong id="time" aria-label="Seconds remaining">75</strong>
+        <div class="enemy-health">
+          <div class="health-heading"><span class="label">The Riftbeast</span><span class="hp" id="enemy-hp" aria-hidden="true">100 / 100 HP</span></div>
+          <progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress>
+        </div>
         <output id="prompt" aria-live="polite">Ready to morph?</output>
         <p id="tracking" hidden></p>
         <div id="ranger-pose" class="ranger-pose" hidden>

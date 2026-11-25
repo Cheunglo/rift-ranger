@@ -21,7 +21,14 @@ const poseLabel = byId('pose-label');
 const player = byId('player');
 const enemy = byId('enemy');
 const time = byId('time');
-const battleLength = 60_000;
+const battleTiming = {
+  duration: 75_000,
+  firstStrike: 7000,
+  strikeInterval: 6200,
+  enragedInterval: 4800,
+  warning: 2100,
+  counterWindow: 2400,
+};
 const attacks = {
   wave: [5, 'Energy slash'],
   power: [22, 'Power strike'],
@@ -56,6 +63,22 @@ paintBeast(byId('beast'));
 
 function say(message) {
   if (prompt.textContent !== message) prompt.textContent = message;
+}
+
+function setHealth(bar, value) {
+  bar.value = value;
+  byId(bar.id + '-hp').textContent = bar.value + ' / ' + bar.max + ' HP';
+}
+
+function setTime(milliseconds) {
+  const seconds = String(Math.max(0, Math.ceil(milliseconds / 1000)));
+  if (time.textContent !== seconds) time.textContent = seconds;
+}
+
+function resetHud() {
+  setHealth(player, player.max);
+  setHealth(enemy, enemy.max);
+  setTime(battleTiming.duration);
 }
 
 function cameraStatus(message, state = '') {
@@ -175,14 +198,12 @@ function resetRound() {
 function startRound(mode) {
   const now = performance.now();
   round = {
-    mode, started: now, strike: now + 4900,
+    mode, started: now, strike: now + battleTiming.firstStrike,
     nextAttack: now, nextWave: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), feedback: '', feedbackUntil: 0, hitUntil: 0,
   };
-  player.value = 100;
-  enemy.value = 100;
-  time.textContent = '60';
+  resetHud();
   arena.dataset.state = 'ready';
   overlay.hidden = true;
   showPose('wave', 'Wave to attack');
@@ -215,7 +236,7 @@ function attack(move, now, fromCamera = false) {
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'wave' ? 2 : 5;
   const dealt = Math.min(enemy.value, bonus ? damage + counterDamage : damage);
-  enemy.value -= dealt;
+  setHealth(enemy, enemy.value - dealt);
   round.nextAttack = now + 580;
   if (move === 'wave') round.nextWave = now + 950;
   round.hitUntil = now + 170;
@@ -228,8 +249,8 @@ function attack(move, now, fromCamera = false) {
 
 function tick(now) {
   if (!round) return;
-  const remaining = battleLength - (now - round.started);
-  time.textContent = Math.max(0, Math.ceil(remaining / 1000));
+  const remaining = battleTiming.duration - (now - round.started);
+  setTime(remaining);
   if (remaining <= 0) return endRound(false, true);
 
   if (tracker && camera.readyState >= 2 && now >= round.nextPosePoll && camera.currentTime !== round.videoTime) {
@@ -261,14 +282,14 @@ function tick(now) {
   const cameraGuard = round.mode === 'camera' && round.cameraMove?.guard && now - round.lastPose < 260;
   const guard = round.keyboardGuard || cameraGuard;
   if (now >= round.strike) {
-    round.strike = now + (enemy.value <= 40 ? 3600 : 4700);
+    round.strike = now + (enemy.value <= 40 ? battleTiming.enragedInterval : battleTiming.strikeInterval);
     if (guard) {
       round.feedback = 'Blocked! Counter now.';
-      round.counterUntil = now + 1700;
+      round.counterUntil = now + battleTiming.counterWindow;
       confirmPose('guard', 'Blocked!', now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
     } else {
-      player.value = Math.max(0, player.value - 19);
+      setHealth(player, Math.max(0, player.value - 19));
       round.feedback = 'Riftbeast hit! Guard on the next windup.';
       if (player.value === 0) return endRound(false);
     }
@@ -277,7 +298,7 @@ function tick(now) {
 
   if (round.mode === 'camera') updateCameraStatus(now);
   const charge = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove?.charge : 0;
-  const danger = now >= round.strike - 1400;
+  const danger = now >= round.strike - battleTiming.warning;
   const used = round.poseFeedback;
   if (used && now < used.until) showPose(used.move, used.label, 'active');
   else if (danger) showPose('guard', guard ? 'Guard held' : 'Guard now', guard ? 'active' : 'cue');
@@ -389,8 +410,7 @@ exit.addEventListener('click', () => {
   arena.dataset.state = 'ready';
   showOverlay('Defend the city.', 'Keep your head, shoulders and hands in view. You can play sitting or standing.');
   say('Ready to morph?');
-  player.value = enemy.value = 100;
-  time.textContent = '60';
+  resetHud();
   webcam.focus();
 });
 
