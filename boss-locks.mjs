@@ -11,7 +11,7 @@ export function createBossLocks(random = Math.random) {
     const j = Math.floor(random() * (i + 1));
     [moves[i], moves[j]] = [moves[j], moves[i]];
   }
-  return thresholds.map((hp, i) => ({ hp, move: moves[i], total: (i + 1) * 3, done: 0 }));
+  return thresholds.map((hp, i) => ({ hp, move: moves[i], total: (i + 1) * 2, done: 0 }));
 }
 
 export function nextBossLock(locks) {

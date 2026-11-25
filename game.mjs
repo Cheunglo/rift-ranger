@@ -1,5 +1,5 @@
 import { paintBeast } from './beast.mjs';
-import { bossHit, canBossHeal, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=16';
+import { bossHit, canBossHeal, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=17';
 import { combatArt } from './combat-art.mjs?v=13';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=12';
 
@@ -11,6 +11,7 @@ const tracking = byId('tracking');
 const trackingPoints = byId('tracking-points');
 const poseContext = trackingPoints.getContext('2d');
 const overlay = byId('overlay');
+const battleResult = byId('battle-result');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
 const practice = byId('practice');
@@ -245,6 +246,7 @@ function confirmPose(move, label, now) {
 }
 
 function showOverlay(title, copy) {
+  battleResult.hidden = true;
   byId('overlay-title').textContent = title;
   byId('overlay-copy').textContent = copy;
   overlay.hidden = false;
@@ -323,7 +325,7 @@ function resetRound() {
 function startRound(mode, practicing) {
   const now = performance.now();
   round = {
-    mode, practicing, strike: practicing ? Infinity : now + battleTiming.firstStrike,
+    mode, practicing, startedAt: now, strike: practicing ? Infinity : now + battleTiming.firstStrike,
     nextAttack: now, nextBasic: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, beamDamage: 0, lastTick: now,
@@ -348,10 +350,21 @@ function startRound(mode, practicing) {
 }
 
 function endRound(won) {
+  const elapsed = won ? (round.finished.at - round.startedAt) / 1000 : 0;
+  const damage = player.max - player.value;
   resetRound();
   arena.dataset.state = won ? 'win' : 'ready';
   showOverlay(won ? 'City saved!' : 'Ranger down',
     won ? 'The Riftbeast has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
+  if (won) {
+    const timeBonus = Math.round(6000 * 60 / (60 + elapsed));
+    const healthBonus = Math.round(4000 * (1 - damage / player.max));
+    const seconds = Math.floor(elapsed);
+    byId('result-score').textContent = (timeBonus + healthBonus).toLocaleString();
+    byId('result-time').textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+    byId('result-damage').textContent = damage + ' HP';
+    battleResult.hidden = false;
+  }
   webcam.focus();
 }
 
@@ -387,7 +400,7 @@ function attack(move, now, fromCamera = false) {
   const outcome = lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
   confirmPose(move, outcome, now);
   if (fromCamera) cameraNotice(outcome, hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
-  if (enemy.value === 0) round.finished = { won: true, until: now + (move === 'power' ? 800 : 510) };
+  if (enemy.value === 0) round.finished = { won: true, at: now, until: now + (move === 'power' ? 800 : 510) };
   return true;
 }
 
@@ -439,7 +452,7 @@ function updateAura(now, delta, humming) {
     round.beamDamage = Math.max(0, round.beamDamage - dealt);
     if (dealt) {
       damageBoss(dealt, null, now);
-      if (enemy.value === 0) round.finished = { won: true, until: now + 300 };
+      if (enemy.value === 0) round.finished = { won: true, at: now, until: now + 300 };
     }
     if (round.auraMs === 0) finishBeam(now);
   } else if (!firing && humming) {
@@ -529,7 +542,7 @@ function tick(now) {
       confirmPose('guard', 'Blocked! Power counter ready.', now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
     } else {
-      const damage = Math.min(player.value, 19);
+      const damage = Math.min(player.value, Math.round(10 + 9 * enemy.value / enemy.max));
       if (!round.practicing) setHealth(player, player.value - damage);
       round.strikeNotice = round.practicing ? 'Laser hit · no HP lost in practice' : 'Laser hit · −' + damage + ' HP';
       if (player.value === 0) round.finished = { won: false, until: now + 400 };
