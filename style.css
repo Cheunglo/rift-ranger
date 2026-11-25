@@ -27,6 +27,7 @@ h1 span { color: var(--acid); margin-left: .09em; }
 .hp { color: #e8ff75; font: 700 .875rem/1.2 ui-monospace, monospace; white-space: nowrap; }
 .enemy-health .hp { color: #ffb1c3; }
 #time { display: block; color: var(--acid); font: 900 clamp(1.6rem, 5vw, 2.6rem)/1 ui-monospace, monospace; }
+.arena[data-mode="practice"] #time { font-size: clamp(.8rem, 2vw, 1.25rem); }
 progress { appearance: none; display: block; width: 100%; height: 11px; margin-top: 7px; border: 0; background: #140d20; border-radius: 3px; overflow: hidden; accent-color: var(--acid); }
 progress::-webkit-progress-bar { background: #140d20; }
 progress::-webkit-progress-value { background: var(--acid); }
@@ -48,6 +49,9 @@ progress::-moz-progress-bar { background: var(--acid); }
 .overlay { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; text-align: center; padding: 68px 16px 28px; background: #160e23a8; z-index: 4; }
 .overlay h2 { font-size: clamp(2.1rem, 8vw, 5rem); text-shadow: 4px 4px #36204b; }
 .overlay p { max-width: 37ch; text-shadow: 1px 1px #160e23; }
+.practice-option { display: grid; grid-template-columns: auto 1fr; gap: 2px 7px; align-items: center; margin: 0 0 12px; text-align: left; font-weight: 800; }
+.practice-option input { margin: 0; width: 1rem; height: 1rem; accent-color: var(--acid); }
+.practice-option span { grid-column: 2; color: var(--muted); font-size: .875rem; font-weight: 500; }
 .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
 button { font: inherit; font-weight: 800; border: 1px solid transparent; border-radius: 6px; padding: 8px 13px; color: var(--ink); background: var(--acid); cursor: pointer; }
 button.secondary { background: #252035; color: #f6f3ff; border-color: #514563; }
@@ -99,6 +103,13 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 #aura { margin-top: 0; height: 6px; accent-color: #d8abfa; }
 #aura::-webkit-progress-value { background: #d8abfa; }
 #aura::-moz-progress-bar { background: #d8abfa; }
+.mic-control { display: grid; gap: 4px; margin-top: 3px; }
+.mic-control button { justify-self: start; padding: 4px 7px; font-size: .875rem; text-align: left; }
+#practice-laser { justify-self: start; padding: 4px 7px; font-size: .875rem; text-align: left; }
+#mic-status { color: var(--muted); }
+#mic-status[data-state="humming"] { color: var(--acid); }
+#mic-level { height: 4px; margin: 0; }
+#mic-setup-status { margin: 8px 0 0; }
 #tracking { color: #f6f3ff; }
 #tracking[data-state="accepted"] { color: var(--acid); }
 #tracking[data-state="waiting"] { color: #ffdca2; }

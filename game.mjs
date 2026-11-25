@@ -1,6 +1,6 @@
 import { paintBeast } from './beast.mjs';
 import { combatArt } from './combat-art.mjs?v=11';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=11';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=12';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -12,7 +12,12 @@ const poseContext = trackingPoints.getContext('2d');
 const overlay = byId('overlay');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
-const mic = byId('mic');
+const practice = byId('practice');
+const practiceLaser = byId('practice-laser');
+const micButtons = [byId('mic'), byId('mic-setup')];
+const micStatus = byId('mic-status');
+const micLevel = byId('mic-level');
+const micSetupStatus = byId('mic-setup-status');
 const exit = byId('exit');
 const device = byId('device');
 const prompt = byId('prompt');
@@ -34,6 +39,7 @@ const battleTiming = {
   enragedInterval: 4800,
   warning: 3000,
   counterWindow: 2400,
+  practiceCounterWindow: 6000,
 };
 const attacks = {
   basic: [5, 'Energy slash'],
@@ -52,6 +58,12 @@ const trackingHints = {
   guard: 'Left hand held above shoulder height.',
   'power-held': 'Power registered. Lower both hands to reset.',
   reset: 'Lower both hands to attack again.',
+};
+const audioHints = {
+  quiet: 'Mic on · hum close to the mic.',
+  sound: 'Sound heard · try a steady note.',
+  note: 'Note heard · keep humming.',
+  humming: 'Hum detected · charging aura.',
 };
 
 let round;
@@ -89,6 +101,7 @@ function resetHud() {
   setHealth(player, player.max);
   setHealth(enemy, enemy.max);
   setTime(battleTiming.duration);
+  time.setAttribute('aria-label', 'Seconds remaining');
   auraMeter.value = 0;
 }
 
@@ -193,9 +206,33 @@ function stopMic() {
   if (round) round.micHumming = false;
   if (context && context.state !== 'closed') void context.close().catch(() => {});
   context = null;
-  mic.disabled = false;
-  mic.textContent = 'Enable mic';
-  mic.setAttribute('aria-pressed', 'false');
+  setMicControls(false);
+  setMicMessage('');
+  micLevel.value = 0;
+  micLevel.hidden = true;
+}
+
+function setMicControls(active, busy = false) {
+  for (const button of micButtons) {
+    button.disabled = busy;
+    button.textContent = active ? 'Disable microphone' : 'Enable microphone';
+    button.setAttribute('aria-pressed', String(active));
+  }
+}
+
+function setMicMessage(message) {
+  if (micStatus.textContent !== message) micStatus.textContent = message;
+  delete micStatus.dataset.state;
+  micStatus.hidden = !message;
+  if (micSetupStatus.textContent !== message) micSetupStatus.textContent = message;
+  micSetupStatus.hidden = !message;
+}
+
+function showMicInput(state, level) {
+  const hint = audioHints[state];
+  if (micStatus.textContent !== hint) micStatus.textContent = hint;
+  micStatus.dataset.state = state;
+  micLevel.value = level;
 }
 
 function resetRound() {
@@ -208,21 +245,30 @@ function resetRound() {
   poseAnimation?.cancel();
   poseCard.hidden = true;
   bossPanel.hidden = true;
+  practiceLaser.hidden = true;
+  delete arena.dataset.mode;
   webcam.disabled = false;
   webcam.textContent = 'Enable camera';
   exit.hidden = true;
   device.textContent = defaultStatus;
 }
 
-function startRound(mode) {
+function startRound(mode, practicing) {
   const now = performance.now();
   round = {
-    mode, started: now, strike: now + battleTiming.firstStrike,
+    mode, practicing, started: now, strike: practicing ? Infinity : now + battleTiming.firstStrike,
     nextAttack: now, nextBasic: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, aura: 0, lastTick: now,
   };
   resetHud();
+  if (practicing) {
+    arena.dataset.mode = 'practice';
+    time.textContent = 'Practice';
+    time.setAttribute('aria-label', 'Practice mode');
+  }
+  practiceLaser.hidden = !practicing;
+  practiceLaser.disabled = false;
   arena.dataset.state = 'ready';
   overlay.hidden = true;
   showPose();
@@ -275,15 +321,16 @@ function attack(move, now, fromCamera = false) {
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
   const dealt = Math.min(enemy.value, bonus ? damage + counterDamage : damage);
-  setHealth(enemy, enemy.value - dealt);
+  if (!round.practicing) setHealth(enemy, enemy.value - dealt);
   round.nextAttack = now + 580;
   if (move === 'basic') round.nextBasic = now + 950;
   if (move === 'power') round.powerCounterAvailable = false;
   round.attackPose = { move, until: now + 360 };
   visuals.play(move, now, charge);
   round.hitUntil = now + 170;
-  confirmPose(move, label + (bonus ? ' counter' : '') + ' · −' + dealt + ' HP', now);
-  if (fromCamera) cameraNotice(label + ' landed (−' + dealt + ' HP).', 'accepted', now);
+  const damageText = round.practicing ? dealt + ' damage' : '−' + dealt + ' HP';
+  confirmPose(move, label + (bonus ? ' counter' : '') + ' · ' + damageText, now);
+  if (fromCamera) cameraNotice(label + ' landed (' + damageText + ').', 'accepted', now);
   if (enemy.value === 0) round.finished = { won: true, until: now + (move === 'power' ? 800 : 510) };
   return true;
 }
@@ -308,9 +355,11 @@ function tick(now) {
   }
   const delta = Math.min(70, now - round.lastTick);
   round.lastTick = now;
-  const remaining = battleTiming.duration - (now - round.started);
-  setTime(remaining);
-  if (remaining <= 0) return endRound(false, true);
+  if (!round.practicing) {
+    const remaining = battleTiming.duration - (now - round.started);
+    setTime(remaining);
+    if (remaining <= 0) return endRound(false, true);
+  }
 
   if (tracker && camera.readyState >= 2 && now >= round.nextPosePoll && camera.currentTime !== round.videoTime) {
     round.videoTime = camera.currentTime;
@@ -333,7 +382,8 @@ function tick(now) {
 
   if (audioInput && now >= round.nextAudioPoll) {
     round.nextAudioPoll = now + 20;
-    const { clap, humming } = audioInput(now);
+    const { clap, humming, level, state } = audioInput(now);
+    showMicInput(state, level);
     round.micHumming = humming;
     if (clap) attack('clap', now);
   }
@@ -351,17 +401,19 @@ function tick(now) {
   const guard = round.keyboardGuard || cameraGuard;
   if (now >= round.strike) {
     visuals.play('laser', now, guard);
-    round.strike = now + (enemy.value <= 40 ? battleTiming.enragedInterval : battleTiming.strikeInterval);
+    round.strike = round.practicing ? Infinity :
+      now + (enemy.value <= 40 ? battleTiming.enragedInterval : battleTiming.strikeInterval);
+    if (round.practicing) practiceLaser.disabled = false;
     round.strikeNotice = 'Strike finished';
     if (guard) {
-      round.counterUntil = now + battleTiming.counterWindow;
+      round.counterUntil = now + (round.practicing ? battleTiming.practiceCounterWindow : battleTiming.counterWindow);
       round.powerCounterAvailable = true;
       confirmPose('guard', 'Blocked! Power counter ready.', now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
     } else {
       const damage = Math.min(player.value, 19);
-      setHealth(player, player.value - damage);
-      round.strikeNotice = 'Laser hit · −' + damage + ' HP';
+      if (!round.practicing) setHealth(player, player.value - damage);
+      round.strikeNotice = round.practicing ? 'Laser hit · no HP lost in practice' : 'Laser hit · −' + damage + ' HP';
       if (player.value === 0) round.finished = { won: false, until: now + 400 };
     }
     round.strikeNoticeUntil = now + 1000;
@@ -392,6 +444,7 @@ function tick(now) {
 
 webcam.addEventListener('click', async () => {
   const request = ++requestId;
+  const practicing = practice.checked;
   webcam.disabled = true;
   webcam.textContent = 'Starting camera…';
   exit.hidden = false;
@@ -416,7 +469,7 @@ webcam.addEventListener('click', async () => {
       if (round) round.mode = 'keyboard';
       device.textContent = 'Camera disconnected. Keyboard controls are available.';
     });
-    startRound('camera');
+    startRound('camera', practicing);
     device.textContent = 'Camera active. ' + defaultStatus;
   } catch (error) {
     if (request !== requestId) return;
@@ -438,10 +491,16 @@ keyboard.addEventListener('click', () => {
   webcam.disabled = false;
   webcam.textContent = 'Enable camera';
   device.textContent = micStream ? 'Mic active. ' + defaultStatus : defaultStatus;
-  startRound('keyboard');
+  startRound('keyboard', practice.checked);
 });
 
-mic.addEventListener('click', async () => {
+practiceLaser.addEventListener('click', () => {
+  if (!round?.practicing || round.strike !== Infinity) return;
+  practiceLaser.disabled = true;
+  round.strike = performance.now() + battleTiming.warning;
+});
+
+async function toggleMic() {
   if (micStream) {
     stopMic();
     device.textContent = defaultStatus;
@@ -449,9 +508,9 @@ mic.addEventListener('click', async () => {
     return;
   }
   const request = ++micRequestId;
-  mic.disabled = true;
+  setMicControls(false, true);
   exit.hidden = false;
-  device.textContent = 'Allow microphone access when your browser asks.';
+  setMicMessage('Allow microphone access when your browser asks.');
   try {
     const Audio = window.AudioContext || window.webkitAudioContext;
     context = new Audio();
@@ -468,19 +527,22 @@ mic.addEventListener('click', async () => {
       if (micStream !== stream) return;
       stopMic();
       if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
-      device.textContent = 'Mic disconnected. F and G still work.';
+      setMicMessage('Mic disconnected. F and G still work.');
+      device.textContent = defaultStatus;
     });
-    mic.textContent = 'Disable mic';
-    mic.setAttribute('aria-pressed', 'true');
+    setMicControls(true);
+    setMicMessage('Mic on. Hum a steady note, then clap to fire.');
+    micLevel.hidden = false;
     device.textContent = 'Mic active. Hum to build aura, then clap to fire.';
   } catch {
     if (request !== micRequestId) return;
     stopMic();
     if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
-    device.textContent = 'Mic unavailable. F and G still work.';
+    setMicMessage('Microphone unavailable. Check browser permission, or use F and G.');
   }
-  mic.disabled = false;
-});
+}
+
+for (const button of micButtons) button.addEventListener('click', toggleMic);
 
 exit.addEventListener('click', () => {
   resetRound();

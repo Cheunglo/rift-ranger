@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=11">
-  <script type="module" src="./game.mjs?v=11"></script>
+  <link rel="stylesheet" href="./style.css?v=12">
+  <script type="module" src="./game.mjs?v=12"></script>
 </head>
 <body>
   <main>
@@ -37,6 +37,7 @@
           <output id="prompt" aria-live="polite">No attack incoming</output>
           <svg id="warning-pose" class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use href="./poses.svg?v=7#guard"></use></svg>
           <p id="warning-hint" hidden>Left hand up, or hold S.</p>
+          <button id="practice-laser" class="secondary" type="button" hidden>Test a laser attack</button>
         </div>
         <div id="ranger-pose" class="combat-panel" hidden>
           <span class="label">Action detected</span>
@@ -44,6 +45,11 @@
           <svg class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use id="pose-art" href="./poses.svg?v=7#basic"></use></svg>
           <p id="tracking" hidden></p>
           <div class="aura-meter"><label class="label" for="aura">Aura</label><progress id="aura" max="100" value="0"></progress></div>
+          <div class="mic-control">
+            <button id="mic" class="secondary" type="button" aria-pressed="false">Enable microphone</button>
+            <p id="mic-status" hidden></p>
+            <progress id="mic-level" aria-label="Microphone input level" max="100" value="0" hidden></progress>
+          </div>
         </div>
       </div>
       <div class="eclipse"></div>
@@ -54,16 +60,18 @@
       <div class="overlay" id="overlay">
         <h2 id="overlay-title">Defend the city.</h2>
         <p id="overlay-copy">Keep your shoulders and any raised hand in view. You can play sitting or standing.</p>
+        <label class="practice-option"><input id="practice" type="checkbox"> Practice mode <span>Try moves without a timer or damage.</span></label>
         <div class="actions">
           <button id="webcam" type="button">Enable camera</button>
           <button id="keyboard" class="secondary" type="button">Play with keyboard</button>
+          <button id="mic-setup" class="secondary" type="button" aria-pressed="false">Enable microphone</button>
         </div>
+        <p id="mic-setup-status" role="status" hidden></p>
       </div>
     </section>
     <div class="toolbar">
       <div id="device" role="status">Camera and mic stay on your device.</div>
       <div class="actions">
-        <button id="mic" class="secondary" type="button" aria-pressed="false">Enable mic</button>
         <button id="exit" class="secondary" type="button" hidden>End session</button>
       </div>
     </div>

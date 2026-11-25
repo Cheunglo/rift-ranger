@@ -14,7 +14,9 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 | F | Spend aura on a beam |
 | Hold G | Build aura |
 
-Enable the microphone separately if you want to use sound controls. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
+Choose **Enable microphone** on the start screen or in the action panel and grant browser permission to use sound controls. The action panel shows mic input level and whether the game hears a steady hum. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
+
+Select **Practice mode** before starting a camera or keyboard session to try every move without a timer or health loss. Choose **Test a laser attack** to practice guarding, then follow a successful block with a power counter.
 
 ## Publish on GitHub Pages
 

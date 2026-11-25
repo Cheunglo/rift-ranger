@@ -113,60 +113,89 @@ export function gestures() {
 
 export function listen(context, stream) {
   const analyser = context.createAnalyser();
-  analyser.fftSize = 2048;
+  analyser.fftSize = 2 ** Math.ceil(Math.log2(context.sampleRate * .064));
   const source = context.createMediaStreamSource(stream);
   source.connect(analyser);
   const samples = new Float32Array(analyser.fftSize);
+  const stride = Math.max(1, Math.floor(context.sampleRate / 8000));
+  const pitchRate = context.sampleRate / stride;
+  const signal = new Float32Array(Math.floor(samples.length / stride));
+  const shortestPeriod = Math.floor(pitchRate / 850);
+  const longestPeriod = Math.ceil(pitchRate / 65);
+  const comparisonLength = signal.length - longestPeriod - 1;
+  const clapWindow = Math.round(context.sampleRate * .042);
   const started = performance.now();
-  let floor = .006;
+  let noiseFloor = .001;
   let previous = 0;
   let pitch = 0;
   let humSince = 0;
+  let lastNote = -Infinity;
+  let wasHumming = false;
 
-  function detectPitch(rms) {
-    if (rms < Math.max(.008, floor * 2)) return 0;
-    const minimum = Math.floor(context.sampleRate / 520);
-    const maximum = Math.min(samples.length - 1000, Math.ceil(context.sampleRate / 85));
-    let prior = 0;
-    for (let lag = minimum; lag <= maximum; lag += 2) {
-      let product = 0;
-      let initialEnergy = 0;
+  function detectPitch(rms, average) {
+    if (rms < Math.max(.0016, noiseFloor * 1.35)) return 0;
+    for (let i = 0; i < signal.length; i++) {
+      let sum = 0;
+      for (let j = 0; j < stride; j++) sum += samples[i * stride + j];
+      signal[i] = sum / stride - average;
+    }
+
+    let referenceEnergy = 0;
+    for (let i = 0; i < comparisonLength; i++) referenceEnergy += signal[i] ** 2;
+    let previousCorrelation = 0;
+    for (let lag = Math.max(1, shortestPeriod - 1); lag <= longestPeriod + 1; lag++) {
+      let cross = 0;
       let shiftedEnergy = 0;
-      for (let i = 0; i < 1000; i += 4) {
-        const first = samples[i];
-        const second = samples[i + lag];
-        product += first * second;
-        initialEnergy += first * first;
-        shiftedEnergy += second * second;
+      for (let i = 0; i < comparisonLength; i++) {
+        cross += signal[i] * signal[i + lag];
+        shiftedEnergy += signal[i + lag] ** 2;
       }
-      const correlation = product / Math.sqrt(initialEnergy * shiftedEnergy);
-      if (prior > .85 && correlation < prior) return context.sampleRate / (lag - 2);
-      prior = correlation;
+      const correlation = cross / Math.sqrt(referenceEnergy * shiftedEnergy);
+      if (lag > shortestPeriod && previousCorrelation >= .76 && correlation < previousCorrelation) {
+        return pitchRate / (lag - 1);
+      }
+      previousCorrelation = correlation;
     }
     return 0;
   }
 
   return now => {
     analyser.getFloatTimeDomainData(samples);
+    let sum = 0;
     let energy = 0;
+    let recentEnergy = 0;
     let peak = 0;
-    for (const sample of samples) {
+    const startRecent = samples.length - clapWindow;
+    for (let i = 0; i < samples.length; i++) {
+      const sample = samples[i];
+      sum += sample;
       energy += sample ** 2;
-      peak = Math.max(peak, Math.abs(sample));
+      if (i >= startRecent) {
+        recentEnergy += sample ** 2;
+        peak = Math.max(peak, Math.abs(sample));
+      }
     }
-    const rms = Math.sqrt(energy / samples.length);
-    const tone = detectPitch(rms);
-    const clap = now - started > 450 && !tone && rms > Math.max(.013, floor * 3.5, previous * 2.2) &&
-      peak > Math.max(.09, rms * 3.1);
-    if (!tone && !clap) floor = floor * .96 + Math.min(rms, .035) * .04;
-    previous = rms;
+    const average = sum / samples.length;
+    const rms = Math.sqrt(Math.max(0, energy / samples.length - average ** 2));
+    const recentRms = Math.sqrt(recentEnergy / clapWindow);
+    const clap = now - started > 450 && recentRms > Math.max(.013, noiseFloor * 3.5, previous * 2.2) &&
+      peak > Math.max(.09, recentRms * 3.1);
+    previous = recentRms;
+    const tone = clap ? 0 : detectPitch(rms, average);
+    if (!tone && !clap) noiseFloor = noiseFloor * .99 + Math.min(rms, .015) * .01;
 
-    if (!tone) {
-      humSince = 0;
-    } else if (!pitch || Math.abs(tone / pitch - 1) > .12) {
-      humSince = now;
+    if (tone) {
+      const similar = pitch && Math.abs(Math.log2(tone / pitch)) <= .3;
+      if (!similar || now - lastNote > 145) humSince = now;
+      pitch = similar ? pitch * .75 + tone * .25 : tone;
+      lastNote = now;
+      wasHumming = now - humSince >= 200;
+    } else if (now - lastNote > 145 || clap) {
+      wasHumming = false;
     }
-    pitch = tone;
-    return { clap, humming: Boolean(tone && now - humSince >= 160) };
+
+    const level = Math.max(0, Math.min(100, Math.round((20 * Math.log10(rms) + 65) * 2)));
+    const state = wasHumming ? 'humming' : tone ? 'note' : level > 6 ? 'sound' : 'quiet';
+    return { clap, humming: wasHumming, level, state };
   };
 }
