@@ -12,16 +12,20 @@ const mic = byId('mic');
 const exit = byId('exit');
 const device = byId('device');
 const prompt = byId('prompt');
+const poseCard = byId('ranger-pose');
+const poseArt = byId('pose-art');
+const poseLabel = byId('pose-label');
 const player = byId('player');
 const enemy = byId('enemy');
 const time = byId('time');
 const battleLength = 60_000;
 const attacks = {
-  wave: [8, 'Energy slash'],
+  wave: [5, 'Energy slash'],
   power: [22, 'Power strike'],
   clap: [13, 'Clap burst'],
   hum: [18, 'Sonic blast'],
 };
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 let round;
 let animation;
@@ -30,6 +34,7 @@ let cameraStream;
 let micStream;
 let context;
 let audioInput;
+let poseAnimation;
 let requestId = 0;
 let micRequestId = 0;
 const defaultStatus = 'Camera and mic stay on your device.';
@@ -37,6 +42,25 @@ paintBeast(byId('beast'));
 
 function say(message) {
   if (prompt.textContent !== message) prompt.textContent = message;
+}
+
+function showPose(move, label, state = '') {
+  const href = './poses.svg#' + move;
+  if (poseArt.getAttribute('href') !== href) poseArt.setAttribute('href', href);
+  if (poseLabel.textContent !== label) poseLabel.textContent = label;
+  if (poseCard.dataset.state !== state) poseCard.dataset.state = state;
+}
+
+function confirmPose(move, label, now) {
+  round.poseFeedback = { move, label, until: now + 850 };
+  showPose(move, label, 'active');
+  poseAnimation?.cancel();
+  if (!reducedMotion.matches) {
+    poseAnimation = poseArt.ownerSVGElement.animate(
+      [{ transform: 'scale(.88)' }, { transform: 'scale(1.1)' }, { transform: 'scale(1)' }],
+      { duration: 350, easing: 'ease-out' },
+    );
+  }
 }
 
 function showOverlay(title, copy) {
@@ -72,6 +96,8 @@ function resetRound() {
   stopCamera();
   stopMic();
   round = null;
+  poseAnimation?.cancel();
+  poseCard.hidden = true;
   webcam.disabled = false;
   webcam.textContent = 'Enable camera';
   exit.hidden = true;
@@ -82,7 +108,7 @@ function startRound(mode) {
   const now = performance.now();
   round = {
     mode, started: now, strike: now + 4900,
-    nextAttack: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
+    nextAttack: now, nextWave: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false, cameraGuard: false, visible: false,
     readGesture: gestures(), feedback: '', feedbackUntil: 0, hitUntil: 0,
   };
@@ -91,6 +117,8 @@ function startRound(mode) {
   time.textContent = '60';
   arena.dataset.state = 'ready';
   overlay.hidden = true;
+  showPose('wave', 'Wave to attack');
+  poseCard.hidden = false;
   exit.hidden = false;
   say('Get ready!');
   animation = requestAnimationFrame(tick);
@@ -107,13 +135,17 @@ function endRound(won, expired = false) {
 
 function attack(move, now) {
   if (!round || now < round.nextAttack) return;
+  if (move === 'wave' && now < round.nextWave) return;
   const [damage, label] = attacks[move];
   const bonus = now < (round.counterUntil ?? 0);
-  enemy.value = Math.max(0, enemy.value - (bonus ? damage + 5 : damage));
+  const counterDamage = move === 'wave' ? 2 : 5;
+  enemy.value = Math.max(0, enemy.value - (bonus ? damage + counterDamage : damage));
   round.nextAttack = now + 580;
+  if (move === 'wave') round.nextWave = now + 950;
   round.hitUntil = now + 170;
   round.feedback = bonus ? label + ' • Counter bonus' : label;
   round.feedbackUntil = now + 700;
+  confirmPose(move, label, now);
   if (enemy.value === 0) endRound(true);
 }
 
@@ -157,6 +189,7 @@ function tick(now) {
     if (guard) {
       round.feedback = 'Blocked! Counter now.';
       round.counterUntil = now + 1700;
+      confirmPose('guard', 'Blocked!', now);
     } else {
       player.value = Math.max(0, player.value - 19);
       round.feedback = 'Riftbeast hit! Guard on the next windup.';
@@ -166,6 +199,11 @@ function tick(now) {
   }
 
   const danger = now >= round.strike - 1400;
+  const used = round.poseFeedback;
+  if (used && now < used.until) showPose(used.move, used.label, 'active');
+  else if (danger) showPose('guard', guard ? 'Guard held' : 'Guard now', guard ? 'active' : 'cue');
+  else if (round.charge > 0 && round.charge < 1) showPose('power', 'Keep holding', 'cue');
+  else showPose('wave', 'Wave to attack');
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
   if (danger) say(guard ? 'Guard held. Keep holding!' : 'Incoming! Hands by ears or hold S');
   else if (now < round.feedbackUntil) say(round.feedback);
