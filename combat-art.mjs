@@ -6,6 +6,7 @@ export function combatArt(canvas, beast, reducedMotion) {
   let rightLift = 0;
   let previousTime;
   const duration = { basic: 480, power: 780, laser: 360 };
+  const eyeColors = { green: '#69ff77', yellow: '#ffe663', red: '#ff243c' };
   const mix = (from, to, amount) => from + (to - from) * amount;
 
   function polygon(color, points) {
@@ -181,11 +182,12 @@ export function combatArt(canvas, beast, reducedMotion) {
       const settle = reducedMotion.matches ? 1 : 1 - Math.exp(-delta / 34);
       leftLift = mix(leftLift, Number(left), settle);
       rightLift = mix(rightLift, Number(right), settle);
-      if (flash) {
+      const eyeColor = eyeColors[flash];
+      if (eyeColor) {
         for (const [x, y] of scene.eyes) {
           ctx.shadowBlur = 17;
-          ctx.shadowColor = '#ff1745';
-          ctx.fillStyle = '#ff243c';
+          ctx.shadowColor = eyeColor;
+          ctx.fillStyle = eyeColor;
           ctx.fillRect(x - boss.width * .036, y - boss.width * .024, boss.width * .072, boss.width * .048);
         }
         ctx.shadowBlur = 0;

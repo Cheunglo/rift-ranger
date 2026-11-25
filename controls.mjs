@@ -29,7 +29,8 @@ export function gestures() {
   let pose;
   let poseSince;
   let lastFrame;
-  let attackSpent = false;
+  let basicSpent = false;
+  let rightDownSince;
   let powerSpent = false;
   let guardActive = false;
 
@@ -45,6 +46,7 @@ export function gestures() {
       lastSeen.fill(-Infinity);
       pose = undefined;
       guardActive = false;
+      rightDownSince = undefined;
     }
     lastFrame = now;
     if (!framed) return result;
@@ -66,6 +68,10 @@ export function gestures() {
     }
 
     const [left, right] = raised;
+    // A lowered right hand rearms the slash, even with the left hand still in
+    // guard. Keeping the right hand up never repeats the same attack.
+    if (rightDownSince !== undefined && now - rightDownSince >= 120) basicSpent = false;
+    rightDownSince = right ? undefined : (rightDownSince ?? now);
     result.left = left;
     result.right = right;
     const next = left && right ? 'power' : left ? 'guard' : right ? 'basic' : 'neutral';
@@ -78,8 +84,7 @@ export function gestures() {
     const held = now - poseSince;
 
     if (pose === 'neutral') {
-      if (held >= 120) attackSpent = powerSpent = false;
-      result.state = attackSpent ? 'reset' : tracked.some(Boolean) ? 'neutral' : 'hands-hidden';
+      result.state = basicSpent ? 'reset' : tracked.some(Boolean) ? 'neutral' : 'hands-hidden';
       return result;
     }
     if (pose === 'guard') {
@@ -94,13 +99,13 @@ export function gestures() {
         result.attack = 'power';
         // The battle loop calls this only after a valid counter actually fires.
         result.consume = () => {
-          attackSpent = powerSpent = true;
+          basicSpent = powerSpent = true;
           result.state = 'power-held';
         };
       }
       return result;
     }
-    if (attackSpent) {
+    if (basicSpent) {
       result.state = 'reset';
       return result;
     }
@@ -109,7 +114,7 @@ export function gestures() {
     result.state = pose;
     if (held >= 300 && tracked[1]) {
       result.attack = 'basic';
-      attackSpent = true;
+      basicSpent = true;
     }
     return result;
   };

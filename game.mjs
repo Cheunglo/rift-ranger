@@ -1,8 +1,8 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=22';
-import { combatArt } from './combat-art.mjs?v=13';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=21';
+import { combatArt } from './combat-art.mjs?v=26';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=26';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -46,7 +46,7 @@ const battleTiming = {
   firstStrike: 7000,
   slowestStrikeInterval: 6600,
   fastestStrikeInterval: 3650,
-  warning: 3000,
+  warningStep: 1000,
   counterWindow: 2400,
   practiceCounterWindow: 6000,
   healQuietTime: 1800,
@@ -58,6 +58,9 @@ const attacks = {
   power: [22, 'Power strike'],
 };
 const longLaserCredit = 5;
+const warningColors = ['green', 'yellow', 'red'];
+const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
+const warningDuration = () => (warningColors.length - round.warningStart) * battleTiming.warningStep;
 const lockInstructions = {
   basic: 'Right hand up · A',
   power: 'Block, then both up · D',
@@ -75,7 +78,7 @@ const trackingHints = {
   'guard-set': 'Left hand seen. Keep holding to guard.',
   guard: 'Left hand held above shoulder height.',
   'power-held': 'Power registered. Lower both hands to reset.',
-  reset: 'Lower both hands to attack again.',
+  reset: 'Lower your right hand to attack again.',
 };
 const audioHints = {
   calibrating: 'Calibrating mic · stay quiet briefly.',
@@ -339,10 +342,11 @@ function startRound(mode, practicing) {
   const now = performance.now();
   round = {
     mode, practicing, startedAt: now, strike: practicing ? Infinity : now + battleTiming.firstStrike,
-    nextAttack: now, nextBasic: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
+    nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, beamDamage: 0, lastTick: now,
     locks: practicing ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
+    warningStart: randomWarningStart(),
   };
   resetHud();
   lockMarkers.hidden = lockStatus.hidden = practicing;
@@ -410,19 +414,15 @@ function attack(move, now, fromCamera = false) {
     }
     return;
   }
-  if (now < round.nextAttack || (move === 'basic' && now < round.nextBasic)) {
-    if (fromCamera && move === 'basic') {
-      cameraNotice('Right arm recognized. Attack cooling down.', 'waiting', now);
-    }
-    return;
-  }
+  if (move === 'power' && now < round.nextPower) return;
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
   const scaledDamage = Math.max(1, Math.round((damage + (bonus ? counterDamage : 0)) * playerDamageScale(move)));
   const hit = damageBoss(scaledDamage, move, now);
-  round.nextAttack = now + 580;
-  if (move === 'basic') round.nextBasic = now + 950;
-  if (move === 'power') round.powerCounterAvailable = false;
+  if (move === 'power') {
+    round.nextPower = now + 580;
+    round.powerCounterAvailable = false;
+  }
   round.attackPose = { move, until: now + 360 };
   visuals.play(move, now);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
@@ -495,7 +495,7 @@ function updateAura(now, delta, humming) {
   return strength;
 }
 
-function drawBattle(now, guard, flash = false, beamStrength = 0) {
+function drawBattle(now, guard, flash = null, beamStrength = 0) {
   const tracked = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
   const attack = now < round.attackPose?.until ? round.attackPose.move : null;
   visuals.render(now, {
@@ -552,7 +552,7 @@ function tick(now) {
   const humming = round.keyboardHum || (now >= (round.humBlockedUntil ?? 0) && round.micHumming);
   const beamStrength = updateAura(now, delta, humming);
   if (round.finished) {
-    drawBattle(now, false, false, beamStrength);
+    drawBattle(now, false, null, beamStrength);
     animation = requestAnimationFrame(tick);
     return;
   }
@@ -562,6 +562,7 @@ function tick(now) {
   const guard = round.keyboardGuard || cameraGuard;
   if (now >= round.strike) {
     visuals.play('laser', now, guard);
+    round.warningStart = randomWarningStart();
     const interval = battleTiming.fastestStrikeInterval +
       (battleTiming.slowestStrikeInterval - battleTiming.fastestStrikeInterval) * enemy.value / enemy.max;
     round.strike = round.practicing ? Infinity :
@@ -585,8 +586,11 @@ function tick(now) {
   if (round.mode === 'camera') updateCameraStatus(now);
   const cameraPose = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove?.state : null;
   const untilStrike = round.strike - now;
-  const danger = untilStrike <= battleTiming.warning;
-  const flash = danger && (battleTiming.warning - untilStrike) % 1000 < 235;
+  const leadTime = warningDuration();
+  const danger = untilStrike <= leadTime;
+  const warningElapsed = leadTime - untilStrike;
+  const flashIndex = round.warningStart + Math.floor(warningElapsed / battleTiming.warningStep);
+  const flash = danger && warningElapsed % battleTiming.warningStep < 235 ? warningColors[flashIndex] : null;
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
   if (cameraPose === 'power') showPose('power', 'Both arms detected', canPowerCounter(now) ? '' : 'locked');
@@ -660,7 +664,7 @@ keyboard.addEventListener('click', () => {
 practiceLaser.addEventListener('click', () => {
   if (!round?.practicing || round.strike !== Infinity) return;
   practiceLaser.disabled = true;
-  round.strike = performance.now() + battleTiming.warning;
+  round.strike = performance.now() + warningDuration();
 });
 
 async function toggleMic() {
