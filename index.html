@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=5">
-  <script type="module" src="./game.mjs?v=5"></script>
+  <link rel="stylesheet" href="./style.css?v=6">
+  <script type="module" src="./game.mjs?v=6"></script>
 </head>
 <body>
   <main>
@@ -32,11 +32,17 @@
           <div class="health-heading"><span class="label">The Riftbeast</span><span class="hp" id="enemy-hp" aria-hidden="true">100 / 100 HP</span></div>
           <progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress>
         </div>
-        <output id="prompt" aria-live="polite">Ready to morph?</output>
-        <p id="tracking" hidden></p>
-        <div id="ranger-pose" class="ranger-pose" hidden>
-          <svg aria-hidden="true" viewBox="0 0 96 88"><use id="pose-art" href="./poses.svg#wave"></use></svg>
-          <span id="pose-label">Wave to attack</span>
+        <div id="boss-panel" class="combat-panel" hidden>
+          <span class="label">Boss warning</span>
+          <output id="prompt" aria-live="polite">No attack incoming</output>
+          <svg id="warning-pose" class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use href="./poses.svg#guard"></use></svg>
+          <p id="warning-hint" hidden>Hands by your ears, or hold S.</p>
+        </div>
+        <div id="ranger-pose" class="combat-panel" hidden>
+          <span class="label">Action detected</span>
+          <output id="pose-label" aria-live="polite">No action detected</output>
+          <svg class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use id="pose-art" href="./poses.svg#wave"></use></svg>
+          <p id="tracking" hidden></p>
         </div>
       </div>
       <div class="eclipse"></div>
