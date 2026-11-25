@@ -1,7 +1,8 @@
+// Owns the match state, connects input to moves, and updates the HUD and arena.
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=20';
 import { combatArt } from './combat-art.mjs?v=13';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=12';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=21';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -40,6 +41,7 @@ const lockInstruction = byId('lock-instruction');
 const practiceBadge = byId('practice-badge');
 const auraMeter = byId('aura');
 const auraCaption = byId('aura-caption');
+// All timing values are milliseconds. The animation loop uses one clock.
 const battleTiming = {
   firstStrike: 7000,
   slowestStrikeInterval: 6600,
@@ -47,8 +49,9 @@ const battleTiming = {
   warning: 3000,
   counterWindow: 2400,
   practiceCounterWindow: 6000,
-  healDelay: 7500,
-  healInterval: 4500,
+  healQuietTime: 1800,
+  healMinInterval: 700,
+  healFullInterval: 5200,
 };
 const attacks = {
   basic: [5, 'Energy slash'],
@@ -74,6 +77,8 @@ const trackingHints = {
   reset: 'Lower both hands to attack again.',
 };
 const audioHints = {
+  calibrating: 'Calibrating mic · stay quiet briefly.',
+  beam: 'Beam input · hum again after firing.',
   quiet: 'Mic on · hum close to the mic.',
   sound: 'Sound heard · try a steady note.',
   note: 'Note heard · keep humming.',
@@ -88,6 +93,7 @@ let micStream;
 let context;
 let audioInput;
 let poseAnimation;
+// Stale permission or model requests must not reopen a device after you exit.
 let requestId = 0;
 let micRequestId = 0;
 const defaultStatus = 'Camera and mic stay on your device.';
@@ -113,6 +119,7 @@ function resetHud() {
   auraCaption.textContent = 'Aura';
 }
 
+// The HUD previews the next gate and keeps an engaged lock highlighted if the boss heals.
 function showBossLocks() {
   const next = nextBossLock(round.locks);
   const active = Boolean(next?.engaged);
@@ -149,20 +156,28 @@ function lockRequirement(lock) {
 }
 
 function damageBoss(damage, move, now, credit = 1) {
+  // Practice uses the same move effects but never changes either health bar.
   if (round.practicing) return { dealt: Math.min(enemy.value, damage), lock: null };
   const hit = bossHit(round.locks, enemy.value, damage, move, credit);
   if (hit.dealt) setHealth(enemy, hit.hp);
   if (hit.dealt || hit.credited) {
-    round.nextHeal = now + battleTiming.healDelay;
+    round.nextHeal = now + battleTiming.healQuietTime + healInterval();
     showBossLocks();
   }
   return hit;
 }
 
+function healInterval() {
+  // Each tick restores one HP. The interval grows with health, so the rate
+  // falls as the boss heals. The minimum keeps low-HP recovery bounded.
+  const { healMinInterval, healFullInterval } = battleTiming;
+  return healMinInterval + (healFullInterval - healMinInterval) * enemy.value / enemy.max;
+}
+
 function healBoss(now) {
   if (round.practicing || now < round.nextHeal || enemy.value <= 0 || enemy.value >= enemy.max) return;
   setHealth(enemy, enemy.value + 1);
-  round.nextHeal = now + battleTiming.healInterval;
+  round.nextHeal = now + healInterval();
   showBossLocks();
 }
 
@@ -180,6 +195,7 @@ function cameraStatus(message, state = '') {
 }
 
 function drawTracking(points) {
+  // The overlay shares the video dimensions; CSS mirrors both together.
   const { videoWidth: width, videoHeight: height } = camera;
   if (!width || !height) return;
   if (trackingPoints.width !== width || trackingPoints.height !== height) {
@@ -308,6 +324,7 @@ function showMicInput(state, level) {
 }
 
 function resetRound() {
+  // Cancel the frame loop and release both devices before showing the menu.
   requestId++;
   cancelAnimationFrame(animation);
   stopCamera();
@@ -333,7 +350,7 @@ function startRound(mode, practicing) {
     nextAttack: now, nextBasic: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, beamDamage: 0, lastTick: now,
-    locks: practicing ? [] : createBossLocks(), nextHeal: now + battleTiming.healDelay,
+    locks: practicing ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
   };
   resetHud();
   lockMarkers.hidden = lockStatus.hidden = practicing;
@@ -354,6 +371,7 @@ function startRound(mode, practicing) {
 }
 
 function endRound(won) {
+  // Use the frame that landed the final hit, excluding the victory animation.
   const elapsed = won ? (round.finished.at - round.startedAt) / 1000 : 0;
   const damage = player.max - player.value;
   resetRound();
@@ -420,6 +438,7 @@ function requestBeam(now, microphone = false) {
     return;
   }
   if (microphone) {
+    // Repeated claps keep a single beam alive through the gaps between claps.
     if (now >= (round.clapUntil ?? 0)) {
       if (!round.keyboardBeam) finishBeam(now);
       round.clapFrom = now;
@@ -429,6 +448,7 @@ function requestBeam(now, microphone = false) {
 }
 
 function finishBeam(now) {
+  // Only one completed, uninterrupted beam can add credit to a laser lock.
   const spent = round.beamSpent;
   round.beamSpent = 0;
   if (!spent) return;
@@ -447,12 +467,14 @@ function finishBeam(now) {
 }
 
 function updateAura(now, delta, humming) {
+  // Aura is stored in milliseconds so charge and drain share the same rate.
   const clapUntil = round.clapUntil ?? 0;
   const clapTime = Math.max(0, Math.min(now, clapUntil) - Math.max(now - delta, round.clapFrom ?? now));
   const firing = round.keyboardBeam || now < clapUntil;
   const strength = firing ? round.auraMs / auraTiming.capacity : 0;
   const spent = Math.min(round.auraMs, round.keyboardBeam ? delta : clapTime);
   if (spent > 0) {
+    round.humBlockedUntil = now + 320;
     round.auraMs -= spent;
     round.beamSpent = (round.beamSpent ?? 0) + spent;
     // Accumulate fractional damage so starting and stopping cannot round up each hit.
@@ -488,6 +510,8 @@ function drawBattle(now, guard, flash = false, beamStrength = 0) {
 }
 
 function tick(now) {
+  // Sample devices at their own rates, resolve moves and the boss strike,
+  // then render. Keyboard input uses the same move and damage functions.
   if (!round) return;
   if (round.finished) {
     if (now >= round.finished.until) return endRound(round.finished.won);
@@ -518,7 +542,9 @@ function tick(now) {
 
   if (audioInput && now >= round.nextAudioPoll) {
     round.nextAudioPoll = now + 20;
-    const { clap, humming, level, state } = audioInput(now);
+    const suppressHum = Boolean(round.keyboardBeam || now < (round.clapUntil ?? 0) ||
+      now < (round.humBlockedUntil ?? 0));
+    const { clap, humming, level, state } = audioInput(now, suppressHum);
     showMicInput(state, level);
     round.micHumming = humming;
     if (clap) requestBeam(now, true);
@@ -527,7 +553,7 @@ function tick(now) {
     animation = requestAnimationFrame(tick);
     return;
   }
-  const humming = round.keyboardHum || round.micHumming;
+  const humming = round.keyboardHum || (now >= (round.humBlockedUntil ?? 0) && round.micHumming);
   const beamStrength = updateAura(now, delta, humming);
   if (round.finished) {
     drawBattle(now, false, false, beamStrength);

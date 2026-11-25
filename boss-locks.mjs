@@ -1,3 +1,5 @@
+// Health gates are checked from highest HP to lowest. Each gate stores its own
+// lifetime progress, independent of the boss's current health.
 const thresholds = [40, 20, 10];
 export const lockMoves = {
   basic: ['slash', 'slashes'],
@@ -6,6 +8,7 @@ export const lockMoves = {
 };
 
 export function createBossLocks(random = Math.random) {
+  // Shuffle the move list once per fight so every type appears exactly once.
   const moves = Object.keys(lockMoves);
   for (let i = moves.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -21,6 +24,8 @@ export function nextBossLock(locks) {
 export function bossHit(locks, hp, damage, move, credit = 1) {
   const lock = nextBossLock(locks);
   const floor = lock?.hp ?? 0;
+  // The next unopened lock is a hard HP floor. Reaching it opens the challenge;
+  // after that, healing above the floor does not turn off the challenge.
   const next = Math.max(floor, hp - damage);
   if (lock && next === floor) lock.engaged = true;
   const credited = Boolean(lock?.engaged && lock.move === move);

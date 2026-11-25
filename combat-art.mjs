@@ -27,6 +27,7 @@ export function combatArt(canvas, beast, reducedMotion) {
   }
 
   function arm(side, lift) {
+    // Side is -1 for the player's left and +1 for right on the rear-facing ranger.
     return [[side * 19, -62], [side * mix(28, 32, lift), mix(-44, -59, lift)],
       [side * mix(25, 38, lift), mix(-25, -88, lift)]];
   }
@@ -108,6 +109,7 @@ export function combatArt(canvas, beast, reducedMotion) {
 
   function ripples(scene, elapsed) {
     const centerY = (scene.target.y + scene.floor - 60 * scene.scale) / 2;
+    // Offset the start times so the three rings spread out in sequence.
     for (let i = 0; i < 3; i++) {
       const phase = (elapsed - i * 130) / 500;
       if (phase < 0 || phase > 1) continue;
@@ -153,6 +155,8 @@ export function combatArt(canvas, beast, reducedMotion) {
       leftLift = rightLift = 0;
     },
     render(now, { left, right, guard, aura, flash, beamStrength }) {
+      // Draw at display pixel density while keeping layout and effect positions
+      // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
       const ratio = Math.min(2, window.devicePixelRatio || 1);
       const width = Math.round(rect.width * ratio);
@@ -186,6 +190,7 @@ export function combatArt(canvas, beast, reducedMotion) {
         }
         ctx.shadowBlur = 0;
       }
+      // Shield, beam and projectiles sit behind the foreground ranger.
       const active = effects.filter(effect => now - effect.now < duration[effect.kind]);
       effects.splice(0, effects.length, ...active);
       if (guard || active.some(effect => effect.kind === 'laser' && effect.strength)) shield(boss);

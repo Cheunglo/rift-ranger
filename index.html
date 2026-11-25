@@ -7,7 +7,7 @@
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
   <link rel="stylesheet" href="./style.css?v=17">
-  <script type="module" src="./game.mjs?v=20"></script>
+  <script type="module" src="./game.mjs?v=21"></script>
 </head>
 <body>
   <main>
@@ -22,6 +22,7 @@
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Audio <kbd>F</kbd> <kbd>G</kbd></span><strong>Hum, then clap</strong><p>Hum or hold G to build aura. Keep clapping or hold F to sustain the beam.</p></article>
     </section>
     <section class="arena" id="arena" aria-label="Battle arena">
+      <!-- The fixed HUD sits over the battle stage. The canvases draw art and effects. -->
       <div class="hud">
         <div>
           <div class="health-heading"><span class="label">Ranger</span><span class="hp" id="player-hp" aria-hidden="true">100 / 100 HP</span></div>

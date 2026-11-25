@@ -1,3 +1,4 @@
+// Turn local camera landmarks and microphone samples into game inputs.
 const visionPackage = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21';
 const poseModel = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 
@@ -20,6 +21,8 @@ export function posePoint(point, minimumVisibility = .55) {
     point.x > .015 && point.x < .985 && point.y > .015 && point.y < .985;
 }
 
+// Give each round its own pose history. Raised arms can animate immediately, but
+// guard and attack events have separate hold and rearm rules.
 export function gestures() {
   const raised = [false, false];
   const lastSeen = [-Infinity, -Infinity];
@@ -89,6 +92,7 @@ export function gestures() {
       result.state = powerSpent ? 'power-held' : 'power';
       if (!powerSpent && tracked.every(Boolean)) {
         result.attack = 'power';
+        // The battle loop calls this only after a valid counter actually fires.
         result.consume = () => {
           attackSpent = powerSpent = true;
           result.state = 'power-held';
@@ -111,6 +115,7 @@ export function gestures() {
   };
 }
 
+// The analyser reads the microphone without routing it to the speakers.
 export function listen(context, stream) {
   const analyser = context.createAnalyser();
   analyser.fftSize = 2 ** Math.ceil(Math.log2(context.sampleRate * .064));
@@ -124,16 +129,18 @@ export function listen(context, stream) {
   const longestPeriod = Math.ceil(pitchRate / 65);
   const comparisonLength = signal.length - longestPeriod - 1;
   const clapWindow = Math.round(context.sampleRate * .042);
-  const started = performance.now();
-  let noiseFloor = .001;
+  let calibrationUntil;
+  let roomLevel = .001;
   let previous = 0;
   let pitch = 0;
   let humSince = 0;
   let lastNote = -Infinity;
+  let lastClap = -Infinity;
   let wasHumming = false;
 
-  function detectPitch(rms, average) {
-    if (rms < Math.max(.0016, noiseFloor * 1.35)) return 0;
+  // Look for a repeating waveform by comparing it with time-shifted copies.
+  // Averaging small blocks first keeps the comparison cheap at high sample rates.
+  function detectPitch(average) {
     for (let i = 0; i < signal.length; i++) {
       let sum = 0;
       for (let j = 0; j < stride; j++) sum += samples[i * stride + j];
@@ -159,7 +166,9 @@ export function listen(context, stream) {
     return 0;
   }
 
-  return now => {
+  return (now, suppressHum = false) => {
+    calibrationUntil ??= now + 400;
+    const calibrating = now < calibrationUntil;
     analyser.getFloatTimeDomainData(samples);
     let sum = 0;
     let energy = 0;
@@ -178,23 +187,41 @@ export function listen(context, stream) {
     const average = sum / samples.length;
     const rms = Math.sqrt(Math.max(0, energy / samples.length - average ** 2));
     const recentRms = Math.sqrt(recentEnergy / clapWindow);
-    const clap = now - started > 450 && recentRms > Math.max(.013, noiseFloor * 3.5, previous * 2.2) &&
+    // A clap is a sudden peak in the most recent audio, not a sustained note.
+    const clap = !calibrating && recentRms > Math.max(.013, roomLevel * 3.5, previous * 2.2) &&
       peak > Math.max(.09, recentRms * 3.1);
     previous = recentRms;
-    const tone = clap ? 0 : detectPitch(rms, average);
-    if (!tone && !clap) noiseFloor = noiseFloor * .99 + Math.min(rms, .015) * .01;
+    if (clap) lastClap = now;
+    const afterClap = now - lastClap < 110;
+    const level = Math.max(0, Math.min(100, Math.round((20 * Math.log10(rms) + 65) * 2)));
 
+    // Learn steady room noise before playing and between claps during a beam.
+    // Do not treat the clap itself as the new noise floor, or charge from it.
+    if (calibrating || suppressHum || afterClap) {
+      if (!afterClap) roomLevel += (Math.min(rms, .05) - roomLevel) * .2;
+      pitch = 0;
+      lastNote = -Infinity;
+      wasHumming = false;
+      const state = calibrating ? 'calibrating' : suppressHum ? 'beam' : 'sound';
+      return { clap, humming: false, level, state };
+    }
+
+    // A new hum must stand out above the room. A lower threshold then lets a
+    // recognized note fade or wobble briefly without resetting the input.
+    const continuing = now - lastNote <= 145;
+    const threshold = Math.max(.0021, roomLevel * (continuing ? 1.25 : 1.75));
+    const tone = rms >= threshold ? detectPitch(average) : 0;
     if (tone) {
       const similar = pitch && Math.abs(Math.log2(tone / pitch)) <= .3;
       if (!similar || now - lastNote > 145) humSince = now;
       pitch = similar ? pitch * .75 + tone * .25 : tone;
       lastNote = now;
-      wasHumming = now - humSince >= 200;
-    } else if (now - lastNote > 145 || clap) {
+      wasHumming = now - humSince >= 280;
+    } else if (!continuing) {
       wasHumming = false;
+      roomLevel += (Math.min(rms, .05) - roomLevel) * .04;
     }
 
-    const level = Math.max(0, Math.min(100, Math.round((20 * Math.log10(rms) + 65) * 2)));
     const state = wasHumming ? 'humming' : tone ? 'note' : level > 6 ? 'sound' : 'quiet';
     return { clap, humming: wasHumming, level, state };
   };

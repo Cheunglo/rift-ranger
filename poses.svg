@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg">
+  <!-- Shared ranger body and reusable pose icons for the HUD and move guide. -->
   <defs>
     <g id="ranger">
       <path fill="currentColor" d="M35 26c0-8 5-13 13-13s13 5 13 13v5c0 5-5 9-9 11v4h6l9 9-3 21H32l-3-21 9-9h6v-4c-4-2-9-6-9-11z"/>

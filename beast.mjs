@@ -1,3 +1,5 @@
+// Draw the boss once onto a 40×36 canvas. Later layers add highlights over the
+// silhouette, and combat-art.mjs uses the eye pixels as its laser origins.
 export function paintBeast(canvas) {
   const context = canvas.getContext('2d');
   const pixels = (color, rects) => {
