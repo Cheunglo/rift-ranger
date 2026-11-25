@@ -59,9 +59,9 @@ const attacks = {
 };
 const longLaserCredit = 5;
 const lockInstructions = {
-  basic: 'Right hand up or press A.',
-  power: 'Block, then raise both hands or press D.',
-  beam: 'Any partial beam counts as 1. Drain a full aura in one beam to count as ' + longLaserCredit + '.',
+  basic: 'Right hand up · A',
+  power: 'Block, then both up · D',
+  beam: 'Full beam = ' + longLaserCredit,
 };
 const auraTiming = { capacity: 1600, clapGap: 600 };
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -130,8 +130,7 @@ function showBossLocks() {
   }
   let title = 'All three locks opened';
   if (next) {
-    title = 'Next lock at ' + next.hp + ' HP';
-    if (active) title = next.hp === enemy.value ? 'Locked at ' + next.hp + ' HP' : next.hp + ' HP lock active';
+    title = active ? next.hp + ' HP lock' : 'Next lock · ' + next.hp + ' HP';
   }
   const remaining = next ? lockRequirement(next) + ' left' : '';
   const instruction = next && active ? lockInstructions[next.move] : '';
