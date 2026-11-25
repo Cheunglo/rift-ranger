@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=17">
-  <script type="module" src="./game.mjs?v=22"></script>
+  <link rel="stylesheet" href="./style.css?v=23">
+  <script type="module" src="./game.mjs?v=23"></script>
 </head>
 <body>
   <main>
@@ -82,6 +82,14 @@
             <div><dt>Score</dt><dd id="result-score"></dd></div>
             <div><dt>Time</dt><dd id="result-time"></dd></div>
             <div><dt>Damage taken</dt><dd id="result-damage"></dd></div>
+            <div class="score-component">
+              <dt>Speed points · time in seconds</dt>
+              <dd id="result-speed-formula"></dd>
+            </div>
+            <div class="score-component">
+              <dt>Health points · HP after damage</dt>
+              <dd id="result-health-formula"></dd>
+            </div>
           </dl>
           <label class="practice-option"><input id="practice" type="checkbox"> Practice mode <span>Try moves without losing health.</span></label>
           <div class="actions">

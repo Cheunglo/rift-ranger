@@ -365,19 +365,29 @@ function startRound(mode, practicing) {
 
 function endRound(won) {
   // Use the frame that landed the final hit, excluding the victory animation.
-  const elapsed = won ? (round.finished.at - round.startedAt) / 1000 : 0;
+  const elapsed = won ? Math.round(round.finished.at - round.startedAt) / 1000 : 0;
   const damage = player.max - player.value;
   resetRound();
   arena.dataset.state = won ? 'win' : 'ready';
   showOverlay(won ? 'City saved!' : 'Ranger down',
     won ? 'The Riftbeast has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
   if (won) {
-    const timeBonus = Math.round(6000 * 60 / (60 + elapsed));
-    const healthBonus = Math.round(4000 * (1 - damage / player.max));
+    const speedMax = 6000;
+    const healthMax = 4000;
+    const referenceSeconds = 60;
+    const timeBonus = Math.round(speedMax * referenceSeconds / (referenceSeconds + elapsed));
+    const healthBonus = Math.round(healthMax * (player.max - damage) / player.max);
     const seconds = Math.floor(elapsed);
-    byId('result-score').textContent = (timeBonus + healthBonus).toLocaleString();
+    const points = value => value.toLocaleString();
+    byId('result-score').textContent = points(timeBonus + healthBonus);
     byId('result-time').textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
     byId('result-damage').textContent = damage + ' HP';
+    byId('result-speed-formula').textContent =
+      points(speedMax) + ' × ' + referenceSeconds + ' ÷ (' + referenceSeconds + ' + ' + points(elapsed) +
+      ') ≈ ' + points(timeBonus) + ' pts';
+    byId('result-health-formula').textContent =
+      points(healthMax) + ' × (' + player.max + ' − ' + damage + ') ÷ ' + player.max +
+      ' = ' + points(healthBonus) + ' pts';
     battleResult.hidden = false;
   }
   webcam.focus();

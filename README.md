@@ -6,7 +6,7 @@ The boss has locks at 40, 20, and 10 HP that require 2, 4, and 6 qualifying atta
 
 Slash and aura beam damage scale down to a floor of 55% before rounding. Power waves taper more sharply and deal at most 9 damage at 20 boss HP or less. A slash or power counter that gets past the locks always deals at least 1 HP.
 
-A win shows the score, clear time, and damage taken. The score adds up to 6,000 points for speed (6,000 × 60 ÷ (60 + elapsed seconds), rounded) and up to 4,000 for remaining health (40 points per HP).
+A win shows the score, clear time, damage taken, and the calculation for both parts of the score. Speed earns up to 6,000 points (6,000 × 60 ÷ (60 + elapsed seconds), rounded). Remaining health earns up to 4,000 points (40 points per HP).
 
 ## Play locally
 

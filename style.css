@@ -75,6 +75,8 @@ progress::-moz-progress-bar { background: var(--acid); }
 .battle-result dt { color: var(--muted); font-size: .875rem; }
 .battle-result dd { margin: 3px 0 0; font: 800 clamp(1rem, 4vw, 1.45rem)/1.1 ui-monospace, monospace; }
 #result-score { color: var(--acid); }
+.battle-result .score-component { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid #785d8760; text-align: left; }
+.battle-result .score-component dd { font-size: .875rem; font-weight: 600; line-height: 1.35; }
 .practice-option { display: grid; grid-template-columns: auto 1fr; gap: 2px 7px; align-items: center; margin: 0 0 12px; text-align: left; font-weight: 800; }
 .practice-option input { margin: 0; width: 1rem; height: 1rem; accent-color: var(--acid); }
 .practice-option span { grid-column: 2; color: var(--muted); font-size: .875rem; font-weight: 500; }
