@@ -11,7 +11,7 @@ export function createBossLocks(random = Math.random) {
     const j = Math.floor(random() * (i + 1));
     [moves[i], moves[j]] = [moves[j], moves[i]];
   }
-  return thresholds.map((hp, i) => ({ hp, move: moves[i], total: (i + 1) * 2, done: 0 }));
+  return thresholds.map((hp, i) => ({ hp, move: moves[i], total: (i + 1) * 2, done: 0, engaged: false }));
 }
 
 export function nextBossLock(locks) {
@@ -22,12 +22,8 @@ export function bossHit(locks, hp, damage, move, credit = 1) {
   const lock = nextBossLock(locks);
   const floor = lock?.hp ?? 0;
   const next = Math.max(floor, hp - damage);
-  const reached = lock && next === floor;
-  const credited = Boolean(reached && lock.move === move);
+  if (lock && next === floor) lock.engaged = true;
+  const credited = Boolean(lock?.engaged && lock.move === move);
   if (credited) lock.done = Math.min(lock.total, lock.done + credit);
-  return { hp: next, dealt: hp - next, lock: reached ? lock : null, credited };
-}
-
-export function canBossHeal(locks, hp, maximum) {
-  return hp > 0 && hp < maximum && nextBossLock(locks)?.hp !== hp;
+  return { hp: next, dealt: hp - next, lock: lock?.engaged ? lock : null, credited };
 }

@@ -1,5 +1,5 @@
 import { paintBeast } from './beast.mjs';
-import { bossHit, canBossHeal, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=17';
+import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=20';
 import { combatArt } from './combat-art.mjs?v=13';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=12';
 
@@ -115,12 +115,16 @@ function resetHud() {
 
 function showBossLocks() {
   const next = nextBossLock(round.locks);
-  const active = next?.hp === enemy.value;
+  const active = Boolean(next?.engaged);
   for (const lock of round.locks) {
     byId('lock-' + lock.hp).dataset.state = lock.done === lock.total ? 'open' :
       lock === next && active ? 'active' : 'closed';
   }
-  const title = next ? (active ? 'Locked at ' : 'Next lock at ') + next.hp + ' HP' : 'All three locks opened';
+  let title = 'All three locks opened';
+  if (next) {
+    title = 'Next lock at ' + next.hp + ' HP';
+    if (active) title = next.hp === enemy.value ? 'Locked at ' + next.hp + ' HP' : next.hp + ' HP lock active';
+  }
   const remaining = next ? lockRequirement(next) + ' left' : '';
   const instruction = next && active ? lockInstructions[next.move] : '';
   if (lockTitle.textContent !== title) lockTitle.textContent = title;
@@ -156,7 +160,7 @@ function damageBoss(damage, move, now, credit = 1) {
 }
 
 function healBoss(now) {
-  if (round.practicing || now < round.nextHeal || !canBossHeal(round.locks, enemy.value, enemy.max)) return;
+  if (round.practicing || now < round.nextHeal || enemy.value <= 0 || enemy.value >= enemy.max) return;
   setHealth(enemy, enemy.value + 1);
   round.nextHeal = now + battleTiming.healInterval;
   showBossLocks();
@@ -372,8 +376,9 @@ function canPowerCounter(now) {
   return round.powerCounterAvailable && now < round.counterUntil;
 }
 
-function playerDamageScale() {
-  return .55 + .45 * enemy.value / enemy.max;
+function playerDamageScale(move) {
+  const minimum = move === 'power' ? .16 : .55;
+  return minimum + (1 - minimum) * enemy.value / enemy.max;
 }
 
 function attack(move, now, fromCamera = false) {
@@ -393,7 +398,7 @@ function attack(move, now, fromCamera = false) {
   }
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
-  const scaledDamage = Math.max(1, Math.round((damage + (bonus ? counterDamage : 0)) * playerDamageScale()));
+  const scaledDamage = Math.max(1, Math.round((damage + (bonus ? counterDamage : 0)) * playerDamageScale(move)));
   const hit = damageBoss(scaledDamage, move, now);
   round.nextAttack = now + 580;
   if (move === 'basic') round.nextBasic = now + 950;
@@ -428,7 +433,7 @@ function finishBeam(now) {
   round.beamSpent = 0;
   if (!spent) return;
   const lock = nextBossLock(round.locks);
-  if (lock?.move !== 'beam' || lock.hp !== enemy.value) return;
+  if (lock?.move !== 'beam' || !lock.engaged) return;
   if (spent < auraTiming.capacity / 2 - 1e-6) {
     round.poseFeedback = {
       move: 'clap', label: 'Spend at least half an aura in one beam', state: 'locked', until: now + 1600,
