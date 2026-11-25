@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=3">
-  <script type="module" src="./game.mjs?v=3"></script>
+  <link rel="stylesheet" href="./style.css?v=4">
+  <script type="module" src="./game.mjs?v=4"></script>
 </head>
 <body>
   <main>
@@ -16,7 +16,7 @@
       <p>Webcam arcade</p>
     </header>
     <section class="moves" aria-label="Moves">
-      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg#wave"></use></svg><span>Attack <kbd>A</kbd></span><strong>Wave</strong><p>Sweep one hand sideways above your shoulder.</p></article>
+      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg#wave"></use></svg><span>Attack <kbd>A</kbd></span><strong>Wave</strong><p>Hold one hand up, then wave it sideways and back. Keep the other hand down.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg#guard"></use></svg><span>Defend <kbd>S</kbd></span><strong>Guard</strong><p>Hold both hands near your ears when the beast winds up.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg#power"></use></svg><span>Heavy hit <kbd>D</kbd></span><strong>Power pose</strong><p>Reach both hands overhead and hold for a beat.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg#clap"></use></svg><span>Bonus <kbd>F</kbd> <kbd>G</kbd></span><strong>Clap or hum</strong><p>Clap for a burst, or hold a steady note to charge a blast.</p></article>
@@ -27,6 +27,7 @@
         <strong id="time" aria-label="Seconds remaining">60</strong>
         <div class="enemy-health"><span class="label">The Riftbeast</span><progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress></div>
         <output id="prompt" aria-live="polite">Ready to morph?</output>
+        <p id="tracking" hidden></p>
         <div id="ranger-pose" class="ranger-pose" hidden>
           <svg aria-hidden="true" viewBox="0 0 96 88"><use id="pose-art" href="./poses.svg#wave"></use></svg>
           <span id="pose-label">Wave to attack</span>
@@ -35,7 +36,7 @@
       <div class="eclipse"></div>
       <div class="city"></div>
       <canvas id="beast" width="40" height="36" aria-hidden="true"></canvas>
-      <div id="camera-frame" class="camera-frame" hidden><video id="camera" muted playsinline aria-label="Mirrored camera preview"></video><span>LIVE</span></div>
+      <div id="camera-frame" class="camera-frame" hidden><video id="camera" muted playsinline aria-label="Mirrored camera preview"></video><canvas id="tracking-points" aria-hidden="true"></canvas><span>LIVE</span></div>
       <div class="overlay" id="overlay">
         <h2 id="overlay-title">Defend the city.</h2>
         <p id="overlay-copy">Keep your head, shoulders and hands in view. You can play sitting or standing.</p>

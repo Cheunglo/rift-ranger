@@ -91,3 +91,28 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
   .move-icon { width: 30px; }
   .ranger-pose { font-size: .875rem; }
 }
+
+#tracking {
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin: 0;
+  padding: 4px 9px;
+  border: 1px solid #785d87;
+  border-radius: 5px;
+  background: #171326;
+  color: #f6f3ff;
+  text-align: center;
+  font-size: .875rem;
+  font-weight: 700;
+}
+#tracking[data-state="accepted"] { border-color: var(--acid); color: var(--acid); }
+#tracking[data-state="waiting"] { color: #ffdca2; }
+.camera-frame canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1);
+  pointer-events: none;
+}

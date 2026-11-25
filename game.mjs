@@ -1,10 +1,13 @@
 import { paintBeast } from './beast.mjs';
-import { gestures, listen, loadTracker, stopTracks } from './controls.mjs';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=4';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
 const camera = byId('camera');
 const cameraFrame = byId('camera-frame');
+const tracking = byId('tracking');
+const trackingPoints = byId('tracking-points');
+const poseContext = trackingPoints.getContext('2d');
 const overlay = byId('overlay');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
@@ -26,6 +29,17 @@ const attacks = {
   hum: [18, 'Sonic blast'],
 };
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const armLines = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
+const trackingHints = {
+  framing: 'Step back until your head, shoulders and both hands are visible.',
+  neutral: 'Raise one hand and keep the other below your shoulder.',
+  'wave-set': 'Hold your raised hand still for a moment.',
+  'wave-ready': 'Wave ready. Move your raised hand sideways.',
+  'wave-return': 'Now move your hand back.',
+  'guard-set': 'Keep both hands beside your ears.',
+  guard: 'Guard recognized. Hold it through the strike.',
+  'two-hands': 'Hands beside ears to guard, or overhead for power.',
+};
 
 let round;
 let animation;
@@ -42,6 +56,58 @@ paintBeast(byId('beast'));
 
 function say(message) {
   if (prompt.textContent !== message) prompt.textContent = message;
+}
+
+function cameraStatus(message, state = '') {
+  const text = 'Camera: ' + message;
+  if (tracking.textContent !== text) tracking.textContent = text;
+  if (tracking.dataset.state !== state) tracking.dataset.state = state;
+}
+
+function drawTracking(points) {
+  const { videoWidth: width, videoHeight: height } = camera;
+  if (!width || !height) return;
+  if (trackingPoints.width !== width || trackingPoints.height !== height) {
+    trackingPoints.width = width;
+    trackingPoints.height = height;
+  }
+  poseContext.clearRect(0, 0, width, height);
+  poseContext.lineWidth = width * .005;
+  poseContext.strokeStyle = '#e8ff75';
+  poseContext.fillStyle = '#e8ff75';
+  for (const [start, end] of armLines) {
+    const from = points?.[start];
+    const to = points?.[end];
+    if (!posePoint(from) || !posePoint(to)) continue;
+    poseContext.beginPath();
+    poseContext.moveTo(from.x * width, from.y * height);
+    poseContext.lineTo(to.x * width, to.y * height);
+    poseContext.stroke();
+  }
+  for (const index of [0, 11, 12, 13, 14, 15, 16]) {
+    const point = points?.[index];
+    if (!posePoint(point)) continue;
+    poseContext.beginPath();
+    poseContext.arc(point.x * width, point.y * height, width * .009, 0, 2 * Math.PI);
+    poseContext.fill();
+  }
+}
+
+function updateCameraStatus(now) {
+  const move = round.cameraMove;
+  if (!move || now - round.lastPose > 400) return cameraStatus('Waiting for tracking…', 'waiting');
+  const notice = round.cameraNotice;
+  if (notice && now < notice.until) return cameraStatus(notice.message, notice.state);
+  if (move.state === 'power') {
+    const label = move.charge === 1 ? 'Lower your hands to reset the power pose.' :
+      'Power recognized. Keep holding (' + Math.floor(move.charge * 10) * 10 + '%).';
+    return cameraStatus(label);
+  }
+  cameraStatus(trackingHints[move.state], move.state === 'guard' ? 'accepted' : move.state === 'framing' ? 'waiting' : '');
+}
+
+function cameraNotice(message, state, now) {
+  round.cameraNotice = { message, state, until: now + 950 };
 }
 
 function showPose(move, label, state = '') {
@@ -74,6 +140,8 @@ function stopCamera() {
   cameraStream = null;
   camera.srcObject = null;
   cameraFrame.hidden = true;
+  tracking.hidden = true;
+  poseContext.clearRect(0, 0, trackingPoints.width, trackingPoints.height);
   tracker?.close();
   tracker = null;
 }
@@ -109,7 +177,7 @@ function startRound(mode) {
   round = {
     mode, started: now, strike: now + 4900,
     nextAttack: now, nextWave: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
-    keyboardGuard: false, cameraGuard: false, visible: false,
+    keyboardGuard: false,
     readGesture: gestures(), feedback: '', feedbackUntil: 0, hitUntil: 0,
   };
   player.value = 100;
@@ -119,6 +187,8 @@ function startRound(mode) {
   overlay.hidden = true;
   showPose('wave', 'Wave to attack');
   poseCard.hidden = false;
+  tracking.hidden = mode !== 'camera';
+  if (mode === 'camera') cameraStatus('Waiting for tracking…', 'waiting');
   exit.hidden = false;
   say('Get ready!');
   animation = requestAnimationFrame(tick);
@@ -133,19 +203,26 @@ function endRound(won, expired = false) {
   webcam.focus();
 }
 
-function attack(move, now) {
-  if (!round || now < round.nextAttack) return;
-  if (move === 'wave' && now < round.nextWave) return;
+function attack(move, now, fromCamera = false) {
+  if (!round) return;
   const [damage, label] = attacks[move];
+  if (now < round.nextAttack || (move === 'wave' && now < round.nextWave)) {
+    if (fromCamera) {
+      cameraNotice((move === 'wave' ? 'Wave' : 'Power pose') + ' recognized. Attack cooling down.', 'waiting', now);
+    }
+    return;
+  }
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'wave' ? 2 : 5;
-  enemy.value = Math.max(0, enemy.value - (bonus ? damage + counterDamage : damage));
+  const dealt = Math.min(enemy.value, bonus ? damage + counterDamage : damage);
+  enemy.value -= dealt;
   round.nextAttack = now + 580;
   if (move === 'wave') round.nextWave = now + 950;
   round.hitUntil = now + 170;
   round.feedback = bonus ? label + ' • Counter bonus' : label;
   round.feedbackUntil = now + 700;
   confirmPose(move, label, now);
+  if (fromCamera) cameraNotice(label + ' landed (−' + dealt + ' HP).', 'accepted', now);
   if (enemy.value === 0) endRound(true);
 }
 
@@ -167,12 +244,10 @@ function tick(now) {
       device.textContent = 'Tracking stopped. You can finish with the keyboard.';
     }
     const move = round.readGesture(pose, now);
+    drawTracking(pose);
     round.lastPose = now;
-    round.visible = move.visible;
-    round.cameraGuard = move.guard;
-    round.charge = move.charge;
-    if (move.power) attack('power', now);
-    if (move.wave) attack('wave', now);
+    round.cameraMove = move;
+    if (move.attack) attack(move.attack, now, true);
     if (!round) return;
   }
 
@@ -183,13 +258,15 @@ function tick(now) {
     if (!round) return;
   }
 
-  const guard = round.keyboardGuard || (round.cameraGuard && now - round.lastPose < 260);
+  const cameraGuard = round.mode === 'camera' && round.cameraMove?.guard && now - round.lastPose < 260;
+  const guard = round.keyboardGuard || cameraGuard;
   if (now >= round.strike) {
     round.strike = now + (enemy.value <= 40 ? 3600 : 4700);
     if (guard) {
       round.feedback = 'Blocked! Counter now.';
       round.counterUntil = now + 1700;
       confirmPose('guard', 'Blocked!', now);
+      if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
     } else {
       player.value = Math.max(0, player.value - 19);
       round.feedback = 'Riftbeast hit! Guard on the next windup.';
@@ -198,18 +275,20 @@ function tick(now) {
     round.feedbackUntil = now + 1000;
   }
 
+  if (round.mode === 'camera') updateCameraStatus(now);
+  const charge = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove?.charge : 0;
   const danger = now >= round.strike - 1400;
   const used = round.poseFeedback;
   if (used && now < used.until) showPose(used.move, used.label, 'active');
   else if (danger) showPose('guard', guard ? 'Guard held' : 'Guard now', guard ? 'active' : 'cue');
-  else if (round.charge > 0 && round.charge < 1) showPose('power', 'Keep holding', 'cue');
+  else if (cameraGuard) showPose('guard', 'Guard recognized', 'active');
+  else if (charge > 0 && charge < 1) showPose('power', 'Keep holding', 'cue');
   else showPose('wave', 'Wave to attack');
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
   if (danger) say(guard ? 'Guard held. Keep holding!' : 'Incoming! Hands by ears or hold S');
   else if (now < round.feedbackUntil) say(round.feedback);
-  else if (round.mode === 'camera' && (!round.visible || now - round.lastPose > 400)) say('Keep your head and shoulders in view.');
-  else if (round.charge > 0 && round.charge < 1) say('Charging power pose…');
-  else say('Wave or press A to attack');
+  else if (charge > 0 && charge < 1) say('Charging power pose…');
+  else say(round.mode === 'camera' ? 'Wave to attack' : 'Wave or press A to attack');
   animation = requestAnimationFrame(tick);
 }
 

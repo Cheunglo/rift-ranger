@@ -15,56 +15,111 @@ export function stopTracks(stream) {
   stream?.getTracks().forEach(track => track.stop());
 }
 
+export function posePoint(point) {
+  return point && point.visibility >= .55 &&
+    point.x > .015 && point.x < .985 && point.y > .015 && point.y < .985;
+}
+
 export function gestures() {
-  const wrists = [[], []];
-  let powerSince = 0;
+  let wave;
+  let guardSince;
+  let powerSince;
   let powerSent = false;
+  let lastFrame;
 
   return (points, now) => {
-    const result = { visible: false, guard: false, wave: false, power: false, charge: 0 };
-    const usable = point => point && point.visibility >= .48 &&
-      point.x > .01 && point.x < .99 && point.y > .01 && point.y < .99;
-    const [nose, leftShoulder, rightShoulder, left, right] = [0, 11, 12, 15, 16].map(i => points?.[i]);
-    if (![nose, leftShoulder, rightShoulder].every(usable)) {
-      wrists.forEach(history => { history.length = 0; });
-      powerSince = 0;
+    const result = { state: 'framing', guard: false, attack: null, charge: 0 };
+    const [nose, ...shoulders] = [0, 11, 12].map(i => points?.[i]);
+    const elbows = [13, 14].map(i => points?.[i]);
+    const hands = [15, 16].map(i => points?.[i]);
+    const framed = [nose, ...shoulders, ...hands].every(posePoint);
+
+    if (!framed || now - lastFrame > 260) {
+      wave = guardSince = powerSince = undefined;
       powerSent = false;
+    }
+    lastFrame = now;
+    if (!framed) return result;
+
+    const width = Math.max(.1, Math.hypot(shoulders[0].x - shoulders[1].x, shoulders[0].y - shoulders[1].y));
+    const center = (shoulders[0].x + shoulders[1].x) / 2;
+    const raised = hands.map((hand, i) => hand.y < shoulders[i].y - width * .14);
+
+    if (hands.every(hand => hand.y < nose.y - width * .28)) {
+      wave = guardSince = undefined;
+      powerSince ??= now;
+      result.state = 'power';
+      result.charge = Math.min(1, (now - powerSince) / 720);
+      if (result.charge === 1 && !powerSent) {
+        result.attack = 'power';
+        powerSent = true;
+      }
       return result;
     }
-    result.visible = true;
-    const shoulders = [leftShoulder, rightShoulder];
-    const width = Math.max(.10, Math.hypot(leftShoulder.x - rightShoulder.x, leftShoulder.y - rightShoulder.y));
-    const center = (leftShoulder.x + rightShoulder.x) / 2;
-    const overhead = [left, right].every(hand => usable(hand) && hand.y < nose.y - width * .30);
+    powerSince = undefined;
+    powerSent = false;
 
-    if (overhead) {
-      powerSince ||= now;
-      result.charge = Math.min(1, (now - powerSince) / 720);
-      result.power = result.charge === 1 && !powerSent;
-      powerSent ||= result.power;
-    } else {
-      powerSince = 0;
-      powerSent = false;
-      result.guard = [left, right].every((hand, i) => usable(hand) &&
-        hand.y < shoulders[i].y - width * .08 &&
-        Math.abs(hand.y - nose.y) < width * .55 &&
-        Math.abs(hand.x - nose.x) < width * .85);
+    if (raised.every(Boolean)) {
+      wave = undefined;
+      const byEars = hands.every((hand, i) => {
+        const side = Math.sign(shoulders[i].x - center);
+        const distance = (hand.x - nose.x) / width * side;
+        return distance > .15 && distance < .9 && Math.abs(hand.y - nose.y) < width * .56;
+      });
+      if (byEars) guardSince ??= now;
+      else guardSince = undefined;
+      result.guard = byEars && now - guardSince >= 160;
+      result.state = result.guard ? 'guard' : byEars ? 'guard-set' : 'two-hands';
+      return result;
+    }
+    guardSince = undefined;
+
+    const index = raised.findIndex(Boolean);
+    const hand = hands[index];
+    const elbow = elbows[index];
+    // Use a bent, raised arm. Ignore low sweeps and straight reaches.
+    if (index < 0 || !posePoint(elbow) || elbow.y - hand.y < width * .27 ||
+        hand.y < nose.y - width * .45) {
+      wave = undefined;
+      result.state = 'neutral';
+      return result;
     }
 
-    [left, right].forEach((hand, i) => {
-      const history = wrists[i];
-      if (overhead || result.guard || !usable(hand) || hand.y > shoulders[i].y - width * .1) {
-        history.length = 0;
-        return;
-      }
-      while (history.length && now - history[0].time > 380) history.shift();
-      const x = (hand.x - center) / width;
-      if (history.some(sample => now - sample.time >= 65 && Math.abs(x - sample.x) > .57)) {
-        result.wave = true;
-        history.length = 0;
-      }
-      history.push({ x, time: now });
-    });
+    const x = (hand.x - center) / width;
+    const y = (hand.y - shoulders[index].y) / width;
+    const elbowX = (elbow.x - center) / width;
+    const reset = () => { wave = { index, x, y, elbowX, since: now }; };
+    if (wave?.index !== index || Math.abs(y - wave.y) > .32 || Math.abs(elbowX - wave.elbowX) > .42) {
+      reset();
+    }
+    if (wave.readyAt === undefined) {
+      if (Math.abs(x - wave.x) > .16) reset();
+      if (now - wave.since >= 150) wave.readyAt = now;
+      result.state = wave.readyAt === undefined ? 'wave-set' : 'wave-ready';
+      return result;
+    }
+    if (now - (wave.peakAt ?? wave.readyAt) > (wave.peakAt === undefined ? 1200 : 600)) {
+      reset();
+      result.state = 'wave-set';
+      return result;
+    }
+
+    const travel = x - wave.x;
+    if (wave.peakAt === undefined && Math.abs(travel) >= .34) {
+      wave.peak = travel;
+      wave.peakAt = now;
+    }
+    if (wave.peakAt === undefined) {
+      result.state = 'wave-ready';
+      return result;
+    }
+    result.state = 'wave-return';
+    const direction = Math.sign(wave.peak);
+    if (travel * direction > wave.peak * direction) wave.peak = travel;
+    if ((wave.peak - travel) * direction >= .28) {
+      result.attack = 'wave';
+      reset();
+    }
     return result;
   };
 }
