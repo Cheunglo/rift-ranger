@@ -31,7 +31,7 @@ export function gestures() {
   let guardActive = false;
 
   return (points, now) => {
-    const result = { state: 'framing', guard: false, attack: null };
+    const result = { state: 'framing', guard: false, attack: null, left: false, right: false };
     // MediaPipe uses the player's anatomical left and right, before the preview is mirrored.
     const shoulders = [points?.[11], points?.[12]];
     const hands = [points?.[15], points?.[16]];
@@ -63,6 +63,8 @@ export function gestures() {
     }
 
     const [left, right] = raised;
+    result.left = left;
+    result.right = right;
     const next = left && right ? 'power' : left ? 'guard' : right ? 'basic' : 'neutral';
     if (next !== pose) {
       pose = next;
@@ -120,7 +122,6 @@ export function listen(context, stream) {
   let previous = 0;
   let pitch = 0;
   let humSince = 0;
-  let humSent = false;
 
   function detectPitch(rms) {
     if (rms < Math.max(.008, floor * 2)) return 0;
@@ -162,13 +163,10 @@ export function listen(context, stream) {
 
     if (!tone) {
       humSince = 0;
-      humSent = false;
     } else if (!pitch || Math.abs(tone / pitch - 1) > .12) {
       humSince = now;
     }
     pitch = tone;
-    const hum = tone && !humSent && now - humSince >= 850;
-    if (hum) humSent = true;
-    return clap ? 'clap' : hum ? 'hum' : null;
+    return { clap, humming: Boolean(tone && now - humSince >= 160) };
   };
 }

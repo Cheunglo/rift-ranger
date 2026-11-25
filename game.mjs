@@ -1,5 +1,6 @@
 import { paintBeast } from './beast.mjs';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=10';
+import { combatArt } from './combat-art.mjs?v=11';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=11';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -25,21 +26,22 @@ const poseLabel = byId('pose-label');
 const player = byId('player');
 const enemy = byId('enemy');
 const time = byId('time');
+const auraMeter = byId('aura');
 const battleTiming = {
   duration: 75_000,
   firstStrike: 7000,
   strikeInterval: 6200,
   enragedInterval: 4800,
-  warning: 2100,
+  warning: 3000,
   counterWindow: 2400,
 };
 const attacks = {
   basic: [5, 'Energy slash'],
   power: [22, 'Power strike'],
-  clap: [13, 'Clap burst'],
-  hum: [18, 'Sonic blast'],
+  clap: [0, 'Aura beam'],
 };
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const visuals = combatArt(byId('combat-fx'), byId('beast'), reducedMotion);
 const armLines = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
 const trackingHints = {
   framing: 'Move back so the camera can see your shoulders.',
@@ -87,6 +89,7 @@ function resetHud() {
   setHealth(player, player.max);
   setHealth(enemy, enemy.max);
   setTime(battleTiming.duration);
+  auraMeter.value = 0;
 }
 
 function cameraStatus(message, state = '') {
@@ -187,6 +190,7 @@ function stopMic() {
   stopTracks(micStream);
   micStream = null;
   audioInput = null;
+  if (round) round.micHumming = false;
   if (context && context.state !== 'closed') void context.close().catch(() => {});
   context = null;
   mic.disabled = false;
@@ -200,6 +204,7 @@ function resetRound() {
   stopCamera();
   stopMic();
   round = null;
+  visuals.clear();
   poseAnimation?.cancel();
   poseCard.hidden = true;
   bossPanel.hidden = true;
@@ -215,7 +220,7 @@ function startRound(mode) {
     mode, started: now, strike: now + battleTiming.firstStrike,
     nextAttack: now, nextBasic: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
-    readGesture: gestures(), hitUntil: 0,
+    readGesture: gestures(), hitUntil: 0, aura: 0, lastTick: now,
   };
   resetHud();
   arena.dataset.state = 'ready';
@@ -243,12 +248,17 @@ function canPowerCounter(now) {
 }
 
 function attack(move, now, fromCamera = false) {
-  if (!round) return;
-  const [damage, label] = attacks[move];
+  if (!round || round.finished) return;
+  const [baseDamage, label] = attacks[move];
   if (move === 'power' && !canPowerCounter(now)) {
     if (!fromCamera) {
       round.poseFeedback = { move, label: 'Block a strike first to unlock power', state: 'locked', until: now + 1000 };
     }
+    return;
+  }
+  const charge = move === 'clap' ? round.aura : 0;
+  if (move === 'clap' && charge < .06) {
+    round.poseFeedback = { move, label: 'Hum first to charge the beam', state: 'locked', until: now + 1000 };
     return;
   }
   if (now < round.nextAttack || (move === 'basic' && now < round.nextBasic)) {
@@ -257,6 +267,11 @@ function attack(move, now, fromCamera = false) {
     }
     return;
   }
+  if (move === 'clap') {
+    round.aura = 0;
+    auraMeter.value = 0;
+  }
+  const damage = move === 'clap' ? Math.round(8 + charge * 18) : baseDamage;
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
   const dealt = Math.min(enemy.value, bonus ? damage + counterDamage : damage);
@@ -264,15 +279,35 @@ function attack(move, now, fromCamera = false) {
   round.nextAttack = now + 580;
   if (move === 'basic') round.nextBasic = now + 950;
   if (move === 'power') round.powerCounterAvailable = false;
+  round.attackPose = { move, until: now + 360 };
+  visuals.play(move, now, charge);
   round.hitUntil = now + 170;
   confirmPose(move, label + (bonus ? ' counter' : '') + ' · −' + dealt + ' HP', now);
   if (fromCamera) cameraNotice(label + ' landed (−' + dealt + ' HP).', 'accepted', now);
-  if (enemy.value === 0) endRound(true);
+  if (enemy.value === 0) round.finished = { won: true, until: now + (move === 'power' ? 800 : 510) };
   return true;
+}
+
+function drawBattle(now, guard, flash = false) {
+  const tracked = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
+  const attack = now < round.attackPose?.until ? round.attackPose.move : null;
+  visuals.render(now, {
+    left: Boolean(tracked?.left || guard || attack === 'power'),
+    right: Boolean(tracked?.right || attack === 'basic' || attack === 'power'),
+    guard, aura: round.aura, flash,
+  });
 }
 
 function tick(now) {
   if (!round) return;
+  if (round.finished) {
+    if (now >= round.finished.until) return endRound(round.finished.won);
+    drawBattle(now, false);
+    animation = requestAnimationFrame(tick);
+    return;
+  }
+  const delta = Math.min(70, now - round.lastTick);
+  round.lastTick = now;
   const remaining = battleTiming.duration - (now - round.started);
   setTime(remaining);
   if (remaining <= 0) return endRound(false, true);
@@ -298,14 +333,24 @@ function tick(now) {
 
   if (audioInput && now >= round.nextAudioPoll) {
     round.nextAudioPoll = now + 20;
-    const move = audioInput(now);
-    if (move) attack(move, now);
-    if (!round) return;
+    const { clap, humming } = audioInput(now);
+    round.micHumming = humming;
+    if (clap) attack('clap', now);
+  }
+  if (round.finished) {
+    animation = requestAnimationFrame(tick);
+    return;
+  }
+  const humming = round.keyboardHum || round.micHumming;
+  if (humming && round.aura < 1) {
+    round.aura = Math.min(1, round.aura + delta / 1600);
+    auraMeter.value = Math.round(round.aura * 100);
   }
 
   const cameraGuard = round.mode === 'camera' && round.cameraMove?.guard && now - round.lastPose < 260;
   const guard = round.keyboardGuard || cameraGuard;
   if (now >= round.strike) {
+    visuals.play('laser', now, guard);
     round.strike = now + (enemy.value <= 40 ? battleTiming.enragedInterval : battleTiming.strikeInterval);
     round.strikeNotice = 'Strike finished';
     if (guard) {
@@ -316,15 +361,17 @@ function tick(now) {
     } else {
       const damage = Math.min(player.value, 19);
       setHealth(player, player.value - damage);
-      round.strikeNotice = 'Strike landed · −' + damage + ' HP';
-      if (player.value === 0) return endRound(false);
+      round.strikeNotice = 'Laser hit · −' + damage + ' HP';
+      if (player.value === 0) round.finished = { won: false, until: now + 400 };
     }
     round.strikeNoticeUntil = now + 1000;
   }
 
   if (round.mode === 'camera') updateCameraStatus(now);
   const cameraPose = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove?.state : null;
-  const danger = now >= round.strike - battleTiming.warning;
+  const untilStrike = round.strike - now;
+  const danger = untilStrike <= battleTiming.warning;
+  const flash = danger && (battleTiming.warning - untilStrike) % 1000 < 235;
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
   if (cameraPose === 'power') showPose('power', 'Both arms detected', canPowerCounter(now) ? '' : 'locked');
@@ -333,11 +380,13 @@ function tick(now) {
   else if (recentAction) showPose(used.move, used.label, used.state ?? 'active');
   else if (cameraPose === 'power-held') showPose('power', 'Power registered', 'active');
   else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
+  else if (humming) showPose('hum', round.aura === 1 ? 'Aura full · clap to fire' : 'Building aura');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
-  if (danger) showWarning('Incoming strike', true);
+  if (danger) showWarning('Incoming eye lasers', true);
   else if (now < round.strikeNoticeUntil) showWarning(round.strikeNotice);
   else showWarning('No attack incoming');
+  drawBattle(now, guard, flash);
   animation = requestAnimationFrame(tick);
 }
 
@@ -423,7 +472,7 @@ mic.addEventListener('click', async () => {
     });
     mic.textContent = 'Disable mic';
     mic.setAttribute('aria-pressed', 'true');
-    device.textContent = 'Mic active. Clap or hum during the fight.';
+    device.textContent = 'Mic active. Hum to build aura, then clap to fire.';
   } catch {
     if (request !== micRequestId) return;
     stopMic();
@@ -441,17 +490,23 @@ exit.addEventListener('click', () => {
   webcam.focus();
 });
 
-const keys = { a: 'basic', d: 'power', f: 'clap', g: 'hum' };
+const keys = { a: 'basic', d: 'power', f: 'clap' };
 window.addEventListener('keydown', event => {
-  if (!round || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!round || round.finished || event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();
   if (key === 's') round.keyboardGuard = true;
+  else if (key === 'g') round.keyboardHum = true;
   else if (Object.hasOwn(keys, key) && !event.repeat) attack(keys[key], performance.now());
 });
 window.addEventListener('keyup', event => {
-  if (round && event.key.toLowerCase() === 's') round.keyboardGuard = false;
+  if (!round) return;
+  const key = event.key.toLowerCase();
+  if (key === 's') round.keyboardGuard = false;
+  if (key === 'g') round.keyboardHum = false;
 });
-window.addEventListener('blur', () => { if (round) round.keyboardGuard = false; });
+window.addEventListener('blur', () => {
+  if (round) round.keyboardGuard = round.keyboardHum = false;
+});
 window.addEventListener('pagehide', () => {
   if (round || !exit.hidden) exit.click();
 });

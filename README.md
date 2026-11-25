@@ -1,6 +1,6 @@
 # Rift Ranger
 
-A 75-second browser arcade battle. Raise your right hand above your shoulder to attack or your left hand to guard. After a successful block, raise both hands to fire one power strike during the counter window. Lower both hands to repeat an attack. With the optional microphone, a clap or a steady hum triggers a bonus attack.
+A 75-second browser arcade battle. Raise your right hand above your shoulder to attack or your left hand to shield against the Riftbeast's eye lasers. After a successful block, raise both hands to send three ripples through the arena. Hum to build aura, then clap to spend it on an energy beam. A stronger charge deals more damage.
 
 ## Play locally
 
@@ -11,8 +11,8 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 | A | Basic attack |
 | Hold S | Guard |
 | D | Power counter after blocking |
-| F | Clap |
-| G | Hum |
+| F | Spend aura on a beam |
+| Hold G | Build aura |
 
 Enable the microphone separately if you want to use sound controls. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
 

@@ -36,11 +36,12 @@ progress::-moz-progress-bar { background: var(--acid); }
 #enemy::-moz-progress-bar { background: #ff849e; }
 .eclipse { position: absolute; width: min(44%, 310px); aspect-ratio: 1; left: 50%; top: 17%; transform: translateX(-50%); border-radius: 50%; background: linear-gradient(#fb7f9a, #a14c9f); box-shadow: 0 0 60px #f67da460; opacity: .65; }
 .city { position: absolute; inset: 45% 0 19%; background: #201532; clip-path: polygon(0 57%, 5% 57%, 5% 30%, 9% 30%, 9% 65%, 14% 65%, 14% 48%, 20% 48%, 20% 12%, 24% 12%, 24% 64%, 28% 64%, 28% 45%, 33% 45%, 33% 70%, 65% 70%, 65% 51%, 71% 51%, 71% 24%, 76% 24%, 76% 62%, 80% 62%, 80% 40%, 86% 40%, 86% 8%, 91% 8%, 91% 54%, 96% 54%, 96% 36%, 100% 36%, 100% 100%, 0 100%); }
-#beast { image-rendering: pixelated; position: absolute; width: min(70%, 390px); height: auto; left: 50%; bottom: 13%; filter: drop-shadow(0 15px 0 #1b112c80); transform: translateX(-50%); animation: idle 2s steps(4) infinite alternate; }
+#beast { image-rendering: pixelated; position: absolute; width: min(70%, 340px); height: auto; left: 50%; bottom: 24%; filter: drop-shadow(0 15px 0 #1b112c80); transform: translateX(-50%); animation: idle 2s steps(4) infinite alternate; }
 @keyframes idle { to { transform: translate(-50%, -8px); } }
 .arena[data-state="danger"] #beast { filter: drop-shadow(0 0 18px #ff567b) brightness(1.3); }
 .arena[data-state="hit"] #beast { filter: brightness(2) drop-shadow(0 0 15px #e8ff75); }
 .arena[data-state="win"] #beast { opacity: .28; animation: none; }
+#combat-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
 .camera-frame { position: absolute; right: 3%; bottom: 15%; width: clamp(96px, 22%, 195px); aspect-ratio: 4 / 3; border: 1px solid #a596bd; background: #16131d; border-radius: 8px; overflow: hidden; z-index: 2; }
 .camera-frame video { width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
 .camera-frame span { position: absolute; left: 7px; bottom: 7px; padding: 3px 5px; border-radius: 3px; color: var(--acid); background: #181323; }
@@ -94,6 +95,10 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 #boss-panel[data-state="danger"] { color: #ffd3df; border-color: #ff849e; background: #501a35; }
 #ranger-pose[data-state="active"] { color: var(--acid); border-color: var(--acid); box-shadow: 0 0 22px #e8ff7540; }
 #ranger-pose[data-state="locked"] { color: #ffdca2; }
+.aura-meter { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
+#aura { margin-top: 0; height: 6px; accent-color: #d8abfa; }
+#aura::-webkit-progress-value { background: #d8abfa; }
+#aura::-moz-progress-bar { background: #d8abfa; }
 #tracking { color: #f6f3ff; }
 #tracking[data-state="accepted"] { color: var(--acid); }
 #tracking[data-state="waiting"] { color: #ffdca2; }
