@@ -2,7 +2,7 @@
 
 A browser arcade battle. Raise your right hand above your shoulder to attack or your left hand to shield against the Riftbeast's eye lasers. After a successful block, raise both hands to send three ripples through the arena. Hum to build aura, then clap repeatedly to sustain an energy beam. Aura drains at the same rate it charges, and any unspent aura stays available when you stop.
 
-The boss has locks at 40, 20, and 10 HP that require 3, 6, and 9 qualifying attacks respectively. Each run shuffles slashes, power waves, and long lasers between those locks. A long laser spends one full aura meter in one uninterrupted beam. Shorter beams still damage unprotected HP. The boss slowly heals between hits, but healing pauses at a closed lock and never reverses lock progress.
+The boss has locks at 40, 20, and 10 HP that require 3, 6, and 9 qualifying attacks respectively. Each run shuffles slashes, power waves, and long lasers between those locks. The health display shows which move is needed and how many are left. A long laser spends one full aura meter in one uninterrupted beam. Shorter beams still damage unprotected HP. The boss attacks more frequently as its HP drops. It slowly heals between hits, but healing pauses at a closed lock and never reverses lock progress.
 
 ## Play locally
 

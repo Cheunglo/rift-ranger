@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=14">
-  <script type="module" src="./game.mjs?v=14"></script>
+  <link rel="stylesheet" href="./style.css?v=15">
+  <script type="module" src="./game.mjs?v=15"></script>
 </head>
 <body>
   <main>
@@ -38,7 +38,11 @@
               <span class="lock-marker" id="lock-10" style="--threshold: 10%"></span>
             </div>
           </div>
-          <p id="lock-status" role="status" hidden></p>
+          <p id="lock-status" role="status" hidden>
+            <span id="lock-title"></span>
+            <strong id="lock-remaining"></strong>
+            <span id="lock-instruction"></span>
+          </p>
         </div>
         <div id="boss-panel" class="combat-panel" hidden>
           <span class="label">Boss warning</span>

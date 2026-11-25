@@ -50,8 +50,11 @@ progress::-moz-progress-bar { background: var(--acid); }
 .lock-marker::before { content: ""; position: absolute; inset: -5px 1px auto; height: 4px; border: 1px solid #ffe9ca; border-radius: 3px 3px 0 0; }
 .lock-marker[data-state="open"] { opacity: .32; }
 .lock-marker[data-state="active"] { background: #fff1c8; box-shadow: 0 0 8px #fbc56c; }
-#lock-status { margin: 5px 0 0; color: #f6dfb9; font-size: .875rem; line-height: 1.25; }
-#lock-status[data-active="true"] { color: #fff0c8; font-weight: 800; }
+#lock-status { display: grid; justify-items: end; gap: 3px; margin: 6px 0 0; color: #f6dfb9; font-size: .875rem; line-height: 1.2; }
+#lock-status[data-active="true"] { padding: 7px; border: 1px solid #fbc56c; border-radius: 6px; background: #322338; color: #fff0c8; }
+#lock-title { font: 700 .78rem/1.2 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .03em; }
+#lock-remaining { font-size: clamp(1rem, 2.6vw, 1.35rem); font-weight: 850; }
+#lock-instruction { color: #f7e6d1; }
 .eclipse { position: absolute; width: min(44%, 310px); aspect-ratio: 1; left: 50%; top: 17%; transform: translateX(-50%); border-radius: 50%; background: linear-gradient(#fb7f9a, #a14c9f); box-shadow: 0 0 60px #f67da460; opacity: .65; }
 .city { position: absolute; inset: 45% 0 19%; background: #201532; clip-path: polygon(0 57%, 5% 57%, 5% 30%, 9% 30%, 9% 65%, 14% 65%, 14% 48%, 20% 48%, 20% 12%, 24% 12%, 24% 64%, 28% 64%, 28% 45%, 33% 45%, 33% 70%, 65% 70%, 65% 51%, 71% 51%, 71% 24%, 76% 24%, 76% 62%, 80% 62%, 80% 40%, 86% 40%, 86% 8%, 91% 8%, 91% 54%, 96% 54%, 96% 36%, 100% 36%, 100% 100%, 0 100%); }
 #beast { image-rendering: pixelated; position: absolute; width: min(70%, 340px); height: auto; left: 50%; bottom: 24%; filter: drop-shadow(0 15px 0 #1b112c80); transform: translateX(-50%); animation: idle 2s steps(4) infinite alternate; }

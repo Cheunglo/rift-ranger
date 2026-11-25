@@ -33,12 +33,15 @@ const player = byId('player');
 const enemy = byId('enemy');
 const lockMarkers = byId('lock-markers');
 const lockStatus = byId('lock-status');
+const lockTitle = byId('lock-title');
+const lockRemaining = byId('lock-remaining');
+const lockInstruction = byId('lock-instruction');
 const practiceBadge = byId('practice-badge');
 const auraMeter = byId('aura');
 const battleTiming = {
   firstStrike: 7000,
-  strikeInterval: 6200,
-  enragedInterval: 4800,
+  slowestStrikeInterval: 6600,
+  fastestStrikeInterval: 3650,
   warning: 3000,
   counterWindow: 2400,
   practiceCounterWindow: 6000,
@@ -48,6 +51,11 @@ const battleTiming = {
 const attacks = {
   basic: [5, 'Energy slash'],
   power: [22, 'Power strike'],
+};
+const lockInstructions = {
+  basic: 'Right hand up or press A.',
+  power: 'Block, then raise both hands or press D.',
+  beam: 'Fill the aura, then keep clapping or hold F until empty.',
 };
 const auraTiming = { capacity: 1600, clapGap: 600 };
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -109,11 +117,20 @@ function showBossLocks() {
     byId('lock-' + lock.hp).dataset.state = lock.done === lock.total ? 'open' :
       lock === next && active ? 'active' : 'closed';
   }
-  const text = next
-    ? (active ? 'Locked at ' : 'Next lock at ') + next.hp + ' HP · ' + next.done + '/' + next.total + ' ' + lockMoves[next.move][1]
-    : 'All three locks opened';
-  if (lockStatus.textContent !== text) lockStatus.textContent = text;
+  const title = next ? (active ? 'Locked at ' : 'Next lock at ') + next.hp + ' HP' : 'All three locks opened';
+  const remaining = next ? lockRequirement(next) + ' left' : '';
+  const instruction = next && active ? lockInstructions[next.move] : '';
+  if (lockTitle.textContent !== title) lockTitle.textContent = title;
+  if (lockRemaining.textContent !== remaining) lockRemaining.textContent = remaining;
+  if (lockInstruction.textContent !== instruction) lockInstruction.textContent = instruction;
+  lockRemaining.hidden = !remaining;
+  lockInstruction.hidden = !instruction;
   lockStatus.dataset.active = String(active);
+}
+
+function lockRequirement(lock) {
+  const remaining = lock.total - lock.done;
+  return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];
 }
 
 function damageBoss(damage, move, now) {
@@ -136,8 +153,8 @@ function healBoss(now) {
 
 function lockImpact(hit) {
   if (hit.credited && hit.lock.done === hit.lock.total) return hit.lock.hp + ' HP lock opened';
-  if (hit.credited) return 'Lock progress · ' + hit.lock.done + '/' + hit.lock.total;
-  if (hit.lock && !hit.dealt) return 'Lock needs ' + lockMoves[hit.lock.move][1];
+  if (hit.credited) return lockRequirement(hit.lock) + ' left';
+  if (hit.lock && !hit.dealt) return 'Lock needs ' + lockRequirement(hit.lock);
   return '';
 }
 
@@ -485,8 +502,10 @@ function tick(now) {
   const guard = round.keyboardGuard || cameraGuard;
   if (now >= round.strike) {
     visuals.play('laser', now, guard);
+    const interval = battleTiming.fastestStrikeInterval +
+      (battleTiming.slowestStrikeInterval - battleTiming.fastestStrikeInterval) * enemy.value / enemy.max;
     round.strike = round.practicing ? Infinity :
-      now + (enemy.value <= 40 ? battleTiming.enragedInterval : battleTiming.strikeInterval);
+      now + Math.round(interval);
     if (round.practicing) practiceLaser.disabled = false;
     round.strikeNotice = 'Strike finished';
     if (guard) {
