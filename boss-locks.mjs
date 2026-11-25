@@ -4,7 +4,7 @@ const thresholds = [40, 20, 10];
 export const lockMoves = {
   basic: ['slash', 'slashes'],
   power: ['power wave', 'power waves'],
-  beam: ['long laser', 'long lasers'],
+  beam: ['short laser', 'short lasers'],
 };
 
 export function createBossLocks(random = Math.random) {

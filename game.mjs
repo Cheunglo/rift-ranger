@@ -1,6 +1,6 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
 import { paintBeast } from './beast.mjs';
-import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=20';
+import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=22';
 import { combatArt } from './combat-art.mjs?v=13';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=21';
 
@@ -57,10 +57,11 @@ const attacks = {
   basic: [5, 'Energy slash'],
   power: [22, 'Power strike'],
 };
+const longLaserCredit = 5;
 const lockInstructions = {
   basic: 'Right hand up or press A.',
   power: 'Block, then raise both hands or press D.',
-  beam: 'One full aura makes a long laser. Half an aura makes a short laser.',
+  beam: 'Any partial beam counts as 1. Drain a full aura in one beam to count as ' + longLaserCredit + '.',
 };
 const auraTiming = { capacity: 1600, clapGap: 600 };
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -144,14 +145,6 @@ function showBossLocks() {
 
 function lockRequirement(lock) {
   const remaining = lock.total - lock.done;
-  if (lock.move === 'beam') {
-    const shorts = remaining * 2;
-    if (shorts === 1) return '1 short laser';
-    const longs = Math.floor(remaining);
-    const longText = longs + ' ' + lockMoves.beam[longs === 1 ? 0 : 1];
-    return Number.isInteger(remaining) ? longText + ' or ' + shorts + ' short lasers' :
-      longText + ' + 1 short (or ' + shorts + ' short lasers)';
-  }
   return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];
 }
 
@@ -448,19 +441,13 @@ function requestBeam(now, microphone = false) {
 }
 
 function finishBeam(now) {
-  // Only one completed, uninterrupted beam can add credit to a laser lock.
+  // Count once when a beam ends. A full meter spent in one beam earns the bonus.
   const spent = round.beamSpent;
   round.beamSpent = 0;
   if (!spent) return;
   const lock = nextBossLock(round.locks);
   if (lock?.move !== 'beam' || !lock.engaged) return;
-  if (spent < auraTiming.capacity / 2 - 1e-6) {
-    round.poseFeedback = {
-      move: 'clap', label: 'Spend at least half an aura in one beam', state: 'locked', until: now + 1600,
-    };
-    return;
-  }
-  const credit = spent >= auraTiming.capacity - 1e-6 ? 1 : .5;
+  const credit = spent >= auraTiming.capacity - 1e-6 ? longLaserCredit : 1;
   const hit = damageBoss(0, 'beam', now, credit);
   const impact = lockImpact(hit);
   if (impact) confirmPose('clap', impact, now);
