@@ -2,6 +2,8 @@
 
 A browser arcade battle. Raise your right hand above your shoulder to attack or your left hand to shield against the Riftbeast's eye lasers. After a successful block, raise both hands to send three ripples through the arena. Hum to build aura, then clap repeatedly to sustain an energy beam. Aura drains at the same rate it charges, and any unspent aura stays available when you stop.
 
+The boss has locks at 40, 20, and 10 HP that require 3, 6, and 9 qualifying attacks respectively. Each run shuffles slashes, power waves, and long lasers between those locks. A long laser spends one full aura meter in one uninterrupted beam. Shorter beams still damage unprotected HP. The boss slowly heals between hits, but healing pauses at a closed lock and never reverses lock progress.
+
 ## Play locally
 
 Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the game](http://localhost:8765/) in a current desktop browser. Choose **Enable camera** and grant permission, or choose **Play with keyboard**. Keep your shoulders and any raised hand in view. Your resting hand can be out of frame. The keyboard works in both modes.

@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=13">
-  <script type="module" src="./game.mjs?v=13"></script>
+  <link rel="stylesheet" href="./style.css?v=14">
+  <script type="module" src="./game.mjs?v=14"></script>
 </head>
 <body>
   <main>
@@ -30,7 +30,15 @@
         <strong id="practice-badge" hidden>Practice</strong>
         <div class="enemy-health">
           <div class="health-heading"><span class="label">The Riftbeast</span><span class="hp" id="enemy-hp" aria-hidden="true">100 / 100 HP</span></div>
-          <progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress>
+          <div class="enemy-meter">
+            <progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress>
+            <div id="lock-markers" aria-hidden="true" hidden>
+              <span class="lock-marker" id="lock-40" style="--threshold: 40%"></span>
+              <span class="lock-marker" id="lock-20" style="--threshold: 20%"></span>
+              <span class="lock-marker" id="lock-10" style="--threshold: 10%"></span>
+            </div>
+          </div>
+          <p id="lock-status" role="status" hidden></p>
         </div>
         <div id="boss-panel" class="combat-panel" hidden>
           <span class="label">Boss warning</span>

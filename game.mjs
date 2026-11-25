@@ -1,4 +1,5 @@
 import { paintBeast } from './beast.mjs';
+import { bossHit, canBossHeal, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=14';
 import { combatArt } from './combat-art.mjs?v=13';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=12';
 
@@ -30,6 +31,8 @@ const poseIcon = poseArt.ownerSVGElement;
 const poseLabel = byId('pose-label');
 const player = byId('player');
 const enemy = byId('enemy');
+const lockMarkers = byId('lock-markers');
+const lockStatus = byId('lock-status');
 const practiceBadge = byId('practice-badge');
 const auraMeter = byId('aura');
 const battleTiming = {
@@ -39,6 +42,8 @@ const battleTiming = {
   warning: 3000,
   counterWindow: 2400,
   practiceCounterWindow: 6000,
+  healDelay: 7500,
+  healInterval: 4500,
 };
 const attacks = {
   basic: [5, 'Energy slash'],
@@ -95,6 +100,45 @@ function resetHud() {
   setHealth(player, player.max);
   setHealth(enemy, enemy.max);
   auraMeter.value = 0;
+}
+
+function showBossLocks() {
+  const next = nextBossLock(round.locks);
+  const active = next?.hp === enemy.value;
+  for (const lock of round.locks) {
+    byId('lock-' + lock.hp).dataset.state = lock.done === lock.total ? 'open' :
+      lock === next && active ? 'active' : 'closed';
+  }
+  const text = next
+    ? (active ? 'Locked at ' : 'Next lock at ') + next.hp + ' HP · ' + next.done + '/' + next.total + ' ' + lockMoves[next.move][1]
+    : 'All three locks opened';
+  if (lockStatus.textContent !== text) lockStatus.textContent = text;
+  lockStatus.dataset.active = String(active);
+}
+
+function damageBoss(damage, move, now) {
+  if (round.practicing) return { dealt: Math.min(enemy.value, damage), lock: null };
+  const hit = bossHit(round.locks, enemy.value, damage, move);
+  if (hit.dealt) setHealth(enemy, hit.hp);
+  if (hit.dealt || hit.credited) {
+    round.nextHeal = now + battleTiming.healDelay;
+    showBossLocks();
+  }
+  return hit;
+}
+
+function healBoss(now) {
+  if (round.practicing || now < round.nextHeal || !canBossHeal(round.locks, enemy.value, enemy.max)) return;
+  setHealth(enemy, enemy.value + 1);
+  round.nextHeal = now + battleTiming.healInterval;
+  showBossLocks();
+}
+
+function lockImpact(hit) {
+  if (hit.credited && hit.lock.done === hit.lock.total) return hit.lock.hp + ' HP lock opened';
+  if (hit.credited) return 'Lock progress · ' + hit.lock.done + '/' + hit.lock.total;
+  if (hit.lock && !hit.dealt) return 'Lock needs ' + lockMoves[hit.lock.move][1];
+  return '';
 }
 
 function cameraStatus(message, state = '') {
@@ -242,6 +286,7 @@ function resetRound() {
   bossPanel.hidden = true;
   practiceLaser.hidden = true;
   practiceBadge.hidden = true;
+  lockMarkers.hidden = lockStatus.hidden = true;
   webcam.disabled = false;
   webcam.textContent = 'Enable camera';
   exit.hidden = true;
@@ -255,8 +300,11 @@ function startRound(mode, practicing) {
     nextAttack: now, nextBasic: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, beamDamage: 0, lastTick: now,
+    locks: practicing ? [] : createBossLocks(), nextHeal: now + battleTiming.healDelay,
   };
   resetHud();
+  lockMarkers.hidden = lockStatus.hidden = practicing;
+  if (!practicing) showBossLocks();
   practiceBadge.hidden = !practicing;
   practiceLaser.hidden = !practicing;
   practiceLaser.disabled = false;
@@ -301,17 +349,17 @@ function attack(move, now, fromCamera = false) {
   }
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
-  const dealt = Math.min(enemy.value, bonus ? damage + counterDamage : damage);
-  if (!round.practicing) setHealth(enemy, enemy.value - dealt);
+  const hit = damageBoss(bonus ? damage + counterDamage : damage, move, now);
   round.nextAttack = now + 580;
   if (move === 'basic') round.nextBasic = now + 950;
   if (move === 'power') round.powerCounterAvailable = false;
   round.attackPose = { move, until: now + 360 };
   visuals.play(move, now);
-  round.hitUntil = now + 170;
-  const damageText = round.practicing ? dealt + ' damage' : '−' + dealt + ' HP';
-  confirmPose(move, label + (bonus ? ' counter' : '') + ' · ' + damageText, now);
-  if (fromCamera) cameraNotice(label + ' landed (' + damageText + ').', 'accepted', now);
+  if (hit.dealt || hit.credited) round.hitUntil = now + 170;
+  const damageText = round.practicing ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP';
+  const outcome = lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
+  confirmPose(move, outcome, now);
+  if (fromCamera) cameraNotice(outcome, hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
   if (enemy.value === 0) round.finished = { won: true, until: now + (move === 'power' ? 800 : 510) };
   return true;
 }
@@ -322,8 +370,22 @@ function requestBeam(now, microphone = false) {
     return;
   }
   if (microphone) {
-    if (now >= (round.clapUntil ?? 0)) round.clapFrom = now;
+    if (now >= (round.clapUntil ?? 0)) {
+      if (!round.keyboardBeam) finishBeam(now);
+      round.clapFrom = now;
+    }
     round.clapUntil = now + auraTiming.clapGap;
+  }
+}
+
+function finishBeam(now, longLaser = false) {
+  if (!round.beamRun) return;
+  round.beamRun = null;
+  const lock = nextBossLock(round.locks);
+  if (!longLaser && lock?.hp === enemy.value && lock.move === 'beam') {
+    round.poseFeedback = {
+      move: 'clap', label: 'Short laser · drain a full aura without a break', state: 'locked', until: now + 1600,
+    };
   }
 }
 
@@ -334,20 +396,28 @@ function updateAura(now, delta, humming) {
   const strength = firing ? round.auraMs / auraTiming.capacity : 0;
   const spent = Math.min(round.auraMs, round.keyboardBeam ? delta : clapTime);
   if (spent > 0) {
+    const beam = round.beamRun ??= { startedFull: round.auraMs === auraTiming.capacity };
     round.auraMs -= spent;
     // Accumulate fractional damage so starting and stopping cannot round up each hit.
     const damagePerFullAura = now < (round.counterUntil ?? 0) ? 31 : 26;
     round.beamDamage += spent / auraTiming.capacity * damagePerFullAura;
     const dealt = Math.floor(round.beamDamage + 1e-9);
     round.beamDamage = Math.max(0, round.beamDamage - dealt);
-    if (dealt && !round.practicing) {
-      setHealth(enemy, Math.max(0, enemy.value - dealt));
+    const longLaser = beam.startedFull && round.auraMs === 0;
+    if (dealt || longLaser) {
+      const hit = damageBoss(dealt, longLaser ? 'beam' : null, now);
+      if (longLaser && hit.lock) {
+        const impact = lockImpact(hit);
+        if (impact) confirmPose('clap', impact, now);
+      }
       if (enemy.value === 0) round.finished = { won: true, until: now + 300 };
     }
+    if (round.auraMs === 0) finishBeam(now, longLaser);
   } else if (!firing && humming) {
     round.auraMs = Math.min(auraTiming.capacity, round.auraMs + delta);
   }
-  const charge = Math.round(round.auraMs / auraTiming.capacity * 100);
+  if (!firing) finishBeam(now);
+  const charge = Math.floor(round.auraMs / auraTiming.capacity * 100);
   if (auraMeter.value !== charge) auraMeter.value = charge;
   return strength;
 }
@@ -409,6 +479,7 @@ function tick(now) {
     animation = requestAnimationFrame(tick);
     return;
   }
+  healBoss(now);
 
   const cameraGuard = round.mode === 'camera' && round.cameraMove?.guard && now - round.lastPose < 260;
   const guard = round.keyboardGuard || cameraGuard;
@@ -573,8 +644,10 @@ window.addEventListener('keydown', event => {
   if (key === 's') round.keyboardGuard = true;
   else if (key === 'g') round.keyboardHum = true;
   else if (key === 'f' && !event.repeat) {
+    const now = performance.now();
+    if (now >= (round.clapUntil ?? 0)) finishBeam(now);
     round.keyboardBeam = true;
-    requestBeam(performance.now());
+    requestBeam(now);
   }
   else if (Object.hasOwn(keys, key) && !event.repeat) attack(keys[key], performance.now());
 });
@@ -583,10 +656,17 @@ window.addEventListener('keyup', event => {
   const key = event.key.toLowerCase();
   if (key === 's') round.keyboardGuard = false;
   if (key === 'g') round.keyboardHum = false;
-  if (key === 'f') round.keyboardBeam = false;
+  if (key === 'f') {
+    round.keyboardBeam = false;
+    const now = performance.now();
+    if (now >= (round.clapUntil ?? 0)) finishBeam(now);
+  }
 });
 window.addEventListener('blur', () => {
-  if (round) round.keyboardGuard = round.keyboardHum = round.keyboardBeam = false;
+  if (!round) return;
+  round.keyboardGuard = round.keyboardHum = round.keyboardBeam = false;
+  const now = performance.now();
+  if (now >= (round.clapUntil ?? 0)) finishBeam(now);
 });
 window.addEventListener('pagehide', () => {
   if (round || !exit.hidden) exit.click();
