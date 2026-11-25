@@ -2,7 +2,7 @@
 
 A browser arcade battle. Raise your right hand above your shoulder to attack or your left hand to shield against the Riftbeast's eye lasers. After a successful block, raise both hands to send three ripples through the arena. Hum to build aura, then clap repeatedly to sustain an energy beam. Aura drains at the same rate it charges, and any unspent aura stays available when you stop.
 
-The boss has locks at 40, 20, and 10 HP that require 3, 6, and 9 qualifying attacks respectively. Each run shuffles slashes, power waves, and long lasers between those locks. The health display shows which move is needed and how many are left. A long laser spends one full aura meter in one uninterrupted beam. Shorter beams still damage unprotected HP. The boss attacks more frequently as its HP drops. It slowly heals between hits, but healing pauses at a closed lock and never reverses lock progress.
+The boss has locks at 40, 20, and 10 HP that require 3, 6, and 9 qualifying attacks respectively. Each run shuffles slashes, power waves, and lasers between those locks. The health display shows which move is needed and how many are left. A long laser spends one full aura meter in one uninterrupted beam. A short laser spends at least half a meter without emptying a full one, and two shorts count as one long. Smaller beams still damage unprotected HP. The boss attacks more frequently as its HP drops. It slowly heals between hits, but healing pauses at a closed lock and never reverses lock progress.
 
 ## Play locally
 
@@ -16,7 +16,7 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 | Hold F | Sustain the aura beam |
 | Hold G | Build aura |
 
-Choose **Enable microphone** on the start screen or in the action panel and grant browser permission to use sound controls. The action panel shows mic input level and whether the game hears a steady hum. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
+Choose **Enable microphone** on the start screen or below the boss warning and grant browser permission to use sound controls. The left panel shows the aura meter, mic input level, and whether the game hears a steady hum. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
 
 Select **Practice mode** before starting a camera or keyboard session to try every move without health loss. Choose **Test a laser attack** to practice guarding, then follow a successful block with a power counter.
 

@@ -18,13 +18,13 @@ export function nextBossLock(locks) {
   return locks.find(lock => lock.done < lock.total);
 }
 
-export function bossHit(locks, hp, damage, move) {
+export function bossHit(locks, hp, damage, move, credit = 1) {
   const lock = nextBossLock(locks);
   const floor = lock?.hp ?? 0;
   const next = Math.max(floor, hp - damage);
   const reached = lock && next === floor;
   const credited = Boolean(reached && lock.move === move);
-  if (credited) lock.done++;
+  if (credited) lock.done = Math.min(lock.total, lock.done + credit);
   return { hp: next, dealt: hp - next, lock: reached ? lock : null, credited };
 }
 

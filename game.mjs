@@ -1,5 +1,5 @@
 import { paintBeast } from './beast.mjs';
-import { bossHit, canBossHeal, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=14';
+import { bossHit, canBossHeal, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=16';
 import { combatArt } from './combat-art.mjs?v=13';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=12';
 
@@ -38,6 +38,7 @@ const lockRemaining = byId('lock-remaining');
 const lockInstruction = byId('lock-instruction');
 const practiceBadge = byId('practice-badge');
 const auraMeter = byId('aura');
+const auraCaption = byId('aura-caption');
 const battleTiming = {
   firstStrike: 7000,
   slowestStrikeInterval: 6600,
@@ -55,7 +56,7 @@ const attacks = {
 const lockInstructions = {
   basic: 'Right hand up or press A.',
   power: 'Block, then raise both hands or press D.',
-  beam: 'Fill the aura, then keep clapping or hold F until empty.',
+  beam: 'One full aura makes a long laser. Half an aura makes a short laser.',
 };
 const auraTiming = { capacity: 1600, clapGap: 600 };
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -108,6 +109,7 @@ function resetHud() {
   setHealth(player, player.max);
   setHealth(enemy, enemy.max);
   auraMeter.value = 0;
+  auraCaption.textContent = 'Aura';
 }
 
 function showBossLocks() {
@@ -130,12 +132,20 @@ function showBossLocks() {
 
 function lockRequirement(lock) {
   const remaining = lock.total - lock.done;
+  if (lock.move === 'beam') {
+    const shorts = remaining * 2;
+    if (shorts === 1) return '1 short laser';
+    const longs = Math.floor(remaining);
+    const longText = longs + ' ' + lockMoves.beam[longs === 1 ? 0 : 1];
+    return Number.isInteger(remaining) ? longText + ' or ' + shorts + ' short lasers' :
+      longText + ' + 1 short (or ' + shorts + ' short lasers)';
+  }
   return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];
 }
 
-function damageBoss(damage, move, now) {
+function damageBoss(damage, move, now, credit = 1) {
   if (round.practicing) return { dealt: Math.min(enemy.value, damage), lock: null };
-  const hit = bossHit(round.locks, enemy.value, damage, move);
+  const hit = bossHit(round.locks, enemy.value, damage, move, credit);
   if (hit.dealt) setHealth(enemy, hit.hp);
   if (hit.dealt || hit.credited) {
     round.nextHeal = now + battleTiming.healDelay;
@@ -395,15 +405,22 @@ function requestBeam(now, microphone = false) {
   }
 }
 
-function finishBeam(now, longLaser = false) {
-  if (!round.beamRun) return;
-  round.beamRun = null;
+function finishBeam(now) {
+  const spent = round.beamSpent;
+  round.beamSpent = 0;
+  if (!spent) return;
   const lock = nextBossLock(round.locks);
-  if (!longLaser && lock?.hp === enemy.value && lock.move === 'beam') {
+  if (lock?.move !== 'beam' || lock.hp !== enemy.value) return;
+  if (spent < auraTiming.capacity / 2 - 1e-6) {
     round.poseFeedback = {
-      move: 'clap', label: 'Short laser · drain a full aura without a break', state: 'locked', until: now + 1600,
+      move: 'clap', label: 'Spend at least half an aura in one beam', state: 'locked', until: now + 1600,
     };
+    return;
   }
+  const credit = spent >= auraTiming.capacity - 1e-6 ? 1 : .5;
+  const hit = damageBoss(0, 'beam', now, credit);
+  const impact = lockImpact(hit);
+  if (impact) confirmPose('clap', impact, now);
 }
 
 function updateAura(now, delta, humming) {
@@ -413,29 +430,27 @@ function updateAura(now, delta, humming) {
   const strength = firing ? round.auraMs / auraTiming.capacity : 0;
   const spent = Math.min(round.auraMs, round.keyboardBeam ? delta : clapTime);
   if (spent > 0) {
-    const beam = round.beamRun ??= { startedFull: round.auraMs === auraTiming.capacity };
     round.auraMs -= spent;
+    round.beamSpent = (round.beamSpent ?? 0) + spent;
     // Accumulate fractional damage so starting and stopping cannot round up each hit.
     const damagePerFullAura = now < (round.counterUntil ?? 0) ? 31 : 26;
     round.beamDamage += spent / auraTiming.capacity * damagePerFullAura;
     const dealt = Math.floor(round.beamDamage + 1e-9);
     round.beamDamage = Math.max(0, round.beamDamage - dealt);
-    const longLaser = beam.startedFull && round.auraMs === 0;
-    if (dealt || longLaser) {
-      const hit = damageBoss(dealt, longLaser ? 'beam' : null, now);
-      if (longLaser && hit.lock) {
-        const impact = lockImpact(hit);
-        if (impact) confirmPose('clap', impact, now);
-      }
+    if (dealt) {
+      damageBoss(dealt, null, now);
       if (enemy.value === 0) round.finished = { won: true, until: now + 300 };
     }
-    if (round.auraMs === 0) finishBeam(now, longLaser);
+    if (round.auraMs === 0) finishBeam(now);
   } else if (!firing && humming) {
     round.auraMs = Math.min(auraTiming.capacity, round.auraMs + delta);
   }
   if (!firing) finishBeam(now);
   const charge = Math.floor(round.auraMs / auraTiming.capacity * 100);
   if (auraMeter.value !== charge) auraMeter.value = charge;
+  const caption = strength > 0 ? 'Aura · firing' :
+    charge === 100 ? 'Aura · full' : humming ? 'Aura · charging' : 'Aura';
+  if (auraCaption.textContent !== caption) auraCaption.textContent = caption;
   return strength;
 }
 
@@ -536,7 +551,6 @@ function tick(now) {
   else if (recentAction) showPose(used.move, used.label, used.state ?? 'active');
   else if (cameraPose === 'power-held') showPose('power', 'Power registered', 'active');
   else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
-  else if (humming) showPose('hum', round.auraMs === auraTiming.capacity ? 'Aura full · keep clapping to fire' : 'Building aura');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
   if (danger) showWarning('Incoming eye lasers', true);
