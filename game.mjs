@@ -1,5 +1,5 @@
 import { paintBeast } from './beast.mjs';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=9';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=10';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -48,7 +48,6 @@ const trackingHints = {
   basic: 'Right hand seen. Hold briefly to attack.',
   'guard-set': 'Left hand seen. Keep holding to guard.',
   guard: 'Left hand held above shoulder height.',
-  power: 'Both arms detected. Keep them up if the attack is cooling down.',
   'power-held': 'Power registered. Lower both hands to reset.',
   reset: 'Lower both hands to attack again.',
 };
@@ -129,7 +128,11 @@ function drawTracking(points) {
 function updateCameraStatus(now) {
   const move = round.cameraMove;
   if (!move || now - round.lastPose > 400) return cameraStatus('Waiting for tracking…', 'waiting');
-  if (move.state === 'power') return cameraStatus(trackingHints.power, 'waiting');
+  if (move.state === 'power') {
+    const hint = canPowerCounter(now) ? 'Both arms detected. Attack cooling down.' :
+      'Both arms detected. Block a strike first to unlock power.';
+    return cameraStatus(hint, 'waiting');
+  }
   const notice = round.cameraNotice;
   if (notice && now < notice.until) return cameraStatus(notice.message, notice.state);
   const needsFraming = move.state === 'framing' || move.state === 'hands-hidden';
@@ -235,9 +238,19 @@ function endRound(won, expired = false) {
   webcam.focus();
 }
 
+function canPowerCounter(now) {
+  return round.powerCounterAvailable && now < round.counterUntil;
+}
+
 function attack(move, now, fromCamera = false) {
   if (!round) return;
   const [damage, label] = attacks[move];
+  if (move === 'power' && !canPowerCounter(now)) {
+    if (!fromCamera) {
+      round.poseFeedback = { move, label: 'Block a strike first to unlock power', state: 'locked', until: now + 1000 };
+    }
+    return;
+  }
   if (now < round.nextAttack || (move === 'basic' && now < round.nextBasic)) {
     if (fromCamera && move === 'basic') {
       cameraNotice('Right arm recognized. Attack cooling down.', 'waiting', now);
@@ -250,6 +263,7 @@ function attack(move, now, fromCamera = false) {
   setHealth(enemy, enemy.value - dealt);
   round.nextAttack = now + 580;
   if (move === 'basic') round.nextBasic = now + 950;
+  if (move === 'power') round.powerCounterAvailable = false;
   round.hitUntil = now + 170;
   confirmPose(move, label + (bonus ? ' counter' : '') + ' · −' + dealt + ' HP', now);
   if (fromCamera) cameraNotice(label + ' landed (−' + dealt + ' HP).', 'accepted', now);
@@ -296,7 +310,8 @@ function tick(now) {
     round.strikeNotice = 'Strike finished';
     if (guard) {
       round.counterUntil = now + battleTiming.counterWindow;
-      confirmPose('guard', 'Blocked! Counter now.', now);
+      round.powerCounterAvailable = true;
+      confirmPose('guard', 'Blocked! Power counter ready.', now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
     } else {
       const damage = Math.min(player.value, 19);
@@ -312,10 +327,11 @@ function tick(now) {
   const danger = now >= round.strike - battleTiming.warning;
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
-  if (cameraPose === 'power') showPose('power', 'Both arms detected');
+  if (cameraPose === 'power') showPose('power', 'Both arms detected', canPowerCounter(now) ? '' : 'locked');
   else if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
   else if (guard) showPose('guard', 'Guard detected', 'active');
-  else if (recentAction) showPose(used.move, used.label, 'active');
+  else if (recentAction) showPose(used.move, used.label, used.state ?? 'active');
+  else if (cameraPose === 'power-held') showPose('power', 'Power registered', 'active');
   else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';

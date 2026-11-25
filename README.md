@@ -1,6 +1,6 @@
 # Rift Ranger
 
-A 75-second browser arcade battle. Raise your right hand above your shoulder to attack, your left hand to guard, or both hands to fire a heavy strike as soon as they're detected and the attack is ready. Lower both hands to repeat an attack. With the optional microphone, a clap or a steady hum triggers a bonus attack.
+A 75-second browser arcade battle. Raise your right hand above your shoulder to attack or your left hand to guard. After a successful block, raise both hands to fire one power strike during the counter window. Lower both hands to repeat an attack. With the optional microphone, a clap or a steady hum triggers a bonus attack.
 
 ## Play locally
 
@@ -10,7 +10,7 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 | --- | --- |
 | A | Basic attack |
 | Hold S | Guard |
-| D | Power pose |
+| D | Power counter after blocking |
 | F | Clap |
 | G | Hum |
 

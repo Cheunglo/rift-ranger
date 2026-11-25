@@ -68,6 +68,7 @@ export function gestures() {
       pose = next;
       poseSince = now;
       guardActive = false;
+      if (pose !== 'power') powerSpent = false;
     }
     const held = now - poseSince;
 
