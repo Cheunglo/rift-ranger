@@ -24,6 +24,8 @@ h1 span { color: var(--acid); margin-left: .09em; }
 .battle-stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(transparent 0 3px,#17102330 4px 5px); z-index: 1; }
 .hud { position: absolute; inset: 18px 5% auto; z-index: 3; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px clamp(6px, 1.8vw, 22px); align-items: center; }
 .hud > div:first-child { align-self: start; }
+#camera-bonus-status { margin: 5px 0 0; color: var(--acid); font-size: .875rem; line-height: 1.2; }
+#camera-bonus-status[data-earned="false"] { color: var(--muted); }
 .enemy-health { grid-column: 3; align-self: start; text-align: right; }
 .health-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 8px; }
 .enemy-health .health-heading { flex-direction: row-reverse; }

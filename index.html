@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=26">
-  <script type="module" src="./game.mjs?v=26"></script>
+  <link rel="stylesheet" href="./style.css?v=27">
+  <script type="module" src="./game.mjs?v=27"></script>
 </head>
 <body>
   <main>
@@ -27,6 +27,7 @@
         <div>
           <div class="health-heading"><span class="label">Ranger</span><span class="hp" id="player-hp" aria-hidden="true">100 / 100 HP</span></div>
           <progress id="player" aria-label="Ranger health" max="100" value="100"></progress>
+          <p id="camera-bonus-status" role="status" hidden></p>
         </div>
         <strong id="practice-badge" hidden>Practice</strong>
         <div class="enemy-health">
@@ -90,6 +91,10 @@
               <dt>Health points · HP after damage</dt>
               <dd id="result-health-formula"></dd>
             </div>
+            <div id="result-camera-bonus" class="score-component" hidden>
+              <dt>Camera bonus</dt>
+              <dd id="result-camera-formula"></dd>
+            </div>
           </dl>
           <label class="practice-option"><input id="practice" type="checkbox"> Practice mode <span>Try moves without losing health.</span></label>
           <div class="actions">
@@ -107,7 +112,7 @@
         <button id="exit" class="secondary" type="button" hidden>End session</button>
       </div>
     </div>
-    <p class="footer">Mic optional. Keyboard controls work in either mode.</p>
+    <p class="footer">Mic optional. <span id="camera-bonus-note">Keyboard controls work in either mode.</span></p>
   </main>
 </body>
 </html>

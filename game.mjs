@@ -13,6 +13,7 @@ const trackingPoints = byId('tracking-points');
 const poseContext = trackingPoints.getContext('2d');
 const overlay = byId('overlay');
 const battleResult = byId('battle-result');
+const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
 const practice = byId('practice');
@@ -58,6 +59,7 @@ const attacks = {
   power: [22, 'Power strike'],
 };
 const longLaserCredit = 5;
+const cameraBonusPercent = 20;
 const warningColors = ['green', 'yellow', 'red'];
 const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
 const warningDuration = () => (warningColors.length - round.warningStart) * battleTiming.warningStep;
@@ -102,6 +104,8 @@ let requestId = 0;
 let micRequestId = 0;
 const defaultStatus = 'Camera and mic stay on your device.';
 paintBeast(byId('beast'));
+byId('camera-bonus-note').textContent =
+  'Camera clears without keyboard combat earn +' + cameraBonusPercent + '% score.';
 
 function showWarning(message, incoming = false) {
   if (prompt.textContent !== message) prompt.textContent = message;
@@ -325,6 +329,7 @@ function resetRound() {
   stopCamera();
   stopMic();
   round = null;
+  cameraBonusStatus.hidden = true;
   visuals.clear();
   poseAnimation?.cancel();
   poseCard.hidden = true;
@@ -342,6 +347,7 @@ function startRound(mode, practicing) {
   const now = performance.now();
   round = {
     mode, practicing, startedAt: now, strike: practicing ? Infinity : now + battleTiming.firstStrike,
+    cameraBonusEligible: mode === 'camera' && !practicing,
     nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, beamDamage: 0, lastTick: now,
@@ -349,6 +355,9 @@ function startRound(mode, practicing) {
     warningStart: randomWarningStart(),
   };
   resetHud();
+  cameraBonusStatus.hidden = !round.cameraBonusEligible;
+  cameraBonusStatus.dataset.earned = 'true';
+  cameraBonusStatus.textContent = '+' + cameraBonusPercent + '% camera bonus active';
   lockMarkers.hidden = lockStatus.hidden = practicing;
   if (!practicing) showBossLocks();
   practiceBadge.hidden = !practicing;
@@ -366,10 +375,18 @@ function startRound(mode, practicing) {
   animation = requestAnimationFrame(tick);
 }
 
+function forfeitCameraBonus(reason) {
+  if (!round?.cameraBonusEligible || round.finished) return;
+  round.cameraBonusEligible = false;
+  cameraBonusStatus.dataset.earned = 'false';
+  cameraBonusStatus.textContent = reason + ' · no camera bonus';
+}
+
 function endRound(won) {
   // Use the frame that landed the final hit, excluding the victory animation.
   const elapsed = won ? Math.round(round.finished.at - round.startedAt) / 1000 : 0;
   const damage = player.max - player.value;
+  const cameraBonusEligible = round.cameraBonusEligible;
   resetRound();
   arena.dataset.state = won ? 'win' : 'ready';
   showOverlay(won ? 'City saved!' : 'Ranger down',
@@ -380,9 +397,11 @@ function endRound(won) {
     const referenceSeconds = 60;
     const timeBonus = Math.round(speedMax * referenceSeconds / (referenceSeconds + elapsed));
     const healthBonus = Math.round(healthMax * (player.max - damage) / player.max);
+    const baseScore = timeBonus + healthBonus;
+    const cameraBonus = cameraBonusEligible ? Math.round(baseScore * cameraBonusPercent / 100) : 0;
     const seconds = Math.floor(elapsed);
     const points = value => value.toLocaleString();
-    byId('result-score').textContent = points(timeBonus + healthBonus);
+    byId('result-score').textContent = points(baseScore + cameraBonus);
     byId('result-time').textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
     byId('result-damage').textContent = damage + ' HP';
     byId('result-speed-formula').textContent =
@@ -391,6 +410,9 @@ function endRound(won) {
     byId('result-health-formula').textContent =
       points(healthMax) + ' × (' + player.max + ' − ' + damage + ') ÷ ' + player.max +
       ' = ' + points(healthBonus) + ' pts';
+    byId('result-camera-bonus').hidden = !cameraBonusEligible;
+    byId('result-camera-formula').textContent =
+      points(baseScore) + ' × ' + cameraBonusPercent + '% ≈ +' + points(cameraBonus) + ' pts';
     battleResult.hidden = false;
   }
   webcam.focus();
@@ -525,6 +547,7 @@ function tick(now) {
       pose = tracker.detectForVideo(camera, now).landmarks[0];
     } catch {
       stopCamera();
+      forfeitCameraBonus('Camera tracking stopped');
       round.mode = 'keyboard';
       device.textContent = 'Tracking stopped. You can finish with the keyboard.';
     }
@@ -633,6 +656,7 @@ webcam.addEventListener('click', async () => {
     stream.getVideoTracks()[0].addEventListener('ended', () => {
       if (cameraStream !== stream) return;
       stopCamera();
+      forfeitCameraBonus('Camera disconnected');
       if (round) round.mode = 'keyboard';
       device.textContent = 'Camera disconnected. Keyboard controls are available.';
     });
@@ -721,17 +745,18 @@ exit.addEventListener('click', () => {
 
 const keys = { a: 'basic', d: 'power' };
 window.addEventListener('keydown', event => {
-  if (!round || round.finished || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!round || round.finished || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();
+  if (!Object.hasOwn(keys, key) && key !== 's' && key !== 'g' && key !== 'f') return;
+  forfeitCameraBonus('Keyboard used');
   if (key === 's') round.keyboardGuard = true;
   else if (key === 'g') round.keyboardHum = true;
-  else if (key === 'f' && !event.repeat) {
+  else if (key === 'f') {
     const now = performance.now();
     if (now >= (round.clapUntil ?? 0)) finishBeam(now);
     round.keyboardBeam = true;
     requestBeam(now);
-  }
-  else if (Object.hasOwn(keys, key) && !event.repeat) attack(keys[key], performance.now());
+  } else attack(keys[key], performance.now());
 });
 window.addEventListener('keyup', event => {
   if (!round) return;
