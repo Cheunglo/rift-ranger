@@ -1,5 +1,5 @@
 import { paintBeast } from './beast.mjs';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=8';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=9';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -48,6 +48,8 @@ const trackingHints = {
   basic: 'Right hand seen. Hold briefly to attack.',
   'guard-set': 'Left hand seen. Keep holding to guard.',
   guard: 'Left hand held above shoulder height.',
+  power: 'Both arms detected. Keep them up if the attack is cooling down.',
+  'power-held': 'Power registered. Lower both hands to reset.',
   reset: 'Lower both hands to attack again.',
 };
 
@@ -127,13 +129,9 @@ function drawTracking(points) {
 function updateCameraStatus(now) {
   const move = round.cameraMove;
   if (!move || now - round.lastPose > 400) return cameraStatus('Waiting for tracking…', 'waiting');
+  if (move.state === 'power') return cameraStatus(trackingHints.power, 'waiting');
   const notice = round.cameraNotice;
   if (notice && now < notice.until) return cameraStatus(notice.message, notice.state);
-  if (move.state === 'power') {
-    const label = move.charge === 1 && !move.attack ? 'Show both raised hands to finish charging.' :
-      'Power recognized. Keep holding (' + Math.floor(move.charge * 10) * 10 + '%).';
-    return cameraStatus(label);
-  }
   const needsFraming = move.state === 'framing' || move.state === 'hands-hidden';
   cameraStatus(trackingHints[move.state], move.state === 'guard' ? 'accepted' : needsFraming ? 'waiting' : '');
 }
@@ -241,8 +239,8 @@ function attack(move, now, fromCamera = false) {
   if (!round) return;
   const [damage, label] = attacks[move];
   if (now < round.nextAttack || (move === 'basic' && now < round.nextBasic)) {
-    if (fromCamera) {
-      cameraNotice((move === 'basic' ? 'Right arm' : 'Power pose') + ' recognized. Attack cooling down.', 'waiting', now);
+    if (fromCamera && move === 'basic') {
+      cameraNotice('Right arm recognized. Attack cooling down.', 'waiting', now);
     }
     return;
   }
@@ -256,6 +254,7 @@ function attack(move, now, fromCamera = false) {
   confirmPose(move, label + (bonus ? ' counter' : '') + ' · −' + dealt + ' HP', now);
   if (fromCamera) cameraNotice(label + ' landed (−' + dealt + ' HP).', 'accepted', now);
   if (enemy.value === 0) endRound(true);
+  return true;
 }
 
 function tick(now) {
@@ -279,7 +278,7 @@ function tick(now) {
     drawTracking(pose);
     round.lastPose = now;
     round.cameraMove = move;
-    if (move.attack) attack(move.attack, now, true);
+    if (move.attack && attack(move.attack, now, true)) move.consume?.();
     if (!round) return;
   }
 
@@ -313,10 +312,10 @@ function tick(now) {
   const danger = now >= round.strike - battleTiming.warning;
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
-  if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
+  if (cameraPose === 'power') showPose('power', 'Both arms detected');
+  else if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
   else if (guard) showPose('guard', 'Guard detected', 'active');
   else if (recentAction) showPose(used.move, used.label, 'active');
-  else if (cameraPose === 'power') showPose('power', 'Power pose charging');
   else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';

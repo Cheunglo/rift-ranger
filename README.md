@@ -1,6 +1,6 @@
 # Rift Ranger
 
-A 75-second browser arcade battle. Raise your right hand above your shoulder to attack, your left hand to guard, or both hands to charge a heavy strike. Lower both hands between attacks. With the optional microphone, a clap or a steady hum triggers a bonus attack.
+A 75-second browser arcade battle. Raise your right hand above your shoulder to attack, your left hand to guard, or both hands to fire a heavy strike as soon as they're detected and the attack is ready. Lower both hands to repeat an attack. With the optional microphone, a clap or a steady hum triggers a bonus attack.
 
 ## Play locally
 

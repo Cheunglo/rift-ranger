@@ -27,10 +27,11 @@ export function gestures() {
   let poseSince;
   let lastFrame;
   let attackSpent = false;
+  let powerSpent = false;
   let guardActive = false;
 
   return (points, now) => {
-    const result = { state: 'framing', guard: false, attack: null, charge: 0 };
+    const result = { state: 'framing', guard: false, attack: null };
     // MediaPipe uses the player's anatomical left and right, before the preview is mirrored.
     const shoulders = [points?.[11], points?.[12]];
     const hands = [points?.[15], points?.[16]];
@@ -71,7 +72,7 @@ export function gestures() {
     const held = now - poseSince;
 
     if (pose === 'neutral') {
-      if (held >= 120) attackSpent = false;
+      if (held >= 120) attackSpent = powerSpent = false;
       result.state = attackSpent ? 'reset' : tracked.some(Boolean) ? 'neutral' : 'hands-hidden';
       return result;
     }
@@ -81,6 +82,17 @@ export function gestures() {
       result.state = result.guard ? 'guard' : 'guard-set';
       return result;
     }
+    if (pose === 'power') {
+      result.state = powerSpent ? 'power-held' : 'power';
+      if (!powerSpent && tracked.every(Boolean)) {
+        result.attack = 'power';
+        result.consume = () => {
+          attackSpent = powerSpent = true;
+          result.state = 'power-held';
+        };
+      }
+      return result;
+    }
     if (attackSpent) {
       result.state = 'reset';
       return result;
@@ -88,11 +100,8 @@ export function gestures() {
 
     // Wait briefly on a single right arm so a two-arm raise can become power.
     result.state = pose;
-    const hold = pose === 'power' ? 650 : 300;
-    if (pose === 'power') result.charge = Math.min(1, held / hold);
-    const ready = pose === 'power' ? tracked.every(Boolean) : tracked[1];
-    if (held >= hold && ready) {
-      result.attack = pose;
+    if (held >= 300 && tracked[1]) {
+      result.attack = 'basic';
       attackSpent = true;
     }
     return result;
