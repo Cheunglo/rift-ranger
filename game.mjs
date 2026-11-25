@@ -1,5 +1,5 @@
 import { paintBeast } from './beast.mjs';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=4';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=7';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -34,7 +34,7 @@ const battleTiming = {
   counterWindow: 2400,
 };
 const attacks = {
-  wave: [5, 'Energy slash'],
+  basic: [5, 'Energy slash'],
   power: [22, 'Power strike'],
   clap: [13, 'Clap burst'],
   hum: [18, 'Sonic blast'],
@@ -42,14 +42,12 @@ const attacks = {
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const armLines = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
 const trackingHints = {
-  framing: 'Step back until your head, shoulders and both hands are visible.',
-  neutral: 'Raise one hand and keep the other below your shoulder.',
-  'wave-set': 'Hold your raised hand still for a moment.',
-  'wave-ready': 'Wave ready. Move your raised hand sideways.',
-  'wave-return': 'Now move your hand back.',
-  'guard-set': 'Guard pose seen. Keep holding.',
-  guard: 'Both hands tracked in guard position.',
-  'two-hands': 'Both hands raised. Guard pose not detected.',
+  framing: 'Keep both shoulders and hands in view.',
+  neutral: 'Raise your left hand to guard, right to attack, or both for power.',
+  basic: 'Right hand seen. Hold briefly to attack.',
+  'guard-set': 'Left hand seen. Keep holding to guard.',
+  guard: 'Left hand held above shoulder height.',
+  reset: 'Lower both hands to attack again.',
 };
 
 let round;
@@ -144,7 +142,7 @@ function cameraNotice(message, state, now) {
 function showPose(move, label = 'No action detected', state = '') {
   poseIcon.toggleAttribute('hidden', !move);
   if (move) {
-    const href = './poses.svg#' + move;
+    const href = './poses.svg?v=7#' + move;
     if (poseArt.getAttribute('href') !== href) poseArt.setAttribute('href', href);
   }
   if (poseLabel.textContent !== label) poseLabel.textContent = label;
@@ -211,7 +209,7 @@ function startRound(mode) {
   const now = performance.now();
   round = {
     mode, started: now, strike: now + battleTiming.firstStrike,
-    nextAttack: now, nextWave: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
+    nextAttack: now, nextBasic: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0,
   };
@@ -232,25 +230,25 @@ function endRound(won, expired = false) {
   resetRound();
   arena.dataset.state = won ? 'win' : 'ready';
   showOverlay(won ? 'City saved!' : expired ? 'Time ran out' : 'Ranger down',
-    won ? 'The Riftbeast has fallen.' : 'Wave to attack, then guard when the Riftbeast winds up.');
+    won ? 'The Riftbeast has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
   webcam.focus();
 }
 
 function attack(move, now, fromCamera = false) {
   if (!round) return;
   const [damage, label] = attacks[move];
-  if (now < round.nextAttack || (move === 'wave' && now < round.nextWave)) {
+  if (now < round.nextAttack || (move === 'basic' && now < round.nextBasic)) {
     if (fromCamera) {
-      cameraNotice((move === 'wave' ? 'Wave' : 'Power pose') + ' recognized. Attack cooling down.', 'waiting', now);
+      cameraNotice((move === 'basic' ? 'Right arm' : 'Power pose') + ' recognized. Attack cooling down.', 'waiting', now);
     }
     return;
   }
   const bonus = now < (round.counterUntil ?? 0);
-  const counterDamage = move === 'wave' ? 2 : 5;
+  const counterDamage = move === 'basic' ? 2 : 5;
   const dealt = Math.min(enemy.value, bonus ? damage + counterDamage : damage);
   setHealth(enemy, enemy.value - dealt);
   round.nextAttack = now + 580;
-  if (move === 'wave') round.nextWave = now + 950;
+  if (move === 'basic') round.nextBasic = now + 950;
   round.hitUntil = now + 170;
   confirmPose(move, label + (bonus ? ' counter' : '') + ' · −' + dealt + ' HP', now);
   if (fromCamera) cameraNotice(label + ' landed (−' + dealt + ' HP).', 'accepted', now);
@@ -308,14 +306,15 @@ function tick(now) {
   }
 
   if (round.mode === 'camera') updateCameraStatus(now);
-  const charge = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove?.charge : 0;
+  const cameraPose = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove?.state : null;
   const danger = now >= round.strike - battleTiming.warning;
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
   if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
   else if (guard) showPose('guard', 'Guard detected', 'active');
   else if (recentAction) showPose(used.move, used.label, 'active');
-  else if (charge > 0 && charge < 1) showPose('power', 'Power pose charging');
+  else if (cameraPose === 'power') showPose('power', 'Power pose charging');
+  else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
   if (danger) showWarning('Incoming strike', true);
@@ -424,7 +423,7 @@ exit.addEventListener('click', () => {
   webcam.focus();
 });
 
-const keys = { a: 'wave', d: 'power', f: 'clap', g: 'hum' };
+const keys = { a: 'basic', d: 'power', f: 'clap', g: 'hum' };
 window.addEventListener('keydown', event => {
   if (!round || event.ctrlKey || event.metaKey || event.altKey) return;
   const key = event.key.toLowerCase();

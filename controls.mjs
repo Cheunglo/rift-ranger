@@ -21,104 +21,62 @@ export function posePoint(point) {
 }
 
 export function gestures() {
-  let wave;
-  let guardSince;
-  let powerSince;
-  let powerSent = false;
+  const raised = [false, false];
+  let pose;
+  let poseSince;
   let lastFrame;
+  let attackSpent = false;
 
   return (points, now) => {
     const result = { state: 'framing', guard: false, attack: null, charge: 0 };
-    const [nose, ...shoulders] = [0, 11, 12].map(i => points?.[i]);
-    const elbows = [13, 14].map(i => points?.[i]);
-    const hands = [15, 16].map(i => points?.[i]);
-    const framed = [nose, ...shoulders, ...hands].every(posePoint);
-
+    // MediaPipe uses the player's anatomical left and right, before the preview is mirrored.
+    const shoulders = [points?.[11], points?.[12]];
+    const hands = [points?.[15], points?.[16]];
+    const framed = [...shoulders, ...hands].every(posePoint);
     if (!framed || now - lastFrame > 260) {
-      wave = guardSince = powerSince = undefined;
-      powerSent = false;
+      raised.fill(false);
+      pose = undefined;
     }
     lastFrame = now;
     if (!framed) return result;
 
     const width = Math.max(.1, Math.hypot(shoulders[0].x - shoulders[1].x, shoulders[0].y - shoulders[1].y));
-    const center = (shoulders[0].x + shoulders[1].x) / 2;
-    const raised = hands.map((hand, i) => hand.y < shoulders[i].y - width * .14);
+    for (let i = 0; i < raised.length; i++) {
+      // Separate up/down thresholds keep a wrist near the boundary from flickering.
+      const margin = raised[i] ? -.06 : .14;
+      raised[i] = hands[i].y < shoulders[i].y - width * margin;
+    }
 
-    if (hands.every(hand => hand.y < nose.y - width * .28)) {
-      wave = guardSince = undefined;
-      powerSince ??= now;
-      result.state = 'power';
-      result.charge = Math.min(1, (now - powerSince) / 720);
-      if (result.charge === 1 && !powerSent) {
-        result.attack = 'power';
-        powerSent = true;
-      }
+    const [left, right] = raised;
+    const next = left && right ? 'power' : left ? 'guard' : right ? 'basic' : 'neutral';
+    if (next !== pose) {
+      pose = next;
+      poseSince = now;
+    }
+    const held = now - poseSince;
+
+    if (pose === 'neutral') {
+      if (held >= 120) attackSpent = false;
+      result.state = attackSpent ? 'reset' : 'neutral';
       return result;
     }
-    powerSince = undefined;
-    powerSent = false;
-
-    if (raised.every(Boolean)) {
-      wave = undefined;
-      const byEars = hands.every((hand, i) => {
-        const side = Math.sign(shoulders[i].x - center);
-        const distance = (hand.x - nose.x) / width * side;
-        return distance > .15 && distance < .9 && Math.abs(hand.y - nose.y) < width * .56;
-      });
-      if (byEars) guardSince ??= now;
-      else guardSince = undefined;
-      result.guard = byEars && now - guardSince >= 160;
-      result.state = result.guard ? 'guard' : byEars ? 'guard-set' : 'two-hands';
+    if (pose === 'guard') {
+      result.guard = held >= 180;
+      result.state = result.guard ? 'guard' : 'guard-set';
       return result;
     }
-    guardSince = undefined;
-
-    const index = raised.findIndex(Boolean);
-    const hand = hands[index];
-    const elbow = elbows[index];
-    // Use a bent, raised arm. Ignore low sweeps and straight reaches.
-    if (index < 0 || !posePoint(elbow) || elbow.y - hand.y < width * .27 ||
-        hand.y < nose.y - width * .45) {
-      wave = undefined;
-      result.state = 'neutral';
+    if (attackSpent) {
+      result.state = 'reset';
       return result;
     }
 
-    const x = (hand.x - center) / width;
-    const y = (hand.y - shoulders[index].y) / width;
-    const elbowX = (elbow.x - center) / width;
-    const reset = () => { wave = { index, x, y, elbowX, since: now }; };
-    if (wave?.index !== index || Math.abs(y - wave.y) > .32 || Math.abs(elbowX - wave.elbowX) > .42) {
-      reset();
-    }
-    if (wave.readyAt === undefined) {
-      if (Math.abs(x - wave.x) > .16) reset();
-      if (now - wave.since >= 150) wave.readyAt = now;
-      result.state = wave.readyAt === undefined ? 'wave-set' : 'wave-ready';
-      return result;
-    }
-    if (now - (wave.peakAt ?? wave.readyAt) > (wave.peakAt === undefined ? 1200 : 600)) {
-      reset();
-      result.state = 'wave-set';
-      return result;
-    }
-
-    const travel = x - wave.x;
-    if (wave.peakAt === undefined && Math.abs(travel) >= .34) {
-      wave.peak = travel;
-      wave.peakAt = now;
-    }
-    if (wave.peakAt === undefined) {
-      result.state = 'wave-ready';
-      return result;
-    }
-    result.state = 'wave-return';
-    const direction = Math.sign(wave.peak);
-    if (travel * direction > wave.peak * direction) wave.peak = travel;
-    if ((wave.peak - travel) * direction >= .28) {
-      result.attack = 'wave';
-      reset();
+    // Wait briefly on a single right arm so a two-arm raise can become power.
+    result.state = pose;
+    const hold = pose === 'power' ? 650 : 300;
+    if (pose === 'power') result.charge = Math.min(1, held / hold);
+    if (held >= hold) {
+      result.attack = pose;
+      attackSpent = true;
     }
     return result;
   };

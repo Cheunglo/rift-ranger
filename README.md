@@ -1,6 +1,6 @@
 # Rift Ranger
 
-A 75-second browser arcade battle. Wave to attack, guard when the Riftbeast winds up, or hold both hands overhead to charge a heavy strike. With the optional microphone, a clap or a steady hum triggers a bonus attack.
+A 75-second browser arcade battle. Raise your right hand above your shoulder to attack, your left hand to guard, or both hands to charge a heavy strike. Lower both hands between attacks. With the optional microphone, a clap or a steady hum triggers a bonus attack.
 
 ## Play locally
 
@@ -8,7 +8,7 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 
 | Input | Move |
 | --- | --- |
-| A | Wave attack |
+| A | Basic attack |
 | Hold S | Guard |
 | D | Power pose |
 | F | Clap |
