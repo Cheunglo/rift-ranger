@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101018">
+  <meta name="description" content="A webcam-powered arcade boss fight.">
+  <title>Rift Ranger</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./game.mjs"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Rift<span>Ranger</span></h1>
+      <p>Webcam arcade</p>
+    </header>
+    <section class="arena" id="arena" aria-label="Battle arena">
+      <div class="hud">
+        <div><span class="label">Ranger</span><progress id="player" aria-label="Ranger health" max="100" value="100"></progress></div>
+        <strong id="time" aria-label="Seconds remaining">60</strong>
+        <div><span class="label">The Riftbeast</span><progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress></div>
+      </div>
+      <div class="eclipse"></div>
+      <div class="city"></div>
+      <canvas id="beast" width="40" height="36" aria-hidden="true"></canvas>
+      <div id="camera-frame" class="camera-frame" hidden><video id="camera" muted playsinline aria-label="Mirrored camera preview"></video><span>LIVE</span></div>
+      <output id="prompt" aria-live="polite">Ready to morph?</output>
+      <div class="overlay" id="overlay">
+        <h2 id="overlay-title">Defend the city.</h2>
+        <p id="overlay-copy">Keep your head, shoulders and hands in view. You can play sitting or standing.</p>
+        <div class="actions">
+          <button id="webcam" type="button">Enable camera</button>
+          <button id="keyboard" class="secondary" type="button">Play with keyboard</button>
+        </div>
+      </div>
+    </section>
+    <div class="toolbar">
+      <div id="device" role="status">Camera and mic stay on your device.</div>
+      <div class="actions">
+        <button id="mic" class="secondary" type="button" aria-pressed="false">Enable mic</button>
+        <button id="exit" class="secondary" type="button" hidden>End session</button>
+      </div>
+    </div>
+    <section class="moves" aria-label="Moves">
+      <article><span>Attack <kbd>A</kbd></span><strong>Wave</strong><p>Sweep one hand sideways above your shoulder.</p></article>
+      <article><span>Defend <kbd>S</kbd></span><strong>Guard</strong><p>Hold both hands near your ears when the beast winds up.</p></article>
+      <article><span>Heavy hit <kbd>D</kbd></span><strong>Power pose</strong><p>Reach both hands overhead and hold for a beat.</p></article>
+      <article><span>Bonus <kbd>F</kbd> <kbd>G</kbd></span><strong>Clap or hum</strong><p>Clap for a burst, or hold a steady note to charge a blast.</p></article>
+    </section>
+    <p class="footer">Mic optional. Keyboard controls work in either mode.</p>
+  </main>
+</body>
+</html>
