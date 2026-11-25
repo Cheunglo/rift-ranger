@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=24">
+  <link rel="stylesheet" href="./style.css?v=25">
   <script type="module" src="./game.mjs?v=24"></script>
 </head>
 <body>
@@ -21,6 +21,11 @@
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#power"></use></svg><span>Counter <kbd>D</kbd></span><strong>Power pose</strong><p>Block a strike, then raise both hands above your shoulders to counter.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Audio <kbd>F</kbd> <kbd>G</kbd></span><strong>Hum, then clap</strong><p>Hum or hold G to build aura. Keep clapping or hold F to sustain the beam.</p></article>
     </section>
+    <p id="lock-status" role="status" hidden>
+      <span id="lock-title"></span>
+      <strong id="lock-remaining"></strong>
+      <span id="lock-instruction"></span>
+    </p>
     <section class="arena" id="arena" aria-label="Battle arena">
       <!-- The fixed HUD sits over the battle stage. The canvases draw art and effects. -->
       <div class="hud">
@@ -39,11 +44,6 @@
               <span class="lock-marker" id="lock-10" style="--threshold: 10%"></span>
             </div>
           </div>
-          <p id="lock-status" role="status" hidden>
-            <span id="lock-title"></span>
-            <strong id="lock-remaining"></strong>
-            <span id="lock-instruction"></span>
-          </p>
         </div>
         <div id="boss-panel" class="combat-panel" hidden>
           <span class="label">Boss warning</span>
