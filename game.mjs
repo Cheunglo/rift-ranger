@@ -1,5 +1,5 @@
 import { paintBeast } from './beast.mjs';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=7';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=8';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -42,7 +42,8 @@ const attacks = {
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const armLines = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
 const trackingHints = {
-  framing: 'Keep both shoulders and hands in view.',
+  framing: 'Move back so the camera can see your shoulders.',
+  'hands-hidden': 'Show your raised hand above your shoulder. Your resting hand can be out of view.',
   neutral: 'Raise your left hand to guard, right to attack, or both for power.',
   basic: 'Right hand seen. Hold briefly to attack.',
   'guard-set': 'Left hand seen. Keep holding to guard.',
@@ -104,10 +105,11 @@ function drawTracking(points) {
   poseContext.lineWidth = width * .005;
   poseContext.strokeStyle = '#e8ff75';
   poseContext.fillStyle = '#e8ff75';
+  const visibleJoint = (point, index) => posePoint(point, index === 15 || index === 16 ? .45 : .55);
   for (const [start, end] of armLines) {
     const from = points?.[start];
     const to = points?.[end];
-    if (!posePoint(from) || !posePoint(to)) continue;
+    if (!visibleJoint(from, start) || !visibleJoint(to, end)) continue;
     poseContext.beginPath();
     poseContext.moveTo(from.x * width, from.y * height);
     poseContext.lineTo(to.x * width, to.y * height);
@@ -115,7 +117,7 @@ function drawTracking(points) {
   }
   for (const index of [0, 11, 12, 13, 14, 15, 16]) {
     const point = points?.[index];
-    if (!posePoint(point)) continue;
+    if (!visibleJoint(point, index)) continue;
     poseContext.beginPath();
     poseContext.arc(point.x * width, point.y * height, width * .009, 0, 2 * Math.PI);
     poseContext.fill();
@@ -128,11 +130,12 @@ function updateCameraStatus(now) {
   const notice = round.cameraNotice;
   if (notice && now < notice.until) return cameraStatus(notice.message, notice.state);
   if (move.state === 'power') {
-    const label = move.charge === 1 ? 'Lower your hands to reset the power pose.' :
+    const label = move.charge === 1 && !move.attack ? 'Show both raised hands to finish charging.' :
       'Power recognized. Keep holding (' + Math.floor(move.charge * 10) * 10 + '%).';
     return cameraStatus(label);
   }
-  cameraStatus(trackingHints[move.state], move.state === 'guard' ? 'accepted' : move.state === 'framing' ? 'waiting' : '');
+  const needsFraming = move.state === 'framing' || move.state === 'hands-hidden';
+  cameraStatus(trackingHints[move.state], move.state === 'guard' ? 'accepted' : needsFraming ? 'waiting' : '');
 }
 
 function cameraNotice(message, state, now) {
@@ -418,7 +421,7 @@ mic.addEventListener('click', async () => {
 exit.addEventListener('click', () => {
   resetRound();
   arena.dataset.state = 'ready';
-  showOverlay('Defend the city.', 'Keep your head, shoulders and hands in view. You can play sitting or standing.');
+  showOverlay('Defend the city.', 'Keep your shoulders and any raised hand in view. You can play sitting or standing.');
   resetHud();
   webcam.focus();
 });

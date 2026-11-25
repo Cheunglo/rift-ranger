@@ -15,35 +15,49 @@ export function stopTracks(stream) {
   stream?.getTracks().forEach(track => track.stop());
 }
 
-export function posePoint(point) {
-  return point && point.visibility >= .55 &&
+export function posePoint(point, minimumVisibility = .55) {
+  return point && point.visibility >= minimumVisibility &&
     point.x > .015 && point.x < .985 && point.y > .015 && point.y < .985;
 }
 
 export function gestures() {
   const raised = [false, false];
+  const lastSeen = [-Infinity, -Infinity];
   let pose;
   let poseSince;
   let lastFrame;
   let attackSpent = false;
+  let guardActive = false;
 
   return (points, now) => {
     const result = { state: 'framing', guard: false, attack: null, charge: 0 };
     // MediaPipe uses the player's anatomical left and right, before the preview is mirrored.
     const shoulders = [points?.[11], points?.[12]];
     const hands = [points?.[15], points?.[16]];
-    const framed = [...shoulders, ...hands].every(posePoint);
+    const visibleShoulders = shoulders.map(point => posePoint(point));
+    const framed = visibleShoulders.some(Boolean);
     if (!framed || now - lastFrame > 260) {
       raised.fill(false);
+      lastSeen.fill(-Infinity);
       pose = undefined;
+      guardActive = false;
     }
     lastFrame = now;
     if (!framed) return result;
 
-    const width = Math.max(.1, Math.hypot(shoulders[0].x - shoulders[1].x, shoulders[0].y - shoulders[1].y));
+    const width = visibleShoulders.every(Boolean)
+      ? Math.max(.1, Math.hypot(shoulders[0].x - shoulders[1].x, shoulders[0].y - shoulders[1].y))
+      : .2;
+    const tracked = hands.map((hand, i) => visibleShoulders[i] && posePoint(hand, .45));
     for (let i = 0; i < raised.length; i++) {
+      if (!tracked[i]) {
+        // Brief occlusion should not turn a two-arm pose into a one-arm pose.
+        if (now - lastSeen[i] > 160) raised[i] = false;
+        continue;
+      }
+      lastSeen[i] = now;
       // Separate up/down thresholds keep a wrist near the boundary from flickering.
-      const margin = raised[i] ? -.06 : .14;
+      const margin = raised[i] ? -.06 : .09;
       raised[i] = hands[i].y < shoulders[i].y - width * margin;
     }
 
@@ -52,16 +66,18 @@ export function gestures() {
     if (next !== pose) {
       pose = next;
       poseSince = now;
+      guardActive = false;
     }
     const held = now - poseSince;
 
     if (pose === 'neutral') {
       if (held >= 120) attackSpent = false;
-      result.state = attackSpent ? 'reset' : 'neutral';
+      result.state = attackSpent ? 'reset' : tracked.some(Boolean) ? 'neutral' : 'hands-hidden';
       return result;
     }
     if (pose === 'guard') {
-      result.guard = held >= 180;
+      if (held >= 180 && tracked[0]) guardActive = true;
+      result.guard = guardActive;
       result.state = result.guard ? 'guard' : 'guard-set';
       return result;
     }
@@ -74,7 +90,8 @@ export function gestures() {
     result.state = pose;
     const hold = pose === 'power' ? 650 : 300;
     if (pose === 'power') result.charge = Math.min(1, held / hold);
-    if (held >= hold) {
+    const ready = pose === 'power' ? tracked.every(Boolean) : tracked[1];
+    if (held >= hold && ready) {
       result.attack = pose;
       attackSpent = true;
     }

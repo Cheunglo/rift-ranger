@@ -4,7 +4,7 @@ A 75-second browser arcade battle. Raise your right hand above your shoulder to 
 
 ## Play locally
 
-Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the game](http://localhost:8765/) in a current desktop browser. Choose **Enable camera** and grant permission, or choose **Play with keyboard**. Keep your upper body and both hands in view. The keyboard works in both modes.
+Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the game](http://localhost:8765/) in a current desktop browser. Choose **Enable camera** and grant permission, or choose **Play with keyboard**. Keep your shoulders and any raised hand in view. Your resting hand can be out of frame. The keyboard works in both modes.
 
 | Input | Move |
 | --- | --- |
