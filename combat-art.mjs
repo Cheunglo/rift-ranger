@@ -5,7 +5,7 @@ export function combatArt(canvas, beast, reducedMotion) {
   let leftLift = 0;
   let rightLift = 0;
   let previousTime;
-  const duration = { basic: 480, power: 780, clap: 480, laser: 360 };
+  const duration = { basic: 480, power: 780, laser: 360 };
   const mix = (from, to, amount) => from + (to - from) * amount;
 
   function polygon(color, points) {
@@ -152,7 +152,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       previousTime = undefined;
       leftLift = rightLift = 0;
     },
-    render(now, { left, right, guard, aura, flash }) {
+    render(now, { left, right, guard, aura, flash, beamStrength }) {
       const rect = canvas.getBoundingClientRect();
       const ratio = Math.min(2, window.devicePixelRatio || 1);
       const width = Math.round(rect.width * ratio);
@@ -189,12 +189,12 @@ export function combatArt(canvas, beast, reducedMotion) {
       const active = effects.filter(effect => now - effect.now < duration[effect.kind]);
       effects.splice(0, effects.length, ...active);
       if (guard || active.some(effect => effect.kind === 'laser' && effect.strength)) shield(boss);
+      if (beamStrength > 0) beam(scene, beamStrength);
       for (const effect of active) {
         const elapsed = now - effect.now;
         ctx.globalAlpha = Math.min(1, (duration[effect.kind] - elapsed) / 130);
         if (effect.kind === 'basic') slash(scene, elapsed);
         else if (effect.kind === 'power') ripples(scene, elapsed);
-        else if (effect.kind === 'clap') beam(scene, effect.strength);
         else lasers(scene, effect.strength);
       }
       ctx.globalAlpha = 1;

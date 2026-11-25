@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=12">
-  <script type="module" src="./game.mjs?v=12"></script>
+  <link rel="stylesheet" href="./style.css?v=13">
+  <script type="module" src="./game.mjs?v=13"></script>
 </head>
 <body>
   <main>
@@ -19,7 +19,7 @@
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#basic"></use></svg><span>Attack <kbd>A</kbd></span><strong>Basic attack</strong><p>Raise your right hand above your shoulder. Lower both hands to repeat.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#guard"></use></svg><span>Defend <kbd>S</kbd></span><strong>Guard</strong><p>Raise your left hand above your shoulder and hold it through the strike.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#power"></use></svg><span>Counter <kbd>D</kbd></span><strong>Power pose</strong><p>Block a strike, then raise both hands above your shoulders to counter.</p></article>
-      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Audio <kbd>F</kbd> <kbd>G</kbd></span><strong>Hum, then clap</strong><p>Hum or hold G to build aura. Clap or press F to spend it on a beam.</p></article>
+      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Audio <kbd>F</kbd> <kbd>G</kbd></span><strong>Hum, then clap</strong><p>Hum or hold G to build aura. Keep clapping or hold F to sustain the beam.</p></article>
     </section>
     <section class="arena" id="arena" aria-label="Battle arena">
       <div class="hud">
@@ -27,7 +27,7 @@
           <div class="health-heading"><span class="label">Ranger</span><span class="hp" id="player-hp" aria-hidden="true">100 / 100 HP</span></div>
           <progress id="player" aria-label="Ranger health" max="100" value="100"></progress>
         </div>
-        <strong id="time" aria-label="Seconds remaining">75</strong>
+        <strong id="practice-badge" hidden>Practice</strong>
         <div class="enemy-health">
           <div class="health-heading"><span class="label">The Riftbeast</span><span class="hp" id="enemy-hp" aria-hidden="true">100 / 100 HP</span></div>
           <progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress>
@@ -60,7 +60,7 @@
       <div class="overlay" id="overlay">
         <h2 id="overlay-title">Defend the city.</h2>
         <p id="overlay-copy">Keep your shoulders and any raised hand in view. You can play sitting or standing.</p>
-        <label class="practice-option"><input id="practice" type="checkbox"> Practice mode <span>Try moves without a timer or damage.</span></label>
+        <label class="practice-option"><input id="practice" type="checkbox"> Practice mode <span>Try moves without losing health.</span></label>
         <div class="actions">
           <button id="webcam" type="button">Enable camera</button>
           <button id="keyboard" class="secondary" type="button">Play with keyboard</button>
