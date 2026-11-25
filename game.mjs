@@ -393,7 +393,7 @@ function attack(move, now, fromCamera = false) {
   }
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
-  const scaledDamage = Math.round((damage + (bonus ? counterDamage : 0)) * playerDamageScale());
+  const scaledDamage = Math.max(1, Math.round((damage + (bonus ? counterDamage : 0)) * playerDamageScale()));
   const hit = damageBoss(scaledDamage, move, now);
   round.nextAttack = now + 580;
   if (move === 'basic') round.nextBasic = now + 950;

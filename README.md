@@ -4,6 +4,8 @@ A browser arcade battle. Raise your right hand above your shoulder to attack or 
 
 The boss has locks at 40, 20, and 10 HP that require 2, 4, and 6 qualifying attacks respectively. Each run shuffles slashes, power waves, and lasers between those locks. The health display shows which move is needed and how many are left. A long laser spends one full aura meter in one uninterrupted beam. A short laser spends at least half a meter without emptying a full one, and two shorts count as one long. Smaller beams still damage unprotected HP. As the boss loses HP, it fires more often and the player's attacks do less damage. An unblocked boss laser deals 19 HP at any boss health. Healing pauses at a closed lock and never reverses lock progress.
 
+Player damage scales down to a floor of 55% before rounding. A slash or power counter that gets past the locks always deals at least 1 HP.
+
 A win shows the score, clear time, and damage taken. The score adds up to 6,000 points for speed (6,000 × 60 ÷ (60 + elapsed seconds), rounded) and up to 4,000 for remaining health (40 points per HP).
 
 ## Play locally
