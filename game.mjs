@@ -372,6 +372,10 @@ function canPowerCounter(now) {
   return round.powerCounterAvailable && now < round.counterUntil;
 }
 
+function playerDamageScale() {
+  return .55 + .45 * enemy.value / enemy.max;
+}
+
 function attack(move, now, fromCamera = false) {
   if (!round || round.finished) return;
   const [damage, label] = attacks[move];
@@ -389,7 +393,8 @@ function attack(move, now, fromCamera = false) {
   }
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
-  const hit = damageBoss(bonus ? damage + counterDamage : damage, move, now);
+  const scaledDamage = Math.round((damage + (bonus ? counterDamage : 0)) * playerDamageScale());
+  const hit = damageBoss(scaledDamage, move, now);
   round.nextAttack = now + 580;
   if (move === 'basic') round.nextBasic = now + 950;
   if (move === 'power') round.powerCounterAvailable = false;
@@ -447,7 +452,7 @@ function updateAura(now, delta, humming) {
     round.beamSpent = (round.beamSpent ?? 0) + spent;
     // Accumulate fractional damage so starting and stopping cannot round up each hit.
     const damagePerFullAura = now < (round.counterUntil ?? 0) ? 31 : 26;
-    round.beamDamage += spent / auraTiming.capacity * damagePerFullAura;
+    round.beamDamage += spent / auraTiming.capacity * damagePerFullAura * playerDamageScale();
     const dealt = Math.floor(round.beamDamage + 1e-9);
     round.beamDamage = Math.max(0, round.beamDamage - dealt);
     if (dealt) {
@@ -542,7 +547,7 @@ function tick(now) {
       confirmPose('guard', 'Blocked! Power counter ready.', now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
     } else {
-      const damage = Math.min(player.value, Math.round(10 + 9 * enemy.value / enemy.max));
+      const damage = Math.min(player.value, 19);
       if (!round.practicing) setHealth(player, player.value - damage);
       round.strikeNotice = round.practicing ? 'Laser hit · no HP lost in practice' : 'Laser hit · −' + damage + ' HP';
       if (player.value === 0) round.finished = { won: false, until: now + 400 };
