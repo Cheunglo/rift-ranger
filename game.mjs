@@ -105,7 +105,7 @@ let micRequestId = 0;
 const defaultStatus = 'Camera and mic stay on your device.';
 paintBeast(byId('beast'));
 byId('camera-bonus-note').textContent =
-  'Camera clears without keyboard combat earn +' + cameraBonusPercent + '% score.';
+  'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
 
 function showWarning(message, incoming = false) {
   if (prompt.textContent !== message) prompt.textContent = message;
