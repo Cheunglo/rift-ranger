@@ -11,5 +11,5 @@ export const lessons = [
   { id: 'guard-break', title: 'Recover from a guard break', hint: 'Block the laser. Lower and raise your left hand, or release and re-press S, to block the fire.' },
   { id: 'slash-lock', title: 'Open the slash lock', hint: 'Slash to reach 40 HP, then keep slashing until the lock breaks.', lock: { hp: 40, move: 'basic', total: 2 }, startHp: 43 },
   { id: 'power-lock', title: 'Open the power lock', hint: 'Block the laser, then raise both hands or press D to open the lock.', lock: { hp: 20, move: 'power', total: 1 }, startHp: 23 },
-  { id: 'beam-lock', title: 'Open the laser lock', hint: 'Fire at Stage 1 or higher, then at Stage 2 or higher.', lock: { hp: 10, move: 'beam', total: 2, stages: [1, 2] }, startHp: 12 },
+  { id: 'beam-lock', title: 'Open the laser lock', hint: 'Earn 2 laser credits. Stages 1, 2, and 3 give 1, 2, and 4 credits.', lock: { hp: 10, move: 'beam', total: 2 }, startHp: 12 },
 ];

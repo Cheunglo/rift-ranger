@@ -1,7 +1,7 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=41';
+import { lessons } from './tutorial.mjs?v=42';
 import { paintBeast } from './beast.mjs';
-import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=39';
+import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
 import { combatArt } from './combat-art.mjs?v=41';
 import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
@@ -78,6 +78,7 @@ const warningDuration = () => round.strikeKind === 'flame' ? flameChargeTime : e
 const lockInstructions = {
   basic: 'Right hand up · A',
   power: 'Block, then both up · D',
+  beam: 'Stages 1–3 earn 1, 2, 4',
 };
 // Each additional stage takes twice as long to fill as the last one.
 const auraStages = [
@@ -166,9 +167,7 @@ function showBossLocks() {
     title = active ? next.hp + ' HP lock' : 'Next lock · ' + next.hp + ' HP';
   }
   const remaining = next ? lockRequirement(next) + ' left' : '';
-  const instruction = active
-    ? next.move === 'beam' ? 'Stage ' + requiredLaserStage(next) + '+ laser' : lockInstructions[next.move]
-    : '';
+  const instruction = active ? lockInstructions[next.move] : '';
   if (lockTitle.textContent !== title) lockTitle.textContent = title;
   if (lockRemaining.textContent !== remaining) lockRemaining.textContent = remaining;
   if (lockInstruction.textContent !== instruction) lockInstruction.textContent = instruction;
@@ -211,7 +210,6 @@ function healBoss(now) {
 function lockImpact(hit) {
   if (hit.credited && hit.lock.done === hit.lock.total) return hit.lock.hp + ' HP lock opened';
   if (hit.credited) return lockRequirement(hit.lock) + ' left';
-  if (hit.lock?.move === 'beam' && !hit.dealt) return 'Lock needs Stage ' + requiredLaserStage(hit.lock) + '+ laser';
   if (hit.lock && !hit.dealt) return 'Lock needs ' + lockRequirement(hit.lock);
   return '';
 }
@@ -716,7 +714,7 @@ function fireBeam(now) {
   }
 
   // A clap spends the meter and fires one shot at the highest completed stage.
-  // Strength changes HP damage, but each shot earns at most one lock credit.
+  // Higher stages deal more damage and can earn multiple laser lock credits.
   round.auraMs = 0;
   round.humBlockedUntil = now + beamDuration + 200;
   round.beamFlash = { until: now + beamDuration, strength: stage.multiplier / 4 };

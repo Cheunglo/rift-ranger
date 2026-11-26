@@ -1,10 +1,11 @@
 // Health gates are checked from highest HP to lowest. Each gate stores its own
 // lifetime progress, independent of the boss's current health.
 const thresholds = [40, 20, 10];
+const laserCredits = [0, 1, 2, 4];
 export const lockMoves = {
   basic: ['slash', 'slashes'],
   power: ['power wave', 'power waves'],
-  beam: ['short laser', 'short lasers'],
+  beam: ['laser credit', 'laser credits'],
 };
 
 function shuffle(items, random) {
@@ -16,21 +17,15 @@ function shuffle(items, random) {
 }
 
 export function createBossLocks(random = Math.random) {
-  // Every move gets one gate. Laser stages cycle in a shuffled order to keep
-  // requirements varied without asking for a run of only the slowest charge.
+  // Every move gets one gate. The laser gate counts credits from any charge stage.
   const moves = shuffle(Object.keys(lockMoves), random);
   return thresholds.map((hp, i) => ({
     hp, move: moves[i], total: (i + 1) * 2, done: 0, engaged: false,
-    ...(moves[i] === 'beam' ? { stages: shuffle([1, 2, 3], random) } : {}),
   }));
 }
 
 export function nextBossLock(locks) {
   return locks.find(lock => lock.done < lock.total);
-}
-
-export function requiredLaserStage(lock) {
-  return lock.stages?.[lock.done % lock.stages.length];
 }
 
 export function bossHit(locks, hp, damage, move, auraStage) {
@@ -40,9 +35,9 @@ export function bossHit(locks, hp, damage, move, auraStage) {
   // after that, healing above the floor does not turn off the challenge.
   const next = Math.max(floor, hp - damage);
   if (lock && next === floor) lock.engaged = true;
-  // The requested laser stage is the minimum charge for one lock credit.
-  const credited = Boolean(lock?.engaged && lock.move === move &&
-    (move !== 'beam' || auraStage >= requiredLaserStage(lock)));
-  if (credited) lock.done++;
+  const credits = move === 'beam' ? laserCredits[auraStage] ?? 0 : 1;
+  const credited = Boolean(lock?.engaged && lock.move === move && credits > 0);
+  // Spend credits only on the lock that caught this hit.
+  if (credited) lock.done = Math.min(lock.total, lock.done + credits);
   return { hp: next, dealt: hp - next, lock: lock?.engaged ? lock : null, credited };
 }
