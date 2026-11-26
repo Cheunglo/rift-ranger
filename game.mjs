@@ -1,4 +1,5 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
+import { lessons } from './tutorial.mjs?v=29';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=22';
 import { combatArt } from './combat-art.mjs?v=26';
@@ -16,8 +17,8 @@ const battleResult = byId('battle-result');
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
-const practice = byId('practice');
-const practiceLaser = byId('practice-laser');
+const tutorial = byId('tutorial');
+const tutorialPanel = byId('tutorial-panel');
 const micButtons = [byId('mic'), byId('mic-setup')];
 const micStatus = byId('mic-status');
 const micLevel = byId('mic-level');
@@ -39,7 +40,7 @@ const lockStatus = byId('lock-status');
 const lockTitle = byId('lock-title');
 const lockRemaining = byId('lock-remaining');
 const lockInstruction = byId('lock-instruction');
-const practiceBadge = byId('practice-badge');
+const tutorialBadge = byId('tutorial-badge');
 const auraMeter = byId('aura');
 const auraCaption = byId('aura-caption');
 // All timing values are milliseconds. The animation loop uses one clock.
@@ -49,7 +50,6 @@ const battleTiming = {
   fastestStrikeInterval: 3650,
   warningStep: 1000,
   counterWindow: 2400,
-  practiceCounterWindow: 6000,
   healQuietTime: 1800,
   healMinInterval: 700,
   healFullInterval: 5200,
@@ -125,6 +125,7 @@ function resetHud() {
   setHealth(enemy, enemy.max);
   auraMeter.value = 0;
   auraCaption.textContent = 'Aura';
+  for (const marker of lockMarkers.children) marker.dataset.state = 'closed';
 }
 
 // The HUD previews the next gate and keeps an engaged lock highlighted if the boss heals.
@@ -155,8 +156,8 @@ function lockRequirement(lock) {
 }
 
 function damageBoss(damage, move, now, credit = 1) {
-  // Practice uses the same move effects but never changes either health bar.
-  if (round.practicing) return { dealt: Math.min(enemy.value, damage), lock: null };
+  // The move drills use the real effects. Health gates only appear in the lock lessons.
+  if (isTutorial() && !lesson().lock) return { dealt: Math.min(enemy.value, damage), lock: null };
   const hit = bossHit(round.locks, enemy.value, damage, move, credit);
   if (hit.dealt) setHealth(enemy, hit.hp);
   if (hit.dealt || hit.credited) {
@@ -174,7 +175,7 @@ function healInterval() {
 }
 
 function healBoss(now) {
-  if (round.practicing || now < round.nextHeal || enemy.value <= 0 || enemy.value >= enemy.max) return;
+  if (isTutorial() || now < round.nextHeal || enemy.value <= 0 || enemy.value >= enemy.max) return;
   setHealth(enemy, enemy.value + 1);
   round.nextHeal = now + healInterval();
   showBossLocks();
@@ -334,8 +335,8 @@ function resetRound() {
   poseAnimation?.cancel();
   poseCard.hidden = true;
   bossPanel.hidden = true;
-  practiceLaser.hidden = true;
-  practiceBadge.hidden = true;
+  tutorialPanel.hidden = true;
+  tutorialBadge.hidden = true;
   lockMarkers.hidden = lockStatus.hidden = true;
   webcam.disabled = false;
   webcam.textContent = 'Enable camera';
@@ -343,26 +344,27 @@ function resetRound() {
   device.textContent = defaultStatus;
 }
 
-function startRound(mode, practicing) {
+function startRound(mode, learning) {
   const now = performance.now();
   round = {
-    mode, practicing, startedAt: now, strike: practicing ? Infinity : now + battleTiming.firstStrike,
-    cameraBonusEligible: mode === 'camera' && !practicing,
+    mode, lessonIndex: learning ? 0 : null, startedAt: now, strike: learning ? Infinity : now + battleTiming.firstStrike,
+    cameraBonusEligible: mode === 'camera' && !learning,
     nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, beamDamage: 0, lastTick: now,
-    locks: practicing ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
+    locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(),
   };
   resetHud();
   cameraBonusStatus.hidden = !round.cameraBonusEligible;
   cameraBonusStatus.dataset.earned = 'true';
   cameraBonusStatus.textContent = '+' + cameraBonusPercent + '% camera bonus active';
-  lockMarkers.hidden = lockStatus.hidden = practicing;
-  if (!practicing) showBossLocks();
-  practiceBadge.hidden = !practicing;
-  practiceLaser.hidden = !practicing;
-  practiceLaser.disabled = false;
+  if (learning) showLesson(now);
+  else {
+    lockMarkers.hidden = lockStatus.hidden = false;
+    showBossLocks();
+  }
+  tutorialBadge.hidden = !learning;
   arena.dataset.state = 'ready';
   overlay.hidden = true;
   showPose();
@@ -373,6 +375,56 @@ function startRound(mode, practicing) {
   if (mode === 'camera') cameraStatus('Waiting for tracking…', 'waiting');
   exit.hidden = false;
   animation = requestAnimationFrame(tick);
+}
+
+function isTutorial() {
+  return round.lessonIndex !== null;
+}
+
+function lesson() {
+  return lessons[round.lessonIndex];
+}
+
+function showLesson(now) {
+  const current = lesson();
+  tutorialPanel.hidden = false;
+  byId('tutorial-step').textContent = 'Tutorial · ' + (round.lessonIndex + 1) + ' / ' + lessons.length;
+  byId('tutorial-title').textContent = current.title;
+  byId('tutorial-instruction').textContent = current.hint;
+  round.strike = Infinity;
+  if (current.id !== 'counter') {
+    round.counterUntil = 0;
+    round.powerCounterAvailable = false;
+  }
+  if (current.id === 'block' || current.id === 'power-lock') {
+    round.warningStart = 0;
+    round.strike = now + warningDuration() + 1000;
+  }
+  lockMarkers.hidden = lockStatus.hidden = !current.lock;
+  if (current.lock) {
+    // Retain earlier tutorial gates so their markers stay open in the HUD.
+    round.locks.push({ ...current.lock, done: 0, engaged: false });
+    setHealth(enemy, current.startHp);
+    showBossLocks();
+  }
+}
+
+function advanceLesson(now) {
+  if (round.lessonIndex + 1 === lessons.length) {
+    round.finished = { tutorial: true, until: now + 650 };
+    return;
+  }
+  round.lessonIndex++;
+  showLesson(now);
+}
+
+function completeTutorial() {
+  resetRound();
+  tutorial.checked = false;
+  arena.dataset.state = 'ready';
+  showOverlay('Tutorial complete', 'You learned every move and opened all three locks. In battle, lock moves are shuffled and the boss can heal.');
+  resetHud();
+  webcam.focus();
 }
 
 function forfeitCameraBonus(reason) {
@@ -429,6 +481,9 @@ function playerDamageScale(move) {
 
 function attack(move, now, fromCamera = false) {
   if (!round || round.finished) return;
+  const current = isTutorial() ? lesson() : null;
+  if (current && !current.lock && !((current.id === 'slash' && move === 'basic') ||
+      (current.id === 'counter' && move === 'power'))) return;
   const [damage, label] = attacks[move];
   if (move === 'power' && !canPowerCounter(now)) {
     if (!fromCamera) {
@@ -448,11 +503,13 @@ function attack(move, now, fromCamera = false) {
   round.attackPose = { move, until: now + 360 };
   visuals.play(move, now);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
-  const damageText = round.practicing ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP';
+  const damageText = isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP';
   const outcome = lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
   confirmPose(move, outcome, now);
   if (fromCamera) cameraNotice(outcome, hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
-  if (enemy.value === 0) round.finished = { won: true, at: now, until: now + (move === 'power' ? 800 : 510) };
+  if (current && (current.id === 'slash' || current.id === 'counter' ||
+      (hit.credited && hit.lock.done === hit.lock.total))) advanceLesson(now);
+  else if (enemy.value === 0) round.finished = { won: true, at: now, until: now + (move === 'power' ? 800 : 510) };
   return true;
 }
 
@@ -476,21 +533,30 @@ function finishBeam(now) {
   const spent = round.beamSpent;
   round.beamSpent = 0;
   if (!spent) return;
+  const full = spent >= auraTiming.capacity - 1e-6;
+  if (isTutorial() && lesson().id === 'beam' && full) {
+    advanceLesson(now);
+    return;
+  }
   const lock = nextBossLock(round.locks);
   if (lock?.move !== 'beam' || !lock.engaged) return;
-  const credit = spent >= auraTiming.capacity - 1e-6 ? longLaserCredit : 1;
+  const credit = full ? longLaserCredit : 1;
   const hit = damageBoss(0, 'beam', now, credit);
   const impact = lockImpact(hit);
   if (impact) confirmPose('clap', impact, now);
+  if (isTutorial() && hit.credited && hit.lock.done === hit.lock.total) advanceLesson(now);
 }
 
 function updateAura(now, delta, humming) {
   // Aura is stored in milliseconds so charge and drain share the same rate.
   const clapUntil = round.clapUntil ?? 0;
   const clapTime = Math.max(0, Math.min(now, clapUntil) - Math.max(now - delta, round.clapFrom ?? now));
-  const firing = round.keyboardBeam || now < clapUntil;
+  const current = isTutorial() ? lesson().id : null;
+  const canFire = !current || current === 'beam' || current === 'beam-lock';
+  const canCharge = canFire || current === 'hum';
+  const firing = canFire && (round.keyboardBeam || now < clapUntil);
   const strength = firing ? round.auraMs / auraTiming.capacity : 0;
-  const spent = Math.min(round.auraMs, round.keyboardBeam ? delta : clapTime);
+  const spent = canFire ? Math.min(round.auraMs, round.keyboardBeam ? delta : clapTime) : 0;
   if (spent > 0) {
     round.humBlockedUntil = now + 320;
     round.auraMs -= spent;
@@ -505,8 +571,9 @@ function updateAura(now, delta, humming) {
       if (enemy.value === 0) round.finished = { won: true, at: now, until: now + 300 };
     }
     if (round.auraMs === 0) finishBeam(now);
-  } else if (!firing && humming) {
+  } else if (canCharge && !firing && humming) {
     round.auraMs = Math.min(auraTiming.capacity, round.auraMs + delta);
+    if (current === 'hum' && round.auraMs === auraTiming.capacity) advanceLesson(now);
   }
   if (!firing) finishBeam(now);
   const charge = Math.floor(round.auraMs / auraTiming.capacity * 100);
@@ -532,7 +599,7 @@ function tick(now) {
   // then render. Keyboard input uses the same move and damage functions.
   if (!round) return;
   if (round.finished) {
-    if (now >= round.finished.until) return endRound(round.finished.won);
+    if (now >= round.finished.until) return round.finished.tutorial ? completeTutorial() : endRound(round.finished.won);
     drawBattle(now, false);
     animation = requestAnimationFrame(tick);
     return;
@@ -588,19 +655,23 @@ function tick(now) {
     round.warningStart = randomWarningStart();
     const interval = battleTiming.fastestStrikeInterval +
       (battleTiming.slowestStrikeInterval - battleTiming.fastestStrikeInterval) * enemy.value / enemy.max;
-    round.strike = round.practicing ? Infinity :
+    round.strike = isTutorial() ? Infinity :
       now + Math.round(interval);
-    if (round.practicing) practiceLaser.disabled = false;
     round.strikeNotice = 'Strike finished';
     if (guard) {
-      round.counterUntil = now + (round.practicing ? battleTiming.practiceCounterWindow : battleTiming.counterWindow);
+      round.counterUntil = isTutorial() ? Infinity : now + battleTiming.counterWindow;
       round.powerCounterAvailable = true;
       confirmPose('guard', 'Blocked! Power counter ready.', now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
+      if (isTutorial() && lesson().id === 'block') advanceLesson(now);
     } else {
       const damage = Math.min(player.value, 19);
-      if (!round.practicing) setHealth(player, player.value - damage);
-      round.strikeNotice = round.practicing ? 'Laser hit · no HP lost in practice' : 'Laser hit · −' + damage + ' HP';
+      if (!isTutorial()) setHealth(player, player.value - damage);
+      round.strikeNotice = isTutorial() ? 'Missed block · try the next shot' : 'Laser hit · −' + damage + ' HP';
+      if (isTutorial()) {
+        round.warningStart = 0;
+        round.strike = now + warningDuration() + 1300;
+      }
       if (player.value === 0) round.finished = { won: false, until: now + 400 };
     }
     round.strikeNoticeUntil = now + 1000;
@@ -634,7 +705,7 @@ function tick(now) {
 
 webcam.addEventListener('click', async () => {
   const request = ++requestId;
-  const practicing = practice.checked;
+  const learning = tutorial.checked;
   webcam.disabled = true;
   webcam.textContent = 'Starting camera…';
   exit.hidden = false;
@@ -660,7 +731,7 @@ webcam.addEventListener('click', async () => {
       if (round) round.mode = 'keyboard';
       device.textContent = 'Camera disconnected. Keyboard controls are available.';
     });
-    startRound('camera', practicing);
+    startRound('camera', learning);
     device.textContent = 'Camera active. ' + defaultStatus;
   } catch (error) {
     if (request !== requestId) return;
@@ -682,13 +753,7 @@ keyboard.addEventListener('click', () => {
   webcam.disabled = false;
   webcam.textContent = 'Enable camera';
   device.textContent = micStream ? 'Mic active. ' + defaultStatus : defaultStatus;
-  startRound('keyboard', practice.checked);
-});
-
-practiceLaser.addEventListener('click', () => {
-  if (!round?.practicing || round.strike !== Infinity) return;
-  practiceLaser.disabled = true;
-  round.strike = performance.now() + warningDuration();
+  startRound('keyboard', tutorial.checked);
 });
 
 async function toggleMic() {
