@@ -5,7 +5,7 @@ export function combatArt(canvas, beast, reducedMotion) {
   let leftLift = 0;
   let rightLift = 0;
   let previousTime;
-  const duration = { basic: 480, power: 780, laser: 360 };
+  const duration = { basic: 480, power: 780, heal: 850, laser: 360 };
   const eyeColors = { green: '#69ff77', yellow: '#ffe663', red: '#ff243c' };
   const mix = (from, to, amount) => from + (to - from) * amount;
 
@@ -135,6 +135,30 @@ export function combatArt(canvas, beast, reducedMotion) {
     line([origin, target], '#fff1ff', width * .28);
   }
 
+  function heal(scene, elapsed) {
+    ctx.save();
+    ctx.translate(scene.x, scene.floor);
+    ctx.scale(scene.scale, scene.scale);
+    ctx.shadowColor = '#45ff95';
+    ctx.shadowBlur = 9;
+    // Sparks start at staggered heights around the ranger and rise past the hands.
+    for (let i = 0; i < 12; i++) {
+      const start = i * 23;
+      const progress = (elapsed - start) / 570;
+      if (progress < 0 || progress >= 1) continue;
+      const side = i % 2 ? 1 : -1;
+      const spread = 28 + (i * 13) % 25;
+      const rise = reducedMotion.matches ? .4 : progress;
+      const x = side * (spread + rise * 12);
+      const y = -20 - (i * 11) % 44 - rise * 78;
+      const size = 2 + (i % 3);
+      ctx.globalAlpha = Math.min(1, progress * 6, (1 - progress) * 4);
+      polygon(i % 3 === 0 ? '#ddffba' : '#72ff9d',
+        [[x, y - size * 2], [x + size, y], [x, y + size * 2], [x - size, y]]);
+    }
+    ctx.restore();
+  }
+
   function lasers(scene, blocked) {
     const endY = blocked ? scene.boss.y + scene.boss.height : scene.floor - 62 * scene.scale;
     scene.eyes.forEach(([x, y], i) => {
@@ -202,6 +226,7 @@ export function combatArt(canvas, beast, reducedMotion) {
         ctx.globalAlpha = Math.min(1, (duration[effect.kind] - elapsed) / 130);
         if (effect.kind === 'basic') slash(scene, elapsed);
         else if (effect.kind === 'power') ripples(scene, elapsed);
+        else if (effect.kind === 'heal') heal(scene, elapsed);
         else lasers(scene, effect.strength);
       }
       ctx.globalAlpha = 1;

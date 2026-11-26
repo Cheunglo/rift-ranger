@@ -2,7 +2,7 @@
 import { lessons } from './tutorial.mjs?v=35';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=35';
-import { combatArt } from './combat-art.mjs?v=26';
+import { combatArt } from './combat-art.mjs?v=36';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=34';
 
 const byId = id => document.getElementById(id);
@@ -590,6 +590,8 @@ function healPlayer(now, fromCamera = false) {
   round.auraMs = 0;
   showAura();
   setHealth(player, player.value + restored);
+  round.attackPose = { move: 'heal', until: now + 750 };
+  visuals.play('heal', now);
   confirmPose('heal', 'Healed +' + restored + ' HP', now);
   if (fromCamera) cameraNotice('Healed +' + restored + ' HP.', 'accepted', now);
   if (isTutorial()) {
@@ -652,10 +654,11 @@ function updateAura(now, delta, humming) {
 function drawBattle(now, guard, flash = null) {
   const tracked = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
   const attack = now < round.attackPose?.until ? round.attackPose.move : null;
+  const bothArms = attack === 'power' || attack === 'heal';
   const beamStrength = now < round.beamFlash?.until ? round.beamFlash.strength : 0;
   visuals.render(now, {
-    left: Boolean(tracked?.left || guard || attack === 'power'),
-    right: Boolean(tracked?.right || attack === 'basic' || attack === 'power'),
+    left: Boolean(tracked?.left || guard || bothArms),
+    right: Boolean(tracked?.right || attack === 'basic' || bothArms),
     guard, aura: round.auraMs / auraCapacity, flash, beamStrength,
   });
 }
