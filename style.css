@@ -26,6 +26,7 @@ h1 span { color: var(--acid); margin-left: .09em; }
 .hud > div:first-child { align-self: start; }
 #camera-bonus-status { margin: 5px 0 0; color: var(--acid); font-size: .875rem; line-height: 1.2; }
 #camera-bonus-status[data-earned="false"] { color: var(--muted); }
+#burn-status { margin: 5px 0 0; color: #ffb883; font: 700 .8125rem/1.2 ui-monospace, monospace; }
 .enemy-health { grid-column: 3; align-self: start; text-align: right; }
 .health-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 8px; }
 .enemy-health .health-heading { flex-direction: row-reverse; }

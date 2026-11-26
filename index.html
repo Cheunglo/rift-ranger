@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=38">
-  <script type="module" src="./game.mjs?v=39"></script>
+  <link rel="stylesheet" href="./style.css?v=40">
+  <script type="module" src="./game.mjs?v=40"></script>
 </head>
 <body>
   <main>
@@ -27,6 +27,7 @@
         <div>
           <div class="health-heading"><span class="label">Ranger</span><span class="hp" id="player-hp" aria-hidden="true">100 / 100 HP</span></div>
           <progress id="player" aria-label="Ranger health" max="100" value="100"></progress>
+          <p id="burn-status" role="status" hidden>Burning · −1 HP/sec</p>
           <p id="camera-bonus-status" role="status" hidden></p>
         </div>
         <strong id="tutorial-badge" hidden>Tutorial</strong>
@@ -47,7 +48,7 @@
           </p>
         </div>
         <div id="boss-panel" class="combat-panel" hidden>
-          <span class="label">Boss warning</span>
+          <span class="label" id="boss-panel-label">Boss warning</span>
           <output id="prompt" aria-live="polite">No attack incoming</output>
           <svg id="warning-pose" class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use href="./poses.svg?v=7#guard"></use></svg>
           <p id="warning-hint" hidden>Left hand up, or hold S.</p>

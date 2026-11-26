@@ -1,8 +1,8 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=39';
+import { lessons } from './tutorial.mjs?v=40';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=39';
-import { combatArt } from './combat-art.mjs?v=38';
+import { combatArt } from './combat-art.mjs?v=40';
 import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
 const byId = id => document.getElementById(id);
@@ -25,6 +25,7 @@ const exit = byId('exit');
 const device = byId('device');
 const prompt = byId('prompt');
 const bossPanel = byId('boss-panel');
+const bossPanelLabel = byId('boss-panel-label');
 const warningPose = byId('warning-pose');
 const warningHint = byId('warning-hint');
 const poseCard = byId('ranger-pose');
@@ -32,6 +33,7 @@ const poseArt = byId('pose-art');
 const poseIcon = poseArt.ownerSVGElement;
 const poseLabel = byId('pose-label');
 const player = byId('player');
+const burnStatus = byId('burn-status');
 const enemy = byId('enemy');
 const lockMarkers = byId('lock-markers');
 const lockStatus = byId('lock-status');
@@ -59,7 +61,18 @@ const attacks = {
 const cameraBonusPercent = 20;
 const warningColors = ['green', 'yellow', 'red'];
 const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
-const warningDuration = () => (warningColors.length - round.warningStart) * battleTiming.warningStep;
+const eyeWarningDuration = () => (warningColors.length - round.warningStart) * battleTiming.warningStep;
+// Each phase stores its exclusive end time and the move that can interrupt it.
+const flamePhases = [
+  { until: 1400, color: '#ff352d', move: 'basic', hint: 'Slash to interrupt' },
+  { until: 2800, color: '#ff8b28', move: 'beam', stage: 1, hint: 'Stage 1+ laser to interrupt' },
+  { until: 4200, color: '#ffdd39', move: 'beam', stage: 2, hint: 'Stage 2+ laser to interrupt' },
+  { until: 6600, color: '#43a8ff', move: 'beam', stage: 3, hint: 'Stage 3 laser to interrupt' },
+  { until: 7100, color: '#ffffff', halo: '#43a8ff', hint: 'White-hot · guard now' },
+];
+const flameChargeTime = flamePhases.at(-1).until;
+const burnInterval = 1000;
+const warningDuration = () => round.strikeKind === 'flame' ? flameChargeTime : eyeWarningDuration();
 const lockInstructions = {
   basic: 'Right hand up · A',
   power: 'Block, then both up · D',
@@ -131,6 +144,7 @@ function setHealth(bar, value) {
 function resetHud() {
   setHealth(player, player.max);
   setHealth(enemy, enemy.max);
+  burnStatus.hidden = true;
   auraMeter.value = 0;
   auraCaption.textContent = 'Aura';
   for (const marker of lockMarkers.children) marker.dataset.state = 'closed';
@@ -389,6 +403,7 @@ function resetRound() {
   cancelAnimationFrame(animation);
   stopCamera();
   round = null;
+  burnStatus.hidden = true;
   cameraBonusStatus.hidden = true;
   visuals.clear();
   poseAnimation?.cancel();
@@ -412,7 +427,7 @@ function startRound(mode, learning) {
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
-    warningStart: randomWarningStart(),
+    warningStart: randomWarningStart(), strikeKind: 'laser', burnTickAt: Infinity,
   };
   resetHud();
   cameraBonusStatus.hidden = !round.cameraBonusEligible;
@@ -453,6 +468,7 @@ function showLesson(now) {
   byId('tutorial-title').textContent = current.title;
   byId('tutorial-instruction').textContent = current.hint;
   round.strike = Infinity;
+  round.strikeKind = current.id === 'flame' ? 'flame' : 'laser';
   if (current.id !== 'counter') {
     round.counterUntil = 0;
     round.powerCounterAvailable = false;
@@ -461,6 +477,7 @@ function showLesson(now) {
     round.warningStart = 0;
     round.strike = now + warningDuration() + 1000;
   }
+  if (current.id === 'flame') round.strike = now + flameChargeTime + 1000;
   lockMarkers.hidden = lockStatus.hidden = !current.lock;
   if (current.lock) {
     // Retain earlier tutorial gates so their markers stay open in the HUD.
@@ -540,11 +557,48 @@ function playerDamageScale(move) {
   return minimum + (1 - minimum) * enemy.value / enemy.max;
 }
 
+function flamePhase(now) {
+  if (round.strikeKind !== 'flame' || now >= round.strike) return;
+  const elapsed = now - (round.strike - flameChargeTime);
+  if (elapsed >= 0) return flamePhases.find(phase => elapsed < phase.until);
+}
+
+function scheduleNextStrike(now) {
+  if (isTutorial()) {
+    round.strike = Infinity;
+    return;
+  }
+  round.strikeKind = round.strikeKind === 'laser' ? 'flame' : 'laser';
+  round.warningStart = randomWarningStart();
+  const interval = battleTiming.fastestStrikeInterval +
+    (battleTiming.slowestStrikeInterval - battleTiming.fastestStrikeInterval) * enemy.value / enemy.max;
+  // A faster boss still gives players the full flamethrower warning.
+  round.strike = now + Math.max(Math.round(interval), round.strikeKind === 'flame' ? flameChargeTime + 1000 : 0);
+}
+
+function interruptFlame(move, now, stage) {
+  const phase = flamePhase(now);
+  if (phase?.move !== move || (move === 'beam' && stage < phase.stage)) return false;
+  scheduleNextStrike(now);
+  round.strikeNotice = 'Flamethrower interrupted!';
+  round.strikeNoticeUntil = now + 1400;
+  if (isTutorial() && lesson().id === 'flame') advanceLesson(now);
+  return true;
+}
+
+function hurtPlayer(amount, now) {
+  const damage = Math.min(player.value, amount);
+  round.damageTaken += damage;
+  setHealth(player, player.value - damage);
+  if (player.value === 0) round.finished = { won: false, until: now + 400 };
+  return damage;
+}
+
 function attack(move, now, fromCamera = false) {
   if (!round || round.finished) return;
   if (move === 'power' && !canPowerCounter(now)) return healPlayer(now, fromCamera);
   const current = isTutorial() ? lesson() : null;
-  if (current && !current.lock && !((current.id === 'slash' && move === 'basic') ||
+  if (current && !current.lock && !(((current.id === 'slash' || current.id === 'flame') && move === 'basic') ||
       (current.id === 'counter' && move === 'power'))) return;
   const [damage, label] = attacks[move];
   if (move === 'power' && now < round.nextPower) return;
@@ -558,9 +612,11 @@ function attack(move, now, fromCamera = false) {
   }
   round.attackPose = { move, until: now + 360 };
   visuals.play(move, now);
+  const interrupted = interruptFlame(move, now);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
   const damageText = isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP';
-  const outcome = lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
+  const outcome = interrupted ? 'Flamethrower interrupted!' :
+    lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
   confirmPose(move, outcome, now);
   if (fromCamera) cameraNotice(outcome, hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
   if (current && (current.id === 'slash' || current.id === 'counter' ||
@@ -576,7 +632,9 @@ function readyAuraStage() {
 function healBlockReason(now) {
   if (isTutorial() && lesson().id !== 'heal') return 'Follow the current lesson.';
   if (canPowerCounter(now)) return 'Heal after the power counter window.';
-  if (player.value >= player.max) return 'Health is full. Block a strike to unlock a power counter.';
+  if (player.value >= player.max && round.burnTickAt === Infinity) {
+    return 'Health is full. Block a strike to unlock a power counter.';
+  }
   if (!readyAuraStage()) return 'Charge aura to Stage 1 to heal.';
   return '';
 }
@@ -589,13 +647,17 @@ function healPlayer(now, fromCamera = false) {
     return false;
   }
   const restored = Math.min(player.max - player.value, readyAuraStage().multiplier * 5);
+  const burned = round.burnTickAt !== Infinity;
+  round.burnTickAt = Infinity;
+  burnStatus.hidden = true;
   round.auraMs = 0;
   showAura();
   setHealth(player, player.value + restored);
   round.attackPose = { move: 'heal', until: now + 750 };
   visuals.play('heal', now);
-  confirmPose('heal', 'Healed +' + restored + ' HP', now);
-  if (fromCamera) cameraNotice('Healed +' + restored + ' HP.', 'accepted', now);
+  const outcome = 'Healed +' + restored + ' HP' + (burned ? ' · Burn cleared' : '');
+  confirmPose('heal', outcome, now);
+  if (fromCamera) cameraNotice(outcome, 'accepted', now);
   if (isTutorial()) {
     setHealth(player, player.max);
     advanceLesson(now);
@@ -606,7 +668,7 @@ function healPlayer(now, fromCamera = false) {
 function fireBeam(now) {
   if (!round || round.finished) return;
   const current = isTutorial() ? lesson().id : null;
-  if (current && current !== 'beam' && current !== 'beam-lock') return;
+  if (current && current !== 'beam' && current !== 'beam-lock' && current !== 'flame') return;
   const stage = readyAuraStage();
   if (!stage) {
     round.poseFeedback = { move: 'clap', label: 'Charge aura to Stage 1 first', state: 'locked', until: now + 1000 };
@@ -622,9 +684,11 @@ function fireBeam(now) {
   const baseDamage = now < (round.counterUntil ?? 0) ? 8 : 6;
   const damage = Math.max(1, Math.round(baseDamage * playerDamageScale())) * stage.multiplier;
   const hit = damageBoss(damage, 'beam', now, stage.level);
+  const interrupted = interruptFlame('beam', now, stage.level);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
-  const outcome = lockImpact(hit) || stage.multiplier + '× laser · ' +
-    (isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP');
+  const outcome = interrupted ? 'Flamethrower interrupted!' :
+    lockImpact(hit) || stage.multiplier + '× laser · ' +
+      (isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP');
   confirmPose('clap', outcome, now);
   if (current === 'beam' || (current === 'beam-lock' && hit.credited && hit.lock.done === hit.lock.total)) {
     advanceLesson(now);
@@ -646,14 +710,15 @@ function showAura() {
 
 function updateAura(now, delta, humming) {
   const current = isTutorial() ? lesson().id : null;
-  if (humming && (!current || current === 'hum' || current === 'heal' || current === 'beam' || current === 'beam-lock')) {
+  if (humming && (!current || current === 'hum' || current === 'heal' || current === 'beam' ||
+      current === 'beam-lock' || current === 'flame')) {
     round.auraMs = Math.min(auraCapacity, round.auraMs + delta);
     if (current === 'hum' && readyAuraStage()) advanceLesson(now);
   }
   showAura();
 }
 
-function drawBattle(now, guard, flash = null) {
+function drawBattle(now, guard, flash = null, flame = null) {
   const tracked = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
   const attack = now < round.attackPose?.until ? round.attackPose.move : null;
   const bothArms = attack === 'power' || attack === 'heal';
@@ -661,7 +726,7 @@ function drawBattle(now, guard, flash = null) {
   visuals.render(now, {
     left: Boolean(tracked?.left || guard || bothArms),
     right: Boolean(tracked?.right || attack === 'basic' || bothArms),
-    guard, aura: round.auraMs / auraCapacity, flash, beamStrength,
+    guard, aura: round.auraMs / auraCapacity, flash, beamStrength, flame,
   });
 }
 
@@ -714,34 +779,43 @@ function tick(now) {
   updateAura(now, delta, humming);
   healBoss(now);
 
+  if (now >= round.burnTickAt) {
+    const ticks = 1 + Math.floor((now - round.burnTickAt) / burnInterval);
+    round.burnTickAt += ticks * burnInterval;
+    hurtPlayer(ticks, now);
+    if (round.finished) {
+      animation = requestAnimationFrame(tick);
+      return;
+    }
+  }
+
   const cameraGuard = round.mode === 'camera' && round.cameraMove?.guard && now - round.lastPose < 260;
   const guard = round.keyboardGuard || cameraGuard;
   if (now >= round.strike) {
-    visuals.play('laser', now, guard);
-    round.warningStart = randomWarningStart();
-    const interval = battleTiming.fastestStrikeInterval +
-      (battleTiming.slowestStrikeInterval - battleTiming.fastestStrikeInterval) * enemy.value / enemy.max;
-    round.strike = isTutorial() ? Infinity :
-      now + Math.round(interval);
+    const kind = round.strikeKind;
+    visuals.play(kind, now, guard);
+    scheduleNextStrike(now);
     round.strikeNotice = 'Strike finished';
     if (guard) {
-      round.counterUntil = isTutorial() ? Infinity : now + battleTiming.counterWindow;
+      round.counterUntil = isTutorial() && kind === 'laser' ? Infinity : now + battleTiming.counterWindow;
       round.powerCounterAvailable = true;
       confirmPose('guard', 'Blocked! Power counter ready.', now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
       if (isTutorial() && lesson().id === 'block') advanceLesson(now);
+      if (isTutorial() && kind === 'flame') round.strikeNotice = 'Blocked · interrupt the next charge';
+    } else if (isTutorial()) {
+      round.strikeNotice = kind === 'flame' ? 'Flame hit · interrupt the next charge' : 'Missed block · try the next shot';
     } else {
-      const damage = Math.min(player.value, 19);
-      if (!isTutorial()) {
-        round.damageTaken += damage;
-        setHealth(player, player.value - damage);
+      const damage = hurtPlayer(kind === 'flame' ? 10 : 19, now);
+      round.strikeNotice = (kind === 'flame' ? 'Flame hit' : 'Laser hit') + ' · −' + damage + ' HP';
+      if (kind === 'flame' && !round.finished && round.burnTickAt === Infinity) {
+        round.burnTickAt = now + burnInterval;
+        burnStatus.hidden = false;
       }
-      round.strikeNotice = isTutorial() ? 'Missed block · try the next shot' : 'Laser hit · −' + damage + ' HP';
-      if (isTutorial()) {
-        round.warningStart = 0;
-        round.strike = now + warningDuration() + 1300;
-      }
-      if (player.value === 0) round.finished = { won: false, until: now + 400 };
+    }
+    if (isTutorial() && (!guard || kind === 'flame')) {
+      round.warningStart = 0;
+      round.strike = now + warningDuration() + 1300;
     }
     round.strikeNoticeUntil = now + 1000;
   }
@@ -752,8 +826,9 @@ function tick(now) {
   const leadTime = warningDuration();
   const danger = untilStrike <= leadTime;
   const warningElapsed = leadTime - untilStrike;
+  const flame = flamePhase(now);
   const flashIndex = round.warningStart + Math.floor(warningElapsed / battleTiming.warningStep);
-  const flash = danger && warningElapsed % battleTiming.warningStep < 235 ? warningColors[flashIndex] : null;
+  const flash = danger && !flame && warningElapsed % battleTiming.warningStep < 235 ? warningColors[flashIndex] : null;
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
   if (cameraPose === 'power') {
@@ -769,10 +844,15 @@ function tick(now) {
   else if (cameraPose === 'reset' && round.cameraMove.right) showPose('basic', 'Lower right hand to slash again');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
-  if (danger) showWarning('Incoming eye lasers', true);
+  const bossLabel = flame ? 'Flamethrower' : 'Boss warning';
+  if (bossPanelLabel.textContent !== bossLabel) bossPanelLabel.textContent = bossLabel;
+  if (flame) showWarning(flame.hint, true);
+  else if (danger) showWarning('Incoming eye lasers', true);
   else if (now < round.strikeNoticeUntil) showWarning(round.strikeNotice);
   else showWarning('No attack incoming');
-  drawBattle(now, guard, flash);
+  drawBattle(now, guard, flash, flame && {
+    color: flame.color, halo: flame.halo, charge: warningElapsed / leadTime,
+  });
   animation = requestAnimationFrame(tick);
 }
 
