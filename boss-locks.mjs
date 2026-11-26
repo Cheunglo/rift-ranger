@@ -21,7 +21,7 @@ export function nextBossLock(locks) {
   return locks.find(lock => lock.done < lock.total);
 }
 
-export function bossHit(locks, hp, damage, move, credit = 1) {
+export function bossHit(locks, hp, damage, move) {
   const lock = nextBossLock(locks);
   const floor = lock?.hp ?? 0;
   // The next unopened lock is a hard HP floor. Reaching it opens the challenge;
@@ -29,6 +29,6 @@ export function bossHit(locks, hp, damage, move, credit = 1) {
   const next = Math.max(floor, hp - damage);
   if (lock && next === floor) lock.engaged = true;
   const credited = Boolean(lock?.engaged && lock.move === move);
-  if (credited) lock.done = Math.min(lock.total, lock.done + credit);
+  if (credited) lock.done++;
   return { hp: next, dealt: hp - next, lock: lock?.engaged ? lock : null, credited };
 }

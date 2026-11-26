@@ -1,7 +1,7 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=32';
+import { lessons } from './tutorial.mjs?v=33';
 import { paintBeast } from './beast.mjs';
-import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=22';
+import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=33';
 import { combatArt } from './combat-art.mjs?v=26';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=26';
 
@@ -56,7 +56,6 @@ const attacks = {
   basic: [5, 'Energy slash'],
   power: [22, 'Power strike'],
 };
-const longLaserCredit = 5;
 const cameraBonusPercent = 20;
 const warningColors = ['green', 'yellow', 'red'];
 const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
@@ -64,9 +63,16 @@ const warningDuration = () => (warningColors.length - round.warningStart) * batt
 const lockInstructions = {
   basic: 'Right hand up · A',
   power: 'Block, then both up · D',
-  beam: 'Full beam = ' + longLaserCredit,
+  beam: 'Hum, then clap · G / F',
 };
-const auraTiming = { capacity: 1600, clapGap: 600 };
+// Each additional stage takes twice as long to fill as the last one.
+const auraStages = [
+  { chargeMs: 800, multiplier: 1 },
+  { chargeMs: 2400, multiplier: 2 },
+  { chargeMs: 5600, multiplier: 4 },
+];
+const auraCapacity = auraStages.at(-1).chargeMs;
+const beamDuration = 420;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const visuals = combatArt(byId('combat-fx'), byId('beast'), reducedMotion);
 const armLines = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
@@ -157,10 +163,10 @@ function lockRequirement(lock) {
   return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];
 }
 
-function damageBoss(damage, move, now, credit = 1) {
+function damageBoss(damage, move, now) {
   // The move drills use the real effects. Health gates only appear in the lock lessons.
   if (isTutorial() && !lesson().lock) return { dealt: Math.min(enemy.value, damage), lock: null };
-  const hit = bossHit(round.locks, enemy.value, damage, move, credit);
+  const hit = bossHit(round.locks, enemy.value, damage, move);
   if (hit.dealt) setHealth(enemy, hit.hp);
   if (hit.dealt || hit.credited) {
     round.nextHeal = now + battleTiming.healQuietTime + healInterval();
@@ -343,7 +349,7 @@ function activateMic(stream, audioContext) {
     setMicMessage('Mic disconnected. F and G still work.');
     device.textContent = defaultStatus;
   });
-  setMicMessage('Mic on. Hum a steady note, then keep clapping to fire.');
+  setMicMessage('Mic on. Hum to charge, then clap once to fire.');
   micLevel.hidden = false;
 }
 
@@ -353,7 +359,6 @@ function stopMic() {
   audioInput = null;
   if (round) {
     round.micHumming = false;
-    round.clapUntil = 0;
   }
   if (context && context.state !== 'closed') void context.close().catch(() => {});
   context = null;
@@ -401,7 +406,7 @@ function startRound(mode, learning) {
     cameraBonusEligible: mode === 'camera' && !learning,
     nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
-    readGesture: gestures(), hitUntil: 0, auraMs: 0, beamDamage: 0, lastTick: now,
+    readGesture: gestures(), hitUntil: 0, auraMs: 0, lastTick: now,
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(),
   };
@@ -563,84 +568,68 @@ function attack(move, now, fromCamera = false) {
   return true;
 }
 
-function requestBeam(now, microphone = false) {
-  if (round.auraMs <= 0) {
-    round.poseFeedback = { move: 'clap', label: 'Hum first to charge the beam', state: 'locked', until: now + 1000 };
+function readyAuraStage() {
+  return auraStages.findLast(stage => round.auraMs >= stage.chargeMs);
+}
+
+function fireBeam(now) {
+  if (!round || round.finished) return;
+  const current = isTutorial() ? lesson().id : null;
+  if (current && current !== 'beam' && current !== 'beam-lock') return;
+  const stage = readyAuraStage();
+  if (!stage) {
+    round.poseFeedback = { move: 'clap', label: 'Charge aura to Stage 1 first', state: 'locked', until: now + 1000 };
     return;
   }
-  if (microphone) {
-    // Repeated claps keep a single beam alive through the gaps between claps.
-    if (now >= (round.clapUntil ?? 0)) {
-      if (!round.keyboardBeam) finishBeam(now);
-      round.clapFrom = now;
-    }
-    round.clapUntil = now + auraTiming.clapGap;
+
+  // A clap spends the meter and fires one shot at the highest completed stage.
+  // Strength changes HP damage, but each shot earns at most one lock credit.
+  round.auraMs = 0;
+  round.humBlockedUntil = now + beamDuration + 200;
+  round.beamFlash = { until: now + beamDuration, strength: stage.multiplier / 4 };
+  showAura();
+  const baseDamage = now < (round.counterUntil ?? 0) ? 8 : 6;
+  const damage = Math.max(1, Math.round(baseDamage * playerDamageScale())) * stage.multiplier;
+  const hit = damageBoss(damage, 'beam', now);
+  if (hit.dealt || hit.credited) round.hitUntil = now + 170;
+  const outcome = lockImpact(hit) || stage.multiplier + '× laser · ' +
+    (isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP');
+  confirmPose('clap', outcome, now);
+  if (current === 'beam' || (current === 'beam-lock' && hit.credited && hit.lock.done === hit.lock.total)) {
+    advanceLesson(now);
+  } else if (enemy.value === 0) {
+    round.finished = { won: true, at: now, until: now + beamDuration };
   }
 }
 
-function finishBeam(now) {
-  // Count once when a beam ends. A full meter spent in one beam earns the bonus.
-  const spent = round.beamSpent;
-  round.beamSpent = 0;
-  if (!spent) return;
-  const full = spent >= auraTiming.capacity - 1e-6;
-  if (isTutorial() && lesson().id === 'beam' && full) {
-    advanceLesson(now);
-    return;
-  }
-  const lock = nextBossLock(round.locks);
-  if (lock?.move !== 'beam' || !lock.engaged) return;
-  const credit = full ? longLaserCredit : 1;
-  const hit = damageBoss(0, 'beam', now, credit);
-  const impact = lockImpact(hit);
-  if (impact) confirmPose('clap', impact, now);
-  if (isTutorial() && hit.credited && hit.lock.done === hit.lock.total) advanceLesson(now);
+function showAura() {
+  const ready = readyAuraStage();
+  const index = ready ? auraStages.indexOf(ready) + 1 : 0;
+  const bottom = ready?.chargeMs ?? 0;
+  const next = auraStages[index];
+  const percent = next ? Math.floor((round.auraMs - bottom) / (next.chargeMs - bottom) * 100) : 100;
+  if (auraMeter.value !== percent) auraMeter.value = percent;
+  const caption = ready ? 'Aura ' + index + ' · ' + ready.multiplier + '×' : 'Aura · charge to 1';
+  if (auraCaption.textContent !== caption) auraCaption.textContent = caption;
 }
 
 function updateAura(now, delta, humming) {
-  // Aura is stored in milliseconds so charge and drain share the same rate.
-  const clapUntil = round.clapUntil ?? 0;
-  const clapTime = Math.max(0, Math.min(now, clapUntil) - Math.max(now - delta, round.clapFrom ?? now));
   const current = isTutorial() ? lesson().id : null;
-  const canFire = !current || current === 'beam' || current === 'beam-lock';
-  const canCharge = canFire || current === 'hum';
-  const firing = canFire && (round.keyboardBeam || now < clapUntil);
-  const strength = firing ? round.auraMs / auraTiming.capacity : 0;
-  const spent = canFire ? Math.min(round.auraMs, round.keyboardBeam ? delta : clapTime) : 0;
-  if (spent > 0) {
-    round.humBlockedUntil = now + 320;
-    round.auraMs -= spent;
-    round.beamSpent = (round.beamSpent ?? 0) + spent;
-    // Accumulate fractional damage so starting and stopping cannot round up each hit.
-    const damagePerFullAura = now < (round.counterUntil ?? 0) ? 31 : 26;
-    round.beamDamage += spent / auraTiming.capacity * damagePerFullAura * playerDamageScale();
-    const dealt = Math.floor(round.beamDamage + 1e-9);
-    round.beamDamage = Math.max(0, round.beamDamage - dealt);
-    if (dealt) {
-      damageBoss(dealt, null, now);
-      if (enemy.value === 0) round.finished = { won: true, at: now, until: now + 300 };
-    }
-    if (round.auraMs === 0) finishBeam(now);
-  } else if (canCharge && !firing && humming) {
-    round.auraMs = Math.min(auraTiming.capacity, round.auraMs + delta);
-    if (current === 'hum' && round.auraMs === auraTiming.capacity) advanceLesson(now);
+  if (humming && (!current || current === 'hum' || current === 'beam' || current === 'beam-lock')) {
+    round.auraMs = Math.min(auraCapacity, round.auraMs + delta);
+    if (current === 'hum' && readyAuraStage()) advanceLesson(now);
   }
-  if (!firing) finishBeam(now);
-  const charge = Math.floor(round.auraMs / auraTiming.capacity * 100);
-  if (auraMeter.value !== charge) auraMeter.value = charge;
-  const caption = strength > 0 ? 'Aura · firing' :
-    charge === 100 ? 'Aura · full' : humming ? 'Aura · charging' : 'Aura';
-  if (auraCaption.textContent !== caption) auraCaption.textContent = caption;
-  return strength;
+  showAura();
 }
 
-function drawBattle(now, guard, flash = null, beamStrength = 0) {
+function drawBattle(now, guard, flash = null) {
   const tracked = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
   const attack = now < round.attackPose?.until ? round.attackPose.move : null;
+  const beamStrength = now < round.beamFlash?.until ? round.beamFlash.strength : 0;
   visuals.render(now, {
     left: Boolean(tracked?.left || guard || attack === 'power'),
     right: Boolean(tracked?.right || attack === 'basic' || attack === 'power'),
-    guard, aura: round.auraMs / auraTiming.capacity, flash, beamStrength,
+    guard, aura: round.auraMs / auraCapacity, flash, beamStrength,
   });
 }
 
@@ -678,24 +667,18 @@ function tick(now) {
 
   if (audioInput && now >= round.nextAudioPoll) {
     round.nextAudioPoll = now + 20;
-    const suppressHum = Boolean(round.keyboardBeam || now < (round.clapUntil ?? 0) ||
-      now < (round.humBlockedUntil ?? 0));
+    const suppressHum = now < (round.humBlockedUntil ?? 0);
     const { clap, humming, level, state } = audioInput(now, suppressHum);
     showMicInput(state, level);
     round.micHumming = humming;
-    if (clap) requestBeam(now, true);
+    if (clap) fireBeam(now);
   }
   if (round.finished) {
     animation = requestAnimationFrame(tick);
     return;
   }
   const humming = round.keyboardHum || (now >= (round.humBlockedUntil ?? 0) && round.micHumming);
-  const beamStrength = updateAura(now, delta, humming);
-  if (round.finished) {
-    drawBattle(now, false, null, beamStrength);
-    animation = requestAnimationFrame(tick);
-    return;
-  }
+  updateAura(now, delta, humming);
   healBoss(now);
 
   const cameraGuard = round.mode === 'camera' && round.cameraMove?.guard && now - round.lastPose < 260;
@@ -740,7 +723,6 @@ function tick(now) {
   if (cameraPose === 'power') showPose('power', 'Both arms detected', canPowerCounter(now) ? '' : 'locked');
   else if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
   else if (guard) showPose('guard', 'Guard detected', 'active');
-  else if (beamStrength > 0) showPose('clap', 'Aura beam firing', 'active');
   else if (recentAction) showPose(used.move, used.label, used.state ?? 'active');
   else if (cameraPose === 'power-held') showPose('power', 'Power registered', 'active');
   else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
@@ -749,7 +731,7 @@ function tick(now) {
   if (danger) showWarning('Incoming eye lasers', true);
   else if (now < round.strikeNoticeUntil) showWarning(round.strikeNotice);
   else showWarning('No attack incoming');
-  drawBattle(now, guard, flash, beamStrength);
+  drawBattle(now, guard, flash);
   animation = requestAnimationFrame(tick);
 }
 
@@ -855,29 +837,17 @@ window.addEventListener('keydown', event => {
   forfeitCameraBonus('Keyboard used');
   if (key === 's') round.keyboardGuard = true;
   else if (key === 'g') round.keyboardHum = true;
-  else if (key === 'f') {
-    const now = performance.now();
-    if (now >= (round.clapUntil ?? 0)) finishBeam(now);
-    round.keyboardBeam = true;
-    requestBeam(now);
-  } else attack(keys[key], performance.now());
+  else if (key === 'f') fireBeam(performance.now());
+  else attack(keys[key], performance.now());
 });
 window.addEventListener('keyup', event => {
   if (!round) return;
   const key = event.key.toLowerCase();
   if (key === 's') round.keyboardGuard = false;
   if (key === 'g') round.keyboardHum = false;
-  if (key === 'f') {
-    round.keyboardBeam = false;
-    const now = performance.now();
-    if (now >= (round.clapUntil ?? 0)) finishBeam(now);
-  }
 });
 window.addEventListener('blur', () => {
-  if (!round) return;
-  round.keyboardGuard = round.keyboardHum = round.keyboardBeam = false;
-  const now = performance.now();
-  if (now >= (round.clapUntil ?? 0)) finishBeam(now);
+  if (round) round.keyboardGuard = round.keyboardHum = false;
 });
 window.addEventListener('pagehide', () => {
   if (round || !exit.hidden) exit.click();
