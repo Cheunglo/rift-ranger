@@ -1,5 +1,5 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=44';
+import { lessons } from './tutorial.mjs?v=45';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
 import { combatArt } from './combat-art.mjs?v=43';
@@ -62,13 +62,13 @@ const cameraBonusPercent = 20;
 const warningColors = ['green', 'yellow', 'red'];
 const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
 const eyeWarningDuration = () => (warningColors.length - round.warningStart) * battleTiming.warningStep;
-// Each phase stores its exclusive end time and which hits can interrupt it.
+// Each phase stores its exclusive end time and the warning shown during it.
 const flamePhases = [
-  { until: 1400, name: 'red', color: '#ff352d', minLaserStage: 1, hint: 'Slash or laser to interrupt' },
-  { until: 2800, name: 'orange', color: '#ff8b28', minLaserStage: 1, hint: 'Slash to cool · Stage 1+ laser' },
-  { until: 4200, name: 'yellow', color: '#ffdd39', minLaserStage: 2, hint: 'Slash to cool · Stage 2+ laser' },
-  { until: 6600, name: 'blue', color: '#43a8ff', minLaserStage: 3, hint: 'Slash to cool · Stage 3 laser' },
-  { until: 7100, color: '#ffffff', halo: '#43a8ff', hint: 'White-hot · guard now' },
+  { until: 1400, name: 'red', color: '#ff352d', hint: 'Slash or laser to interrupt' },
+  { until: 2800, name: 'orange', color: '#ff8b28', hint: 'Cool it · Stage 1+ laser cancels' },
+  { until: 4200, name: 'yellow', color: '#ffdd39', hint: 'Cool it · Stage 2+ laser cancels' },
+  { until: 6600, name: 'blue', color: '#43a8ff', hint: 'Cool it · Stage 3 laser cancels' },
+  { until: 7100, name: 'white', color: '#ffffff', halo: '#43a8ff', hint: 'White-hot · guard now' },
 ];
 const flameChargeTime = flamePhases.at(-1).until;
 const comboLaserLeadTime = 2300;
@@ -616,18 +616,16 @@ function resolveComboLaser(now, guarded, cameraLeftHeld) {
 
 function hitFlameCharge(move, now, stage) {
   const phase = flamePhase(now);
-  if (!phase?.minLaserStage) return '';
-  if (move === 'basic') {
-    const priorIndex = flamePhases.indexOf(phase) - 1;
-    if (priorIndex >= 0) {
-      const priorStart = flamePhases[priorIndex - 1]?.until ?? 0;
-      round.strike = now + flameChargeTime - priorStart;
-      // Move a pending combo with the charge. A laser that fired stays spent.
-      if (round.comboLaserAt < Infinity) round.comboLaserAt = round.strike - comboLaserLeadTime;
-      return 'Fireball cooled to ' + flamePhases[priorIndex].name;
-    }
-  } else if (move !== 'beam' || stage < phase.minLaserStage) {
-    return '';
+  if (!phase || phase.name === 'white') return '';
+  const drop = move === 'basic' ? 1 : move === 'beam' && stage > 0 ? stage + 1 : 0;
+  if (!drop) return '';
+  const priorIndex = flamePhases.indexOf(phase) - drop;
+  if (priorIndex >= 0) {
+    const priorStart = flamePhases[priorIndex - 1]?.until ?? 0;
+    round.strike = now + flameChargeTime - priorStart;
+    // Move a pending combo with the charge. A laser that fired stays spent.
+    if (round.comboLaserAt < Infinity) round.comboLaserAt = round.strike - comboLaserLeadTime;
+    return 'Fireball cooled to ' + flamePhases[priorIndex].name;
   }
   scheduleNextStrike(now);
   round.strikeNotice = 'Flamethrower interrupted!';

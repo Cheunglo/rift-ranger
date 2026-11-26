@@ -7,7 +7,7 @@ export const lessons = [
   { id: 'hum', title: 'Charge aura', hint: 'Hum a steady note or hold G to charge. Higher stages give 2× and 4× laser power.' },
   { id: 'beam', title: 'Fire a short laser', hint: 'Clap once or press F to fire at the highest completed aura stage.' },
   { id: 'heal', title: 'Heal with aura', hint: 'Charge Stage 1 or higher, then raise both hands or press D to spend aura and heal.' },
-  { id: 'flame', title: 'Interrupt the flamethrower', hint: 'Slash to cool the fireball one color. At red, slash or fire any laser to stop it.' },
+  { id: 'flame', title: 'Interrupt the flamethrower', hint: 'Slash drops 1 color. Laser Stages 1–3 drop 2, 3, or 4 colors. Cool past red to stop it.' },
   { id: 'guard-break', title: 'Recover from a guard break', hint: 'Block the laser. Lower and raise your left hand, or release and re-press S, to block the fire.' },
   { id: 'slash-lock', title: 'Open the slash lock', hint: 'Slash to reach 40 HP, then keep slashing until the lock breaks.', lock: { hp: 40, move: 'basic', total: 2 }, startHp: 43 },
   { id: 'power-lock', title: 'Open the power lock', hint: 'Block the laser, then raise both hands or press D to open the lock.', lock: { hp: 20, move: 'power', total: 1 }, startHp: 23 },
