@@ -1,9 +1,9 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=33';
+import { lessons } from './tutorial.mjs?v=34';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=33';
 import { combatArt } from './combat-art.mjs?v=26';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=26';
+import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=34';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -82,6 +82,7 @@ const trackingHints = {
   neutral: 'Raise your left hand to guard, right to attack, or both for power.',
   basic: 'Right hand seen. Hold briefly to attack.',
   'guard-set': 'Left hand seen. Keep holding to guard.',
+  'heal-held': 'Heal registered. Lower your arms to repeat.',
   guard: 'Left hand held above shoulder height.',
   'power-held': 'Power registered. Lower both hands to reset.',
   reset: 'Lower your right hand to attack again.',
@@ -237,8 +238,8 @@ function updateCameraStatus(now) {
   const move = round.cameraMove;
   if (!move || now - round.lastPose > 400) return cameraStatus('Waiting for tracking…', 'waiting');
   if (move.state === 'power') {
-    const hint = canPowerCounter(now) ? 'Both arms detected. Attack cooling down.' :
-      'Both arms detected. Block a strike first to unlock power.';
+    const hint = canPowerCounter(now) ? 'Both arms detected. Power counter ready.' :
+      healBlockReason(now) || 'Both arms detected. Heal ready.';
     return cameraStatus(hint, 'waiting');
   }
   const notice = round.cameraNotice;
@@ -254,7 +255,7 @@ function cameraNotice(message, state, now) {
 function showPose(move, label = 'No action detected', state = '') {
   poseIcon.toggleAttribute('hidden', !move);
   if (move) {
-    const href = './poses.svg?v=7#' + move;
+    const href = './poses.svg?v=34#' + move;
     if (poseArt.getAttribute('href') !== href) poseArt.setAttribute('href', href);
   }
   if (poseLabel.textContent !== label) poseLabel.textContent = label;
@@ -406,7 +407,7 @@ function startRound(mode, learning) {
     cameraBonusEligible: mode === 'camera' && !learning,
     nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
-    readGesture: gestures(), hitUntil: 0, auraMs: 0, lastTick: now,
+    readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(),
   };
@@ -442,6 +443,7 @@ function lesson() {
 
 function showLesson(now) {
   const current = lesson();
+  if (current.id === 'heal') setHealth(player, 80);
   tutorialPanel.hidden = false;
   byId('tutorial-step').textContent = 'Tutorial · ' + (round.lessonIndex + 1) + ' / ' + lessons.length;
   byId('tutorial-title').textContent = current.title;
@@ -492,7 +494,7 @@ function forfeitCameraBonus(reason) {
 function endRound(won) {
   // Use the frame that landed the final hit, excluding the victory animation.
   const elapsed = won ? Math.round(round.finished.at - round.startedAt) / 1000 : 0;
-  const damage = player.max - player.value;
+  const damage = round.damageTaken;
   const cameraBonusEligible = round.cameraBonusEligible;
   resetRound();
   arena.dataset.state = won ? 'win' : 'ready';
@@ -503,7 +505,7 @@ function endRound(won) {
     const healthMax = 4000;
     const referenceSeconds = 60;
     const timeBonus = Math.round(speedMax * referenceSeconds / (referenceSeconds + elapsed));
-    const healthBonus = Math.round(healthMax * (player.max - damage) / player.max);
+    const healthBonus = Math.round(healthMax * Math.max(0, player.max - damage) / player.max);
     const baseScore = timeBonus + healthBonus;
     const cameraBonus = cameraBonusEligible ? Math.round(baseScore * cameraBonusPercent / 100) : 0;
     const seconds = Math.floor(elapsed);
@@ -515,7 +517,7 @@ function endRound(won) {
       points(speedMax) + ' × ' + referenceSeconds + ' ÷ (' + referenceSeconds + ' + ' + points(elapsed) +
       ') ≈ ' + points(timeBonus) + ' pts';
     byId('result-health-formula').textContent =
-      points(healthMax) + ' × (' + player.max + ' − ' + damage + ') ÷ ' + player.max +
+      points(healthMax) + ' × max(0, ' + player.max + ' − ' + damage + ') ÷ ' + player.max +
       ' = ' + points(healthBonus) + ' pts';
     byId('result-camera-bonus').hidden = !cameraBonusEligible;
     byId('result-camera-formula').textContent =
@@ -536,16 +538,11 @@ function playerDamageScale(move) {
 
 function attack(move, now, fromCamera = false) {
   if (!round || round.finished) return;
+  if (move === 'power' && !canPowerCounter(now)) return healPlayer(now, fromCamera);
   const current = isTutorial() ? lesson() : null;
   if (current && !current.lock && !((current.id === 'slash' && move === 'basic') ||
       (current.id === 'counter' && move === 'power'))) return;
   const [damage, label] = attacks[move];
-  if (move === 'power' && !canPowerCounter(now)) {
-    if (!fromCamera) {
-      round.poseFeedback = { move, label: 'Block a strike first to unlock power', state: 'locked', until: now + 1000 };
-    }
-    return;
-  }
   if (move === 'power' && now < round.nextPower) return;
   const bonus = now < (round.counterUntil ?? 0);
   const counterDamage = move === 'basic' ? 2 : 5;
@@ -570,6 +567,34 @@ function attack(move, now, fromCamera = false) {
 
 function readyAuraStage() {
   return auraStages.findLast(stage => round.auraMs >= stage.chargeMs);
+}
+
+function healBlockReason(now) {
+  if (isTutorial() && lesson().id !== 'heal') return 'Follow the current lesson.';
+  if (canPowerCounter(now)) return 'Heal after the power counter window.';
+  if (player.value >= player.max) return 'Health is full. Block a strike to unlock a power counter.';
+  if (!readyAuraStage()) return 'Charge aura to Stage 1 to heal.';
+  return '';
+}
+
+function healPlayer(now, fromCamera = false) {
+  if (!round || round.finished) return false;
+  const blocked = healBlockReason(now);
+  if (blocked) {
+    if (!fromCamera) round.poseFeedback = { move: 'heal', label: blocked, state: 'locked', until: now + 1000 };
+    return false;
+  }
+  const restored = Math.min(player.max - player.value, readyAuraStage().multiplier * 5);
+  round.auraMs = 0;
+  showAura();
+  setHealth(player, player.value + restored);
+  confirmPose('heal', 'Healed +' + restored + ' HP', now);
+  if (fromCamera) cameraNotice('Healed +' + restored + ' HP.', 'accepted', now);
+  if (isTutorial()) {
+    setHealth(player, player.max);
+    advanceLesson(now);
+  }
+  return true;
 }
 
 function fireBeam(now) {
@@ -615,7 +640,7 @@ function showAura() {
 
 function updateAura(now, delta, humming) {
   const current = isTutorial() ? lesson().id : null;
-  if (humming && (!current || current === 'hum' || current === 'beam' || current === 'beam-lock')) {
+  if (humming && (!current || current === 'hum' || current === 'heal' || current === 'beam' || current === 'beam-lock')) {
     round.auraMs = Math.min(auraCapacity, round.auraMs + delta);
     if (current === 'hum' && readyAuraStage()) advanceLesson(now);
   }
@@ -661,7 +686,8 @@ function tick(now) {
     drawTracking(pose);
     round.lastPose = now;
     round.cameraMove = move;
-    if (move.attack && attack(move.attack, now, true)) move.consume?.();
+    const healing = move.attack === 'power' && !canPowerCounter(now);
+    if (move.attack && attack(move.attack, now, true)) move.consume?.(healing ? 'heal-held' : undefined);
     if (!round) return;
   }
 
@@ -699,7 +725,10 @@ function tick(now) {
       if (isTutorial() && lesson().id === 'block') advanceLesson(now);
     } else {
       const damage = Math.min(player.value, 19);
-      if (!isTutorial()) setHealth(player, player.value - damage);
+      if (!isTutorial()) {
+        round.damageTaken += damage;
+        setHealth(player, player.value - damage);
+      }
       round.strikeNotice = isTutorial() ? 'Missed block · try the next shot' : 'Laser hit · −' + damage + ' HP';
       if (isTutorial()) {
         round.warningStart = 0;
@@ -720,10 +749,14 @@ function tick(now) {
   const flash = danger && warningElapsed % battleTiming.warningStep < 235 ? warningColors[flashIndex] : null;
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
-  if (cameraPose === 'power') showPose('power', 'Both arms detected', canPowerCounter(now) ? '' : 'locked');
+  if (cameraPose === 'power') {
+    const counter = canPowerCounter(now);
+    showPose(counter ? 'power' : 'heal', 'Both arms detected', counter || !healBlockReason(now) ? '' : 'locked');
+  }
   else if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
   else if (guard) showPose('guard', 'Guard detected', 'active');
   else if (recentAction) showPose(used.move, used.label, used.state ?? 'active');
+  else if (cameraPose === 'heal-held') showPose('heal', 'Heal registered', 'active');
   else if (cameraPose === 'power-held') showPose('power', 'Power registered', 'active');
   else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
   else showPose();

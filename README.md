@@ -6,7 +6,7 @@ The boss has locks at 40, 20, and 10 HP that require 2, 4, and 6 qualifying atta
 
 Slash and aura beam damage scale down to a floor of 55% before rounding. Power waves taper more sharply and deal at most 9 damage at 20 boss HP or less. A slash or power counter that gets past the locks always deals at least 1 HP.
 
-A win shows your Power Level, clear time, damage taken, and how the Power Level was calculated. Speed earns up to 6,000 points (6,000 × 60 ÷ (60 + elapsed seconds), rounded). Remaining health earns up to 4,000 points (40 points per HP). Keeping the camera active and clearing without keyboard combat inputs adds 20% to that subtotal, rounded to the nearest point. Microphone moves are allowed.
+A win shows your Power Level, clear time, damage taken, and how the Power Level was calculated. Speed earns up to 6,000 points (6,000 × 60 ÷ (60 + elapsed seconds), rounded). Health earns up to 4,000 points, reduced by 40 points per HP of total damage taken and floored at zero. Keeping the camera active and clearing without keyboard combat inputs adds 20% to that subtotal, rounded to the nearest point. Microphone moves are allowed.
 
 ## Play locally
 
@@ -16,9 +16,11 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 | --- | --- |
 | A | Basic attack |
 | Hold S | Guard |
-| D | Power counter after blocking |
+| D | Power counter if ready, otherwise heal with aura |
 | F | Fire a short laser |
 | Hold G | Build aura |
+
+Raise both hands to power counter if one is ready. Otherwise, the same pose spends aura to heal 5, 10, or 20 HP at stages 1, 2, or 3. Healing never erases damage already taken from the Power Level calculation.
 
 Camera mode requests the camera and microphone together and can run without the mic if access fails. In keyboard mode, hold G to charge aura and press F to fire. Stay quiet briefly while the mic calibrates. The left panel shows the aura meter, mic input level, and whether the game hears a steady hum. Humming is ignored during a beam and briefly afterward so steady background noise can settle. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
 

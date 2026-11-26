@@ -32,6 +32,7 @@ export function gestures() {
   let basicSpent = false;
   let rightDownSince;
   let powerSpent = false;
+  let powerResult = 'power-held';
   let guardActive = false;
 
   return (points, now) => {
@@ -94,13 +95,13 @@ export function gestures() {
       return result;
     }
     if (pose === 'power') {
-      result.state = powerSpent ? 'power-held' : 'power';
+      result.state = powerSpent ? powerResult : 'power';
       if (!powerSpent && tracked.every(Boolean)) {
         result.attack = 'power';
-        // The battle loop calls this only after a valid counter actually fires.
-        result.consume = () => {
+        // Both arms up can spend a counter or heal. Latch the accepted action.
+        result.consume = (state = 'power-held') => {
           basicSpent = powerSpent = true;
-          result.state = 'power-held';
+          powerResult = result.state = state;
         };
       }
       return result;

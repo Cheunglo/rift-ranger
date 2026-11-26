@@ -7,7 +7,7 @@
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
   <link rel="stylesheet" href="./style.css?v=32">
-  <script type="module" src="./game.mjs?v=33"></script>
+  <script type="module" src="./game.mjs?v=34"></script>
 </head>
 <body>
   <main>
@@ -18,8 +18,8 @@
     <section class="moves" aria-label="Moves">
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#basic"></use></svg><span>Attack <kbd>A</kbd></span><strong>Basic attack</strong><p>Raise your right hand above your shoulder. Lower it to repeat.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#guard"></use></svg><span>Defend <kbd>S</kbd></span><strong>Guard</strong><p>Raise your left hand above your shoulder and hold it through the strike.</p></article>
-      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#power"></use></svg><span>Counter <kbd>D</kbd></span><strong>Power pose</strong><p>Block a strike, then raise both hands above your shoulders to counter.</p></article>
-      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Audio <kbd>F</kbd> <kbd>G</kbd></span><strong>Hum, then clap</strong><p>Hum or hold G to reach aura stages 1–3. Clap once or press F to fire.</p></article>
+      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#power"></use></svg><span>Counter <kbd>D</kbd></span><strong>Power pose</strong><p>Both hands up or D: power counter if ready, otherwise heal with aura.</p></article>
+      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Aura <kbd>G</kbd> <kbd>F</kbd></span><strong>Fire or heal</strong><p>Hum to charge and clap to fire, or spend aura on a heal.</p></article>
     </section>
     <section id="tutorial-panel" aria-label="Tutorial lesson" role="status" hidden>
       <p id="tutorial-step" class="label"></p>
@@ -91,7 +91,7 @@
               <dd id="result-speed-formula"></dd>
             </div>
             <div class="score-component">
-              <dt>Health points · HP after damage</dt>
+              <dt>Health points · total damage penalty</dt>
               <dd id="result-health-formula"></dd>
             </div>
             <div id="result-camera-bonus" class="score-component" hidden>
