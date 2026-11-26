@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=32">
-  <script type="module" src="./game.mjs?v=37"></script>
+  <link rel="stylesheet" href="./style.css?v=38">
+  <script type="module" src="./game.mjs?v=38"></script>
 </head>
 <body>
   <main>
@@ -20,11 +20,6 @@
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#guard"></use></svg><span>Defend <kbd>S</kbd></span><strong>Guard</strong><p>Raise your left hand above your shoulder and hold it through the strike.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#power"></use></svg><span>Counter <kbd>D</kbd></span><strong>Power pose</strong><p>Both hands up or D: power counter if ready, otherwise heal with aura.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Aura <kbd>G</kbd> <kbd>F</kbd></span><strong>Fire or heal</strong><p>Hum to charge and clap to fire, or spend aura on a heal.</p></article>
-    </section>
-    <section id="tutorial-panel" aria-label="Tutorial lesson" role="status" hidden>
-      <p id="tutorial-step" class="label"></p>
-      <h2 id="tutorial-title"></h2>
-      <p id="tutorial-instruction"></p>
     </section>
     <section class="arena" id="arena" aria-label="Battle arena">
       <!-- The fixed HUD sits over the battle stage. The canvases draw art and effects. -->
@@ -106,6 +101,11 @@
           </div>
         </div>
       </div>
+      <section id="tutorial-panel" aria-label="Tutorial lesson" role="status" hidden>
+        <p id="tutorial-step" class="label"></p>
+        <h2 id="tutorial-title"></h2>
+        <p id="tutorial-instruction"></p>
+      </section>
     </section>
     <div class="toolbar">
       <div id="device" role="status">Camera and mic stay on your device.</div>

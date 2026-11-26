@@ -1,8 +1,8 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=35';
+import { lessons } from './tutorial.mjs?v=38';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=35';
-import { combatArt } from './combat-art.mjs?v=36';
+import { combatArt } from './combat-art.mjs?v=38';
 import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
 const byId = id => document.getElementById(id);
@@ -302,7 +302,7 @@ function showStartMenu() {
 tutorialButton.addEventListener('click', () => {
   tutorialSelected = !tutorialSelected;
   showStartMenu();
-  (tutorialSelected ? webcam : tutorialButton).focus();
+  (tutorialSelected ? webcam : tutorialButton).focus({ preventScroll: true });
 });
 
 function stopCamera() {
@@ -395,6 +395,7 @@ function resetRound() {
   poseCard.hidden = true;
   bossPanel.hidden = true;
   tutorialPanel.hidden = true;
+  arena.removeAttribute('data-tutorial');
   tutorialBadge.hidden = true;
   lockMarkers.hidden = lockStatus.hidden = true;
   updateStartButtons();
@@ -417,6 +418,7 @@ function startRound(mode, learning) {
   cameraBonusStatus.hidden = !round.cameraBonusEligible;
   cameraBonusStatus.dataset.earned = 'true';
   cameraBonusStatus.textContent = '+' + cameraBonusPercent + '% camera bonus active';
+  arena.toggleAttribute('data-tutorial', learning);
   if (learning) showLesson(now);
   else {
     lockMarkers.hidden = lockStatus.hidden = false;
@@ -483,7 +485,7 @@ function completeTutorial() {
   arena.dataset.state = 'ready';
   showOverlay('Tutorial complete', 'You learned every move and opened all three locks. In battle, lock moves are shuffled and the boss can heal.');
   resetHud();
-  webcam.focus();
+  webcam.focus({ preventScroll: true });
 }
 
 function forfeitCameraBonus(reason) {
@@ -526,7 +528,7 @@ function endRound(won) {
       points(baseScore) + ' × ' + cameraBonusPercent + '% ≈ +' + points(cameraBonus) + ' pts';
     battleResult.hidden = false;
   }
-  webcam.focus();
+  webcam.focus({ preventScroll: true });
 }
 
 function canPowerCounter(now) {
@@ -865,7 +867,7 @@ exit.addEventListener('click', () => {
   arena.dataset.state = 'ready';
   showStartMenu();
   resetHud();
-  webcam.focus();
+  webcam.focus({ preventScroll: true });
 });
 
 const keys = { a: 'basic', d: 'power' };

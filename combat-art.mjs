@@ -136,25 +136,51 @@ export function combatArt(canvas, beast, reducedMotion) {
   }
 
   function heal(scene, elapsed) {
+    const still = reducedMotion.matches;
+    const buildup = still ? 1 : Math.min(1, elapsed / 180);
     ctx.save();
     ctx.translate(scene.x, scene.floor);
     ctx.scale(scene.scale, scene.scale);
-    ctx.shadowColor = '#45ff95';
-    ctx.shadowBlur = 9;
-    // Sparks start at staggered heights around the ranger and rise past the hands.
-    for (let i = 0; i < 12; i++) {
-      const start = i * 23;
-      const progress = (elapsed - start) / 570;
+    ctx.globalAlpha *= buildup;
+    const opacity = ctx.globalAlpha;
+    const glow = ctx.createRadialGradient(0, -49, 18, 0, -49, 108);
+    glow.addColorStop(0, '#d7ffb3d9');
+    glow.addColorStop(.45, '#66ff8c99');
+    glow.addColorStop(1, '#2bff7800');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-108, -157, 216, 167);
+    ctx.shadowColor = '#42ff80';
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = '#92ffabcf';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, -4, 48 + buildup * 13, 10, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Draw two jagged streams from the floor to above the ranger's hands.
+    for (const side of [-1, 1]) {
+      const sway = still ? 0 : Math.sin(elapsed / 52 + side) * 7;
+      ctx.save();
+      ctx.scale(side, 1);
+      polygon('#43ff7799', [[20,-3],[44,-27],[48,-55],[36,-46],[54,-90],
+        [60 + sway,-134],[67,-93],[60,-59],[74,-72],[69,-38],[50,-10],[31,0]]);
+      polygon('#c7ffabdf', [[28,-4],[49,-28],[54,-60],[61 + sway,-107],
+        [62,-69],[57,-37],[67,-46],[52,-17]]);
+      ctx.restore();
+    }
+
+    // Stagger the sparks so they keep rising while the aura fades.
+    for (let i = 0; i < 20; i++) {
+      const progress = still ? .24 + (i % 5) * .12 : (elapsed - i * 16) / 490;
       if (progress < 0 || progress >= 1) continue;
       const side = i % 2 ? 1 : -1;
-      const spread = 28 + (i * 13) % 25;
-      const rise = reducedMotion.matches ? .4 : progress;
-      const x = side * (spread + rise * 12);
-      const y = -20 - (i * 11) % 44 - rise * 78;
-      const size = 2 + (i % 3);
-      ctx.globalAlpha = Math.min(1, progress * 6, (1 - progress) * 4);
-      polygon(i % 3 === 0 ? '#ddffba' : '#72ff9d',
-        [[x, y - size * 2], [x + size, y], [x, y + size * 2], [x - size, y]]);
+      const x = side * (31 + (i * 13) % 42 + progress * 11);
+      const y = -14 - (i * 11) % 48 - progress * 96;
+      const size = 2 + (i % 4);
+      ctx.globalAlpha = opacity * Math.min(1, progress * 7, (1 - progress) * 4);
+      polygon(i % 3 === 0 ? '#efffd3' : '#8dff9f',
+        [[x,y - size * 2],[x + 1,y - 1],[x + size,y],[x + 1,y + 1],
+          [x,y + size],[x - 1,y + 1],[x - size,y],[x - 1,y - 1]]);
     }
     ctx.restore();
   }

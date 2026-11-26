@@ -166,7 +166,32 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
   pointer-events: none;
 }
 
-#tutorial-panel { min-height: 7rem; padding: 10px 14px; margin-bottom: 10px; border: 1px solid #785d87; border-radius: 8px; background: #211a32; }
+/* Reserve space inside the arena so lesson changes never move the page. */
+.arena[data-tutorial] { --lesson-height: 104px; }
+.arena[data-tutorial] .battle-stage { bottom: var(--lesson-height); }
+.arena[data-tutorial] #beast { max-width: calc((var(--arena-height) - var(--lesson-height)) * .72); }
+#tutorial-panel {
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--lesson-height);
+  z-index: 3;
+  overflow: auto;
+  padding: 10px clamp(10px, 2.5vw, 24px);
+  border-top: 1px solid #785d87;
+  background: #211a32;
+  line-height: 1.35;
+}
 #tutorial-panel p { margin: 0; }
 #tutorial-panel h2 { margin: 5px 0; font-size: 1.2rem; letter-spacing: -.02em; }
 #tutorial-step { color: var(--acid); }
+@media (max-width: 540px) {
+  .arena[data-tutorial] { --lesson-height: 112px; }
+  #tutorial-panel { padding-block: 8px; font-size: .9375rem; }
+  .arena[data-tutorial] .combat-panel { gap: 3px; font-size: .875rem; }
+  .arena[data-tutorial] .combat-panel :is(.label, p) { font-size: .75rem; }
+  .arena[data-tutorial] .pose-readout { gap: 4px; }
+  .arena[data-tutorial] .pose-readout .combat-icon { width: 30px; }
+}
+@media (max-width: 360px) {
+  .arena[data-tutorial] { --lesson-height: 128px; }
+}
