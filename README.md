@@ -10,7 +10,7 @@ A win shows your Power Level, clear time, damage taken, and how the Power Level 
 
 ## Play locally
 
-Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the game](http://localhost:8765/) in a current desktop browser. Choose **Enable camera** and grant permission, or choose **Play with keyboard**. Keep your shoulders and any raised hand in view. Your resting hand can be out of frame. The keyboard works in both modes.
+Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the game](http://localhost:8765/) in a current desktop browser. Choose **Enable camera + mic** and grant permissions, or choose **Play with keyboard**. Keep your shoulders and any raised hand in view. Your resting hand can be out of frame. The keyboard works in both modes.
 
 | Input | Move |
 | --- | --- |
@@ -20,7 +20,7 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 | Hold F | Sustain the aura beam |
 | Hold G | Build aura |
 
-Choose **Enable microphone** on the start screen or below the boss warning and grant browser permission to use sound controls. Stay quiet briefly while the mic calibrates. The left panel shows the aura meter, mic input level, and whether the game hears a steady hum. Humming is ignored during a beam and briefly afterward so steady background noise can settle. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
+Camera mode requests the camera and microphone together and can run without the mic if access fails. In keyboard mode, choose **Enable microphone** to use sound controls. Stay quiet briefly while the mic calibrates. The left panel shows the aura meter, mic input level, and whether the game hears a steady hum. Humming is ignored during a beam and briefly afterward so steady background noise can settle. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
 
 Choose **Start Tutorial**, then start with camera or keyboard. Complete each prompted move to advance, from slashing and blocking to charging and firing a laser. The final lessons teach all three lock types without health loss or a Power Level penalty. Hum and clap with the mic, or use G and F.
 

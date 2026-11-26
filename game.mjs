@@ -97,6 +97,7 @@ let animation;
 let tracker;
 let cameraStream;
 let micStream;
+let pendingCameraMic;
 let context;
 let audioInput;
 let poseAnimation;
@@ -104,6 +105,9 @@ let poseAnimation;
 let requestId = 0;
 let micRequestId = 0;
 const defaultStatus = 'Camera and mic stay on your device.';
+const videoInputOptions = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } };
+const audioInputOptions = { autoGainControl: false, noiseSuppression: false, echoCancellation: true };
+const micUnavailable = 'Microphone unavailable. Check browser permission, or use F and G.';
 paintBeast(byId('beast'));
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
@@ -275,7 +279,7 @@ function showOverlay(title, copy) {
 
 function updateStartButtons() {
   webcam.disabled = tutorialButton.disabled = false;
-  webcam.textContent = tutorialSelected ? 'Tutorial with camera' : 'Enable camera';
+  webcam.textContent = tutorialSelected ? 'Tutorial with camera + mic' : 'Enable camera + mic';
   keyboard.textContent = tutorialSelected ? 'Tutorial with keyboard' : 'Play with keyboard';
   tutorialButton.textContent = tutorialSelected ? 'Back to battle' : 'Start Tutorial';
 }
@@ -296,6 +300,7 @@ tutorialButton.addEventListener('click', () => {
 });
 
 function stopCamera() {
+  cancelCameraMic();
   stopTracks(cameraStream);
   cameraStream = null;
   camera.srcObject = null;
@@ -304,6 +309,48 @@ function stopCamera() {
   poseContext.clearRect(0, 0, trackingPoints.width, trackingPoints.height);
   tracker?.close();
   tracker = null;
+}
+
+function beginCameraMic() {
+  if (micStream || micButtons.some(button => button.disabled)) return null;
+  const Audio = window.AudioContext || window.webkitAudioContext;
+  if (!Audio) return null;
+  try {
+    const audioContext = new Audio();
+    // Begin resuming inside the click gesture, before the permission prompt.
+    const ready = audioContext.resume().then(() => true, () => false);
+    pendingCameraMic = { audioContext, ready };
+    setMicControls(false, true);
+    return pendingCameraMic;
+  } catch {
+    return null;
+  }
+}
+
+function cancelCameraMic() {
+  if (!pendingCameraMic) return;
+  const { audioContext, stream } = pendingCameraMic;
+  pendingCameraMic = null;
+  stopTracks(stream);
+  void audioContext.close().catch(() => {});
+  setMicControls(false);
+}
+
+function activateMic(stream, audioContext) {
+  const read = listen(audioContext, stream);
+  micStream = stream;
+  context = audioContext;
+  audioInput = read;
+  stream.getAudioTracks()[0].addEventListener('ended', () => {
+    if (micStream !== stream) return;
+    stopMic();
+    if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
+    setMicMessage('Mic disconnected. F and G still work.');
+    device.textContent = defaultStatus;
+  });
+  setMicControls(true);
+  setMicMessage('Mic on. Hum a steady note, then keep clapping to fire.');
+  micLevel.hidden = false;
 }
 
 function stopMic() {
@@ -731,14 +778,33 @@ webcam.addEventListener('click', async () => {
   webcam.disabled = tutorialButton.disabled = true;
   webcam.textContent = 'Starting camera…';
   exit.hidden = false;
-  device.textContent = 'Allow camera access when your browser asks.';
+  const automaticMic = beginCameraMic();
+  let micFallback = false;
+  device.textContent = automaticMic ? 'Allow camera and microphone access when your browser asks.' :
+    'Allow camera access when your browser asks.';
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } },
-    });
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: videoInputOptions, audio: automaticMic ? audioInputOptions : false,
+      });
+    } catch (error) {
+      if (!automaticMic || request !== requestId) throw error;
+      cancelCameraMic();
+      micFallback = true;
+      stream = await navigator.mediaDevices.getUserMedia({ video: videoInputOptions });
+    }
     if (request !== requestId) return stopTracks(stream);
-    cameraStream = stream;
-    camera.srcObject = stream;
+    // Separate tracks so turning off the mic cannot stop the webcam preview.
+    const audioTracks = stream.getAudioTracks();
+    if (automaticMic && pendingCameraMic === automaticMic && audioTracks.length) {
+      automaticMic.stream = new MediaStream(audioTracks);
+    } else {
+      audioTracks.forEach(track => track.stop());
+    }
+    const videoStream = new MediaStream(stream.getVideoTracks());
+    cameraStream = videoStream;
+    camera.srcObject = videoStream;
     await camera.play();
     if (request !== requestId) return;
     cameraFrame.hidden = false;
@@ -746,8 +812,8 @@ webcam.addEventListener('click', async () => {
     const model = await loadTracker();
     if (request !== requestId) return model.close();
     tracker = model;
-    stream.getVideoTracks()[0].addEventListener('ended', () => {
-      if (cameraStream !== stream) return;
+    videoStream.getVideoTracks()[0].addEventListener('ended', () => {
+      if (cameraStream !== videoStream) return;
       stopCamera();
       forfeitCameraBonus('Camera disconnected');
       if (round) round.mode = 'keyboard';
@@ -755,11 +821,26 @@ webcam.addEventListener('click', async () => {
     });
     startRound('camera', learning);
     device.textContent = 'Camera active. ' + defaultStatus;
+    if (micFallback) setMicMessage(micUnavailable);
+    if (pendingCameraMic && pendingCameraMic === automaticMic) {
+      void automaticMic.ready.then(ready => {
+        if (pendingCameraMic !== automaticMic) return;
+        try {
+          if (!ready || !automaticMic.stream) throw new Error('Microphone setup incomplete');
+          activateMic(automaticMic.stream, automaticMic.audioContext);
+          pendingCameraMic = null;
+          device.textContent = 'Camera and microphone active. ' + defaultStatus;
+        } catch {
+          cancelCameraMic();
+          setMicMessage(micUnavailable);
+        }
+      });
+    }
   } catch (error) {
     if (request !== requestId) return;
     stopCamera();
     webcam.disabled = tutorialButton.disabled = false;
-    webcam.textContent = 'Retry camera';
+    webcam.textContent = 'Retry camera + mic';
     exit.hidden = !micStream;
     const cameraError = error.name === 'NotAllowedError' || error.name === 'NotFoundError' ||
       error.name === 'NotReadableError' || !navigator.mediaDevices;
@@ -794,28 +875,20 @@ async function toggleMic() {
     const audioContext = context;
     await audioContext.resume();
     if (request !== micRequestId) return;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { autoGainControl: false, noiseSuppression: false, echoCancellation: true },
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: audioInputOptions });
     if (request !== micRequestId) return stopTracks(stream);
-    micStream = stream;
-    audioInput = listen(audioContext, stream);
-    stream.getAudioTracks()[0].addEventListener('ended', () => {
-      if (micStream !== stream) return;
-      stopMic();
-      if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
-      setMicMessage('Mic disconnected. F and G still work.');
-      device.textContent = defaultStatus;
-    });
-    setMicControls(true);
-    setMicMessage('Mic on. Hum a steady note, then keep clapping to fire.');
-    micLevel.hidden = false;
+    try {
+      activateMic(stream, audioContext);
+    } catch (error) {
+      stopTracks(stream);
+      throw error;
+    }
     device.textContent = 'Mic active. Hum to build aura, then keep clapping to fire.';
   } catch {
     if (request !== micRequestId) return;
     stopMic();
     if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
-    setMicMessage('Microphone unavailable. Check browser permission, or use F and G.');
+    setMicMessage(micUnavailable);
   }
 }
 
