@@ -2,7 +2,7 @@
 import { lessons } from './tutorial.mjs?v=42';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
-import { combatArt } from './combat-art.mjs?v=41';
+import { combatArt } from './combat-art.mjs?v=43';
 import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
 const byId = id => document.getElementById(id);
@@ -765,6 +765,7 @@ function drawBattle(now, guard, flash = null, flame = null) {
     left: Boolean(tracked?.left || guard || bothArms),
     right: Boolean(tracked?.right || attack === 'basic' || bothArms),
     guard, aura: round.auraMs / auraCapacity, flash, beamStrength, flame,
+    burning: round.burnTickAt !== Infinity,
   });
 }
 

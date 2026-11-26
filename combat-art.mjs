@@ -185,6 +185,46 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.restore();
   }
 
+  function burningRanger(scene, now) {
+    const still = reducedMotion.matches;
+    ctx.save();
+    ctx.translate(scene.x, scene.floor);
+    ctx.scale(scene.scale, scene.scale);
+
+    const glow = ctx.createRadialGradient(0, -29, 8, 0, -29, 62);
+    glow.addColorStop(0, '#ff782596');
+    glow.addColorStop(.5, '#ff5b2d70');
+    glow.addColorStop(1, '#ff5b2d00');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-62, -91, 124, 96);
+
+    // Flames rise beside the armor so the ranger's gestures stay readable.
+    for (const side of [-1, 1]) {
+      const flicker = still ? 0 : Math.sin(now / 95 + side);
+      ctx.save();
+      ctx.scale(side, 1);
+      polygon('#fe522e', [[15,-5], [27,-28], [24,-47], [36,-37], [42 + flicker * 7,-83],
+        [49,-54], [45,-34], [55 + flicker * 4,-48], [52,-19], [38,-5], [25,0]]);
+      polygon('#ffb43c', [[25,-5], [34,-24], [37,-46], [44 + flicker * 4,-66],
+        [44,-39], [40,-22], [47,-31], [45,-14], [33,-4]]);
+      polygon('#ffe599', [[31,-7], [38,-19], [40,-35], [43,-22], [39,-11]]);
+      ctx.restore();
+    }
+
+    // Stagger embers so the loop stays continuous between burn damage ticks.
+    for (let i = 0; i < 12; i++) {
+      const rise = still ? (i + 1) / 13 : ((now + i * 137) % 1050) / 1050;
+      const side = i % 2 ? 1 : -1;
+      const x = side * (28 + i * 13 % 19 + rise * 10);
+      const y = -14 - i * 9 % 18 - rise * 96;
+      const size = 1 + i % 3;
+      ctx.globalAlpha = Math.min(1, rise * 7, (1 - rise) * 3);
+      polygon(i % 3 ? '#ff9a44' : '#ffecaa',
+        [[x,y - size * 2], [x + size,y], [x,y + size], [x - size,y]]);
+    }
+    ctx.restore();
+  }
+
   function lasers(scene, blocked) {
     const endY = blocked ? scene.boss.y + scene.boss.height : scene.floor - 62 * scene.scale;
     scene.eyes.forEach(([x, y], i) => {
@@ -269,7 +309,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       previousTime = undefined;
       leftLift = rightLift = 0;
     },
-    render(now, { left, right, guard, aura, flash, beamStrength, flame }) {
+    render(now, { left, right, guard, aura, flash, beamStrength, flame, burning }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
@@ -326,6 +366,7 @@ export function combatArt(canvas, beast, reducedMotion) {
         else lasers(scene, effect.strength);
       }
       ctx.globalAlpha = 1;
+      if (burning) burningRanger(scene, now);
       ranger(scene, aura);
     },
   };
