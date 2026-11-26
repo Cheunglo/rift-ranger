@@ -40,8 +40,9 @@ export function bossHit(locks, hp, damage, move, auraStage) {
   // after that, healing above the floor does not turn off the challenge.
   const next = Math.max(floor, hp - damage);
   if (lock && next === floor) lock.engaged = true;
+  // The requested laser stage is the minimum charge for one lock credit.
   const credited = Boolean(lock?.engaged && lock.move === move &&
-    (move !== 'beam' || auraStage === requiredLaserStage(lock)));
+    (move !== 'beam' || auraStage >= requiredLaserStage(lock)));
   if (credited) lock.done++;
   return { hp: next, dealt: hp - next, lock: lock?.engaged ? lock : null, credited };
 }

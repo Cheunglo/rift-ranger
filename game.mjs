@@ -1,7 +1,7 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=38';
+import { lessons } from './tutorial.mjs?v=39';
 import { paintBeast } from './beast.mjs';
-import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=35';
+import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=39';
 import { combatArt } from './combat-art.mjs?v=38';
 import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
@@ -150,7 +150,7 @@ function showBossLocks() {
   }
   const remaining = next ? lockRequirement(next) + ' left' : '';
   const instruction = active
-    ? next.move === 'beam' ? 'Next: Stage ' + requiredLaserStage(next) + ' laser' : lockInstructions[next.move]
+    ? next.move === 'beam' ? 'Stage ' + requiredLaserStage(next) + '+ laser' : lockInstructions[next.move]
     : '';
   if (lockTitle.textContent !== title) lockTitle.textContent = title;
   if (lockRemaining.textContent !== remaining) lockRemaining.textContent = remaining;
@@ -194,7 +194,7 @@ function healBoss(now) {
 function lockImpact(hit) {
   if (hit.credited && hit.lock.done === hit.lock.total) return hit.lock.hp + ' HP lock opened';
   if (hit.credited) return lockRequirement(hit.lock) + ' left';
-  if (hit.lock?.move === 'beam' && !hit.dealt) return 'Lock needs a Stage ' + requiredLaserStage(hit.lock) + ' laser';
+  if (hit.lock?.move === 'beam' && !hit.dealt) return 'Lock needs Stage ' + requiredLaserStage(hit.lock) + '+ laser';
   if (hit.lock && !hit.dealt) return 'Lock needs ' + lockRequirement(hit.lock);
   return '';
 }
