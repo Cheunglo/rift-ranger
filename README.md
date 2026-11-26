@@ -4,6 +4,8 @@ A browser arcade battle. Raise your right hand above your shoulder to attack or 
 
 The Riftbeast alternates eye lasers with a flamethrower. Slash to interrupt the red fireball. At orange, yellow, or blue, interrupt it with a laser of at least Stage 1, 2, or 3 respectively. White is the final cue to guard. The flamethrower hits for 10 HP and burns for 1 HP per second until you heal with aura. A guard blocks the burst and opens a power counter.
 
+Some flamethrower charges include a guard-breaking eye laser early in blue. The chance is 15%, 40%, 75%, or 100% after opening zero, one, two, or three locks. The shield absorbs the laser and shatters. Lower and raise your left hand again, or release and re-press S, to block the fire. Interrupting the charge before the laser fires cancels both attacks.
+
 The boss has locks at 40, 20, and 10 HP that require 2, 4, and 6 qualifying attacks respectively. Each run shuffles slashes, power waves, and lasers between those locks. Progress starts when you first reach each lock. The health display shows which move is needed and how many are left. At a laser lock, any shot at or above the stage shown on the lock card advances it by one. The minimum stage changes after a qualifying shot. As the boss loses HP, its eye lasers come sooner and the player's attacks do less damage. An unblocked boss laser deals 19 HP at any boss health. Recovery begins sooner and restores HP more often when the boss is low. It can heal while a lock is active, but the lock keeps its progress. Opened locks stay open.
 
 Slash and aura beam damage scale down to a floor of 55% before rounding. Power waves taper more sharply and deal at most 9 damage at 20 boss HP or less. A slash or power counter that gets past the locks always deals at least 1 HP.

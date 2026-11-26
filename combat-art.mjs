@@ -5,7 +5,7 @@ export function combatArt(canvas, beast, reducedMotion) {
   let leftLift = 0;
   let rightLift = 0;
   let previousTime;
-  const duration = { basic: 480, power: 780, heal: 850, laser: 360, flame: 650 };
+  const duration = { basic: 480, power: 780, heal: 850, laser: 360, flame: 650, 'guard-break': 460 };
   const eyeColors = { green: '#69ff77', yellow: '#ffe663', red: '#ff243c' };
   const mix = (from, to, amount) => from + (to - from) * amount;
 
@@ -210,6 +210,22 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.fill();
   }
 
+  function shatteredShield(scene, elapsed) {
+    const progress = reducedMotion.matches ? .35 : elapsed / duration['guard-break'];
+    const { x, y, width, height } = scene.boss;
+    const center = x + width / 2;
+    const impactY = y + height * .82;
+    // Fragments scatter from the lower edge where the eye lasers hit the shield.
+    for (let i = 0; i < 12; i++) {
+      const offset = (i % 6 - 2.5) / 2.5;
+      const shardX = center + offset * width * (.32 + progress * .42);
+      const shardY = impactY - (i % 2) * height * .34 + progress * (i * 11 % 60 - 18);
+      const size = (5 + i % 4 * 2) * scene.scale;
+      polygon(i % 2 ? '#89ebff' : '#defaff', [[shardX - size,shardY - size],
+        [shardX + size,shardY - size * .4],[shardX - size * .3,shardY + size * 1.5]]);
+    }
+  }
+
   function flamethrower(scene, elapsed, blocked) {
     const [x, y] = scene.mouth;
     const endY = blocked ? scene.boss.y + scene.boss.height : scene.floor - 30 * scene.scale;
@@ -303,6 +319,10 @@ export function combatArt(canvas, beast, reducedMotion) {
         else if (effect.kind === 'power') ripples(scene, elapsed);
         else if (effect.kind === 'heal') heal(scene, elapsed);
         else if (effect.kind === 'flame') flamethrower(scene, elapsed, effect.strength);
+        else if (effect.kind === 'guard-break') {
+          if (elapsed < duration.laser) lasers(scene, true);
+          shatteredShield(scene, elapsed);
+        }
         else lasers(scene, effect.strength);
       }
       ctx.globalAlpha = 1;

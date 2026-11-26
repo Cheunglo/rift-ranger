@@ -1,8 +1,8 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=40';
+import { lessons } from './tutorial.mjs?v=41';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=39';
-import { combatArt } from './combat-art.mjs?v=40';
+import { combatArt } from './combat-art.mjs?v=41';
 import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
 const byId = id => document.getElementById(id);
@@ -71,6 +71,8 @@ const flamePhases = [
   { until: 7100, color: '#ffffff', halo: '#43a8ff', hint: 'White-hot · guard now' },
 ];
 const flameChargeTime = flamePhases.at(-1).until;
+const comboLaserLeadTime = 2300;
+const comboChanceByLocksOpened = [.15, .40, .75, 1];
 const burnInterval = 1000;
 const warningDuration = () => round.strikeKind === 'flame' ? flameChargeTime : eyeWarningDuration();
 const lockInstructions = {
@@ -128,12 +130,13 @@ paintBeast(byId('beast'));
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
 
-function showWarning(message, incoming = false) {
+function showWarning(message, incoming = false, hint = 'Left hand up, or hold S.') {
   if (prompt.textContent !== message) prompt.textContent = message;
   const state = incoming ? 'danger' : '';
   if (bossPanel.dataset.state !== state) bossPanel.dataset.state = state;
   warningPose.toggleAttribute('hidden', !incoming);
   warningHint.hidden = !incoming;
+  if (incoming && warningHint.textContent !== hint) warningHint.textContent = hint;
 }
 
 function setHealth(bar, value) {
@@ -253,6 +256,7 @@ function drawTracking(points) {
 function updateCameraStatus(now) {
   const move = round.cameraMove;
   if (!move || now - round.lastPose > 400) return cameraStatus('Waiting for tracking…', 'waiting');
+  if (round.cameraGuardBroken) return cameraStatus('Guard broken. Lower your left hand, then raise it.', 'waiting');
   if (move.state === 'power') {
     const hint = canPowerCounter(now) ? 'Both arms detected. Power counter ready.' :
       healBlockReason(now) || 'Both arms detected. Heal ready.';
@@ -427,7 +431,7 @@ function startRound(mode, learning) {
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
-    warningStart: randomWarningStart(), strikeKind: 'laser', burnTickAt: Infinity,
+    warningStart: randomWarningStart(), strikeKind: 'laser', comboLaserAt: Infinity, burnTickAt: Infinity,
   };
   resetHud();
   cameraBonusStatus.hidden = !round.cameraBonusEligible;
@@ -468,7 +472,8 @@ function showLesson(now) {
   byId('tutorial-title').textContent = current.title;
   byId('tutorial-instruction').textContent = current.hint;
   round.strike = Infinity;
-  round.strikeKind = current.id === 'flame' ? 'flame' : 'laser';
+  round.comboLaserAt = Infinity;
+  round.strikeKind = current.id === 'flame' || current.id === 'guard-break' ? 'flame' : 'laser';
   if (current.id !== 'counter') {
     round.counterUntil = 0;
     round.powerCounterAvailable = false;
@@ -477,7 +482,7 @@ function showLesson(now) {
     round.warningStart = 0;
     round.strike = now + warningDuration() + 1000;
   }
-  if (current.id === 'flame') round.strike = now + flameChargeTime + 1000;
+  if (round.strikeKind === 'flame') scheduleTutorialFlame(now, 1000);
   lockMarkers.hidden = lockStatus.hidden = !current.lock;
   if (current.lock) {
     // Retain earlier tutorial gates so their markers stay open in the HUD.
@@ -564,6 +569,7 @@ function flamePhase(now) {
 }
 
 function scheduleNextStrike(now) {
+  round.comboLaserAt = Infinity;
   if (isTutorial()) {
     round.strike = Infinity;
     return;
@@ -574,6 +580,40 @@ function scheduleNextStrike(now) {
     (battleTiming.slowestStrikeInterval - battleTiming.fastestStrikeInterval) * enemy.value / enemy.max;
   // A faster boss still gives players the full flamethrower warning.
   round.strike = now + Math.max(Math.round(interval), round.strikeKind === 'flame' ? flameChargeTime + 1000 : 0);
+  if (round.strikeKind === 'flame') round.comboLaserAt = undefined;
+}
+
+function scheduleTutorialFlame(now, pause) {
+  round.warningStart = 0;
+  round.strike = now + flameChargeTime + pause;
+  round.comboGuardBlocked = false;
+  round.comboLaserAt = lesson().id === 'guard-break' ? round.strike - comboLaserLeadTime : Infinity;
+}
+
+function updateFlameCombo(now) {
+  // Roll once as the charge begins, using the locks the player has already opened.
+  if (round.comboLaserAt !== undefined || now < round.strike - flameChargeTime) return;
+  const opened = round.locks.filter(lock => lock.done === lock.total).length;
+  round.comboLaserAt = Math.random() < comboChanceByLocksOpened[opened]
+    ? round.strike - comboLaserLeadTime : Infinity;
+}
+
+function resolveComboLaser(now, guarded, cameraLeftHeld) {
+  round.comboLaserAt = Infinity;
+  visuals.play(guarded ? 'guard-break' : 'laser', now);
+  if (guarded) {
+    // The laser spends the shield. Each held input must be released to rearm.
+    round.keyboardGuardBroken = round.keyboardGuard;
+    round.cameraGuardBroken = cameraLeftHeld;
+    round.guardBreakNoticeUntil = now + 900;
+    round.comboGuardBlocked = true;
+    return;
+  }
+  if (!isTutorial()) {
+    const damage = hurtPlayer(19, now);
+    round.strikeNotice = 'Eye laser hit · −' + damage + ' HP';
+    round.strikeNoticeUntil = now + 1000;
+  }
 }
 
 function interruptFlame(move, now, stage) {
@@ -758,6 +798,7 @@ function tick(now) {
     drawTracking(pose);
     round.lastPose = now;
     round.cameraMove = move;
+    if (!move.left && move.state !== 'framing') round.cameraGuardBroken = false;
     const healing = move.attack === 'power' && !canPowerCounter(now);
     if (move.attack && attack(move.attack, now, true)) move.consume?.(healing ? 'heal-held' : undefined);
     if (!round) return;
@@ -789,10 +830,22 @@ function tick(now) {
     }
   }
 
-  const cameraGuard = round.mode === 'camera' && round.cameraMove?.guard && now - round.lastPose < 260;
-  const guard = round.keyboardGuard || cameraGuard;
+  const cameraMove = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
+  const cameraGuard = cameraMove?.guard && !round.cameraGuardBroken;
+  let guard = (round.keyboardGuard && !round.keyboardGuardBroken) || cameraGuard;
+  updateFlameCombo(now);
+  if (now >= round.comboLaserAt) {
+    resolveComboLaser(now, guard, Boolean(cameraMove?.left));
+    guard = false;
+    if (round.finished) {
+      animation = requestAnimationFrame(tick);
+      return;
+    }
+  }
   if (now >= round.strike) {
     const kind = round.strikeKind;
+    const guardDrill = isTutorial() && lesson().id === 'guard-break';
+    const guardDrillDone = guardDrill && guard && round.comboGuardBlocked;
     visuals.play(kind, now, guard);
     scheduleNextStrike(now);
     round.strikeNotice = 'Strike finished';
@@ -813,7 +866,15 @@ function tick(now) {
         burnStatus.hidden = false;
       }
     }
-    if (isTutorial() && (!guard || kind === 'flame')) {
+    if (guardDrillDone) {
+      advanceLesson(now);
+      round.strikeNotice = 'Both attacks blocked!';
+    } else if (guardDrill) {
+      scheduleTutorialFlame(now, 1300);
+      round.strikeNotice = 'Block both attacks · try again';
+    } else if (isTutorial() && kind === 'flame') {
+      scheduleTutorialFlame(now, 1300);
+    } else if (isTutorial() && !guard) {
       round.warningStart = 0;
       round.strike = now + warningDuration() + 1300;
     }
@@ -821,17 +882,22 @@ function tick(now) {
   }
 
   if (round.mode === 'camera') updateCameraStatus(now);
-  const cameraPose = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove?.state : null;
+  const cameraPose = cameraMove?.state;
   const untilStrike = round.strike - now;
   const leadTime = warningDuration();
   const danger = untilStrike <= leadTime;
   const warningElapsed = leadTime - untilStrike;
   const flame = flamePhase(now);
-  const flashIndex = round.warningStart + Math.floor(warningElapsed / battleTiming.warningStep);
-  const flash = danger && !flame && warningElapsed % battleTiming.warningStep < 235 ? warningColors[flashIndex] : null;
+  const eyeElapsed = eyeWarningDuration() - ((flame ? round.comboLaserAt : round.strike) - now);
+  const eyeWarning = eyeElapsed >= 0;
+  const flashIndex = round.warningStart + Math.floor(eyeElapsed / battleTiming.warningStep);
+  const flash = eyeWarning && eyeElapsed % battleTiming.warningStep < 235 ? warningColors[flashIndex] : null;
+  const guardBroken = round.keyboardGuardBroken || (round.mode === 'camera' && round.cameraGuardBroken);
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
-  if (cameraPose === 'power') {
+  if (guardBroken) showPose('guard', 'Guard broken · release to reset', 'locked');
+  else if (now < round.guardBreakNoticeUntil && !guard) showPose('guard', 'Raise guard again', 'locked');
+  else if (cameraPose === 'power') {
     const counter = canPowerCounter(now);
     showPose(counter ? 'power' : 'heal', 'Both arms detected', counter || !healBlockReason(now) ? '' : 'locked');
   }
@@ -844,9 +910,16 @@ function tick(now) {
   else if (cameraPose === 'reset' && round.cameraMove.right) showPose('basic', 'Lower right hand to slash again');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
-  const bossLabel = flame ? 'Flamethrower' : 'Boss warning';
+  const bossLabel = flame ? eyeWarning ? 'Flame + eye lasers' : 'Flamethrower' : 'Boss warning';
   if (bossPanelLabel.textContent !== bossLabel) bossPanelLabel.textContent = bossLabel;
-  if (flame) showWarning(flame.hint, true);
+  if (flame) {
+    const incomingHint = eyeWarning ? 'Guard the eye lasers first.' :
+      guardBroken ? 'Release, then guard again.' :
+        now < round.strikeNoticeUntil && round.strikeNotice.startsWith('Eye laser hit') ? round.strikeNotice : undefined;
+    const drill = isTutorial() && lesson().id === 'guard-break';
+    const message = drill ? (round.comboLaserAt < Infinity ? 'Guard twice' : 'Guard the flames') : flame.hint;
+    showWarning(message, true, incomingHint);
+  }
   else if (danger) showWarning('Incoming eye lasers', true);
   else if (now < round.strikeNoticeUntil) showWarning(round.strikeNotice);
   else showWarning('No attack incoming');
@@ -964,11 +1037,11 @@ window.addEventListener('keydown', event => {
 window.addEventListener('keyup', event => {
   if (!round) return;
   const key = event.key.toLowerCase();
-  if (key === 's') round.keyboardGuard = false;
+  if (key === 's') round.keyboardGuard = round.keyboardGuardBroken = false;
   if (key === 'g') round.keyboardHum = false;
 });
 window.addEventListener('blur', () => {
-  if (round) round.keyboardGuard = round.keyboardHum = false;
+  if (round) round.keyboardGuard = round.keyboardGuardBroken = round.keyboardHum = false;
 });
 window.addEventListener('pagehide', () => {
   if (round || !exit.hidden) exit.click();
