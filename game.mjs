@@ -3,7 +3,7 @@ import { lessons } from './tutorial.mjs?v=35';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=35';
 import { combatArt } from './combat-art.mjs?v=36';
-import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=34';
+import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -217,7 +217,7 @@ function drawTracking(points) {
   poseContext.lineWidth = width * .005;
   poseContext.strokeStyle = '#e8ff75';
   poseContext.fillStyle = '#e8ff75';
-  const visibleJoint = (point, index) => posePoint(point, index === 15 || index === 16 ? .45 : .55);
+  const visibleJoint = (point, index) => index === 15 || index === 16 ? wristPoint(point) : posePoint(point);
   for (const [start, end] of armLines) {
     const from = points?.[start];
     const to = points?.[end];
@@ -763,7 +763,8 @@ function tick(now) {
   else if (recentAction) showPose(used.move, used.label, used.state ?? 'active');
   else if (cameraPose === 'heal-held') showPose('heal', 'Heal registered', 'active');
   else if (cameraPose === 'power-held') showPose('power', 'Power registered', 'active');
-  else if (cameraPose === 'basic') showPose('basic', 'Right hand seen');
+  else if (cameraPose === 'basic') showPose('basic', 'Right hand seen · hold briefly');
+  else if (cameraPose === 'reset' && round.cameraMove.right) showPose('basic', 'Lower right hand to slash again');
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
   if (danger) showWarning('Incoming eye lasers', true);

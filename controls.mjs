@@ -16,9 +16,13 @@ export function stopTracks(stream) {
   stream?.getTracks().forEach(track => track.stop());
 }
 
-export function posePoint(point, minimumVisibility = .55) {
+export function posePoint(point, minimumVisibility = .55, edge = .015) {
   return point && point.visibility >= minimumVisibility &&
-    point.x > .015 && point.x < .985 && point.y > .015 && point.y < .985;
+    point.x > edge && point.x < 1 - edge && point.y > edge && point.y < 1 - edge;
+}
+
+export function wristPoint(point) {
+  return posePoint(point, .42, .005);
 }
 
 // Give each round its own pose history. Raised arms can animate immediately, but
@@ -55,7 +59,7 @@ export function gestures() {
     const width = visibleShoulders.every(Boolean)
       ? Math.max(.1, Math.hypot(shoulders[0].x - shoulders[1].x, shoulders[0].y - shoulders[1].y))
       : .2;
-    const tracked = hands.map((hand, i) => visibleShoulders[i] && posePoint(hand, .45));
+    const tracked = hands.map((hand, i) => visibleShoulders[i] && wristPoint(hand));
     for (let i = 0; i < raised.length; i++) {
       if (!tracked[i]) {
         // Brief occlusion should not turn a two-arm pose into a one-arm pose.
@@ -64,18 +68,26 @@ export function gestures() {
       }
       lastSeen[i] = now;
       // Separate up/down thresholds keep a wrist near the boundary from flickering.
-      const margin = raised[i] ? -.06 : .09;
+      const margin = raised[i] ? -.06 : i === 1 ? .06 : .09;
       raised[i] = hands[i].y < shoulders[i].y - width * margin;
     }
 
     const [left, right] = raised;
     // A lowered right hand rearms the slash, even with the left hand still in
-    // guard. Keeping the right hand up never repeats the same attack.
-    if (rightDownSince !== undefined && now - rightDownSince >= 120) basicSpent = false;
+    // guard. One clearly lowered frame is enough, while borderline positions
+    // still need a short hold. A wrist that leaves frame has its own grace period.
+    const clearlyLowered = tracked[1] && hands[1].y >= shoulders[1].y + width * .3;
+    const restingOffscreen = !tracked[1] && !right && now - lastSeen[1] > 160;
+    if (clearlyLowered || restingOffscreen || (rightDownSince !== undefined && now - rightDownSince >= 75)) {
+      basicSpent = false;
+    }
     rightDownSince = right ? undefined : (rightDownSince ?? now);
     result.left = left;
     result.right = right;
-    const next = left && right ? 'power' : left ? 'guard' : right ? 'basic' : 'neutral';
+    // A briefly hidden left wrist can keep a guard stable, but it must not
+    // keep a clearly raised right wrist stuck in a two-arm pose.
+    const leftForPose = left && (!right || tracked[0] || now - lastSeen[0] <= 70);
+    const next = leftForPose && right ? 'power' : leftForPose ? 'guard' : right ? 'basic' : 'neutral';
     if (next !== pose) {
       pose = next;
       poseSince = now;
@@ -111,11 +123,15 @@ export function gestures() {
       return result;
     }
 
-    // Wait briefly on a single right arm so a two-arm raise can become power.
+    // Leave a short window for both arms to come up. Only latch the slash
+    // when the game accepts it, so a blocked tutorial input doesn't spend it.
     result.state = pose;
-    if (held >= 300 && tracked[1]) {
+    if (held >= 130 && tracked[1]) {
       result.attack = 'basic';
-      basicSpent = true;
+      result.consume = () => {
+        basicSpent = true;
+        result.state = 'reset';
+      };
     }
     return result;
   };
