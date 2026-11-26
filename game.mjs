@@ -1,7 +1,7 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=34';
+import { lessons } from './tutorial.mjs?v=35';
 import { paintBeast } from './beast.mjs';
-import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=33';
+import { bossHit, createBossLocks, lockMoves, nextBossLock, requiredLaserStage } from './boss-locks.mjs?v=35';
 import { combatArt } from './combat-art.mjs?v=26';
 import { gestures, listen, loadTracker, posePoint, stopTracks } from './controls.mjs?v=34';
 
@@ -63,13 +63,12 @@ const warningDuration = () => (warningColors.length - round.warningStart) * batt
 const lockInstructions = {
   basic: 'Right hand up · A',
   power: 'Block, then both up · D',
-  beam: 'Hum, then clap · G / F',
 };
 // Each additional stage takes twice as long to fill as the last one.
 const auraStages = [
-  { chargeMs: 800, multiplier: 1 },
-  { chargeMs: 2400, multiplier: 2 },
-  { chargeMs: 5600, multiplier: 4 },
+  { level: 1, chargeMs: 800, multiplier: 1 },
+  { level: 2, chargeMs: 2400, multiplier: 2 },
+  { level: 3, chargeMs: 5600, multiplier: 4 },
 ];
 const auraCapacity = auraStages.at(-1).chargeMs;
 const beamDuration = 420;
@@ -150,7 +149,9 @@ function showBossLocks() {
     title = active ? next.hp + ' HP lock' : 'Next lock · ' + next.hp + ' HP';
   }
   const remaining = next ? lockRequirement(next) + ' left' : '';
-  const instruction = next && active ? lockInstructions[next.move] : '';
+  const instruction = active
+    ? next.move === 'beam' ? 'Next: Stage ' + requiredLaserStage(next) + ' laser' : lockInstructions[next.move]
+    : '';
   if (lockTitle.textContent !== title) lockTitle.textContent = title;
   if (lockRemaining.textContent !== remaining) lockRemaining.textContent = remaining;
   if (lockInstruction.textContent !== instruction) lockInstruction.textContent = instruction;
@@ -164,10 +165,10 @@ function lockRequirement(lock) {
   return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];
 }
 
-function damageBoss(damage, move, now) {
+function damageBoss(damage, move, now, auraStage) {
   // The move drills use the real effects. Health gates only appear in the lock lessons.
   if (isTutorial() && !lesson().lock) return { dealt: Math.min(enemy.value, damage), lock: null };
-  const hit = bossHit(round.locks, enemy.value, damage, move);
+  const hit = bossHit(round.locks, enemy.value, damage, move, auraStage);
   if (hit.dealt) setHealth(enemy, hit.hp);
   if (hit.dealt || hit.credited) {
     round.nextHeal = now + battleTiming.healQuietTime + healInterval();
@@ -193,6 +194,7 @@ function healBoss(now) {
 function lockImpact(hit) {
   if (hit.credited && hit.lock.done === hit.lock.total) return hit.lock.hp + ' HP lock opened';
   if (hit.credited) return lockRequirement(hit.lock) + ' left';
+  if (hit.lock?.move === 'beam' && !hit.dealt) return 'Lock needs a Stage ' + requiredLaserStage(hit.lock) + ' laser';
   if (hit.lock && !hit.dealt) return 'Lock needs ' + lockRequirement(hit.lock);
   return '';
 }
@@ -615,7 +617,7 @@ function fireBeam(now) {
   showAura();
   const baseDamage = now < (round.counterUntil ?? 0) ? 8 : 6;
   const damage = Math.max(1, Math.round(baseDamage * playerDamageScale())) * stage.multiplier;
-  const hit = damageBoss(damage, 'beam', now);
+  const hit = damageBoss(damage, 'beam', now, stage.level);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
   const outcome = lockImpact(hit) || stage.multiplier + '× laser · ' +
     (isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP');
@@ -629,7 +631,7 @@ function fireBeam(now) {
 
 function showAura() {
   const ready = readyAuraStage();
-  const index = ready ? auraStages.indexOf(ready) + 1 : 0;
+  const index = ready?.level ?? 0;
   const bottom = ready?.chargeMs ?? 0;
   const next = auraStages[index];
   const percent = next ? Math.floor((round.auraMs - bottom) / (next.chargeMs - bottom) * 100) : 100;
