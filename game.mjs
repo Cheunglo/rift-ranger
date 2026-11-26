@@ -17,7 +17,7 @@ const battleResult = byId('battle-result');
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
-const tutorial = byId('tutorial');
+const tutorialButton = byId('tutorial');
 const tutorialPanel = byId('tutorial-panel');
 const micButtons = [byId('mic'), byId('mic-setup')];
 const micStatus = byId('mic-status');
@@ -92,6 +92,7 @@ const audioHints = {
 };
 
 let round;
+let tutorialSelected = false;
 let animation;
 let tracker;
 let cameraStream;
@@ -272,6 +273,28 @@ function showOverlay(title, copy) {
   overlay.hidden = false;
 }
 
+function updateStartButtons() {
+  webcam.disabled = tutorialButton.disabled = false;
+  webcam.textContent = tutorialSelected ? 'Tutorial with camera' : 'Enable camera';
+  keyboard.textContent = tutorialSelected ? 'Tutorial with keyboard' : 'Play with keyboard';
+  tutorialButton.textContent = tutorialSelected ? 'Back to battle' : 'Start Tutorial';
+}
+
+function showStartMenu() {
+  updateStartButtons();
+  if (tutorialSelected) {
+    showOverlay('Guided tutorial', 'Choose camera or keyboard to learn the moves and open the boss locks.');
+  } else {
+    showOverlay('Defend the city.', 'Keep your shoulders and any raised hand in view. You can play sitting or standing.');
+  }
+}
+
+tutorialButton.addEventListener('click', () => {
+  tutorialSelected = !tutorialSelected;
+  showStartMenu();
+  (tutorialSelected ? webcam : tutorialButton).focus();
+});
+
 function stopCamera() {
   stopTracks(cameraStream);
   cameraStream = null;
@@ -338,8 +361,7 @@ function resetRound() {
   tutorialPanel.hidden = true;
   tutorialBadge.hidden = true;
   lockMarkers.hidden = lockStatus.hidden = true;
-  webcam.disabled = false;
-  webcam.textContent = 'Enable camera';
+  updateStartButtons();
   exit.hidden = true;
   device.textContent = defaultStatus;
 }
@@ -419,8 +441,8 @@ function advanceLesson(now) {
 }
 
 function completeTutorial() {
+  tutorialSelected = false;
   resetRound();
-  tutorial.checked = false;
   arena.dataset.state = 'ready';
   showOverlay('Tutorial complete', 'You learned every move and opened all three locks. In battle, lock moves are shuffled and the boss can heal.');
   resetHud();
@@ -705,8 +727,8 @@ function tick(now) {
 
 webcam.addEventListener('click', async () => {
   const request = ++requestId;
-  const learning = tutorial.checked;
-  webcam.disabled = true;
+  const learning = tutorialSelected;
+  webcam.disabled = tutorialButton.disabled = true;
   webcam.textContent = 'Starting camera…';
   exit.hidden = false;
   device.textContent = 'Allow camera access when your browser asks.';
@@ -736,7 +758,7 @@ webcam.addEventListener('click', async () => {
   } catch (error) {
     if (request !== requestId) return;
     stopCamera();
-    webcam.disabled = false;
+    webcam.disabled = tutorialButton.disabled = false;
     webcam.textContent = 'Retry camera';
     exit.hidden = !micStream;
     const cameraError = error.name === 'NotAllowedError' || error.name === 'NotFoundError' ||
@@ -750,10 +772,9 @@ webcam.addEventListener('click', async () => {
 keyboard.addEventListener('click', () => {
   requestId++;
   stopCamera();
-  webcam.disabled = false;
-  webcam.textContent = 'Enable camera';
+  updateStartButtons();
   device.textContent = micStream ? 'Mic active. ' + defaultStatus : defaultStatus;
-  startRound('keyboard', tutorial.checked);
+  startRound('keyboard', tutorialSelected);
 });
 
 async function toggleMic() {
@@ -803,7 +824,7 @@ for (const button of micButtons) button.addEventListener('click', toggleMic);
 exit.addEventListener('click', () => {
   resetRound();
   arena.dataset.state = 'ready';
-  showOverlay('Defend the city.', 'Keep your shoulders and any raised hand in view. You can play sitting or standing.');
+  showStartMenu();
   resetHud();
   webcam.focus();
 });

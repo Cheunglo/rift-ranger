@@ -22,7 +22,7 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 
 Choose **Enable microphone** on the start screen or below the boss warning and grant browser permission to use sound controls. Stay quiet briefly while the mic calibrates. The left panel shows the aura meter, mic input level, and whether the game hears a steady hum. Humming is ignored during a beam and briefly afterward so steady background noise can settle. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
 
-Select **Guided tutorial**, then start with camera or keyboard. Complete each prompted move to advance, from slashing and blocking to charging and firing a laser. The final lessons teach all three lock types without health loss or a Power Level penalty. Hum and clap with the mic, or use G and F.
+Choose **Start Tutorial**, then start with camera or keyboard. Complete each prompted move to advance, from slashing and blocking to charging and firing a laser. The final lessons teach all three lock types without health loss or a Power Level penalty. Hum and clap with the mic, or use G and F.
 
 ## Reading the code
 

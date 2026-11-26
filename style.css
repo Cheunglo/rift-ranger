@@ -80,9 +80,6 @@ progress::-moz-progress-bar { background: var(--acid); }
 #result-score { color: var(--acid); }
 .battle-result .score-component { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid #785d8760; text-align: left; }
 .battle-result .score-component dd { font-size: .875rem; font-weight: 600; line-height: 1.35; }
-.tutorial-option { display: grid; grid-template-columns: auto 1fr; gap: 2px 7px; align-items: center; margin: 0 0 12px; text-align: left; font-weight: 800; }
-.tutorial-option input { margin: 0; width: 1rem; height: 1rem; accent-color: var(--acid); }
-.tutorial-option span { grid-column: 2; color: var(--muted); font-size: .875rem; font-weight: 500; }
 .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
 button { font: inherit; font-weight: 800; border: 1px solid transparent; border-radius: 6px; padding: 8px 13px; color: var(--ink); background: var(--acid); cursor: pointer; }
 button.secondary { background: #252035; color: #f6f3ff; border-color: #514563; }
