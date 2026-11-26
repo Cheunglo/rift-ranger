@@ -1,5 +1,5 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=29';
+import { lessons } from './tutorial.mjs?v=32';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=22';
 import { combatArt } from './combat-art.mjs?v=26';
@@ -19,10 +19,8 @@ const webcam = byId('webcam');
 const keyboard = byId('keyboard');
 const tutorialButton = byId('tutorial');
 const tutorialPanel = byId('tutorial-panel');
-const micButtons = [byId('mic'), byId('mic-setup')];
 const micStatus = byId('mic-status');
 const micLevel = byId('mic-level');
-const micSetupStatus = byId('mic-setup-status');
 const exit = byId('exit');
 const device = byId('device');
 const prompt = byId('prompt');
@@ -103,7 +101,6 @@ let audioInput;
 let poseAnimation;
 // Stale permission or model requests must not reopen a device after you exit.
 let requestId = 0;
-let micRequestId = 0;
 const defaultStatus = 'Camera and mic stay on your device.';
 const videoInputOptions = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } };
 const audioInputOptions = { autoGainControl: false, noiseSuppression: false, echoCancellation: true };
@@ -301,6 +298,7 @@ tutorialButton.addEventListener('click', () => {
 
 function stopCamera() {
   cancelCameraMic();
+  stopMic();
   stopTracks(cameraStream);
   cameraStream = null;
   camera.srcObject = null;
@@ -312,7 +310,7 @@ function stopCamera() {
 }
 
 function beginCameraMic() {
-  if (micStream || micButtons.some(button => button.disabled)) return null;
+  if (micStream || pendingCameraMic) return null;
   const Audio = window.AudioContext || window.webkitAudioContext;
   if (!Audio) return null;
   try {
@@ -320,7 +318,6 @@ function beginCameraMic() {
     // Begin resuming inside the click gesture, before the permission prompt.
     const ready = audioContext.resume().then(() => true, () => false);
     pendingCameraMic = { audioContext, ready };
-    setMicControls(false, true);
     return pendingCameraMic;
   } catch {
     return null;
@@ -333,7 +330,6 @@ function cancelCameraMic() {
   pendingCameraMic = null;
   stopTracks(stream);
   void audioContext.close().catch(() => {});
-  setMicControls(false);
 }
 
 function activateMic(stream, audioContext) {
@@ -344,17 +340,14 @@ function activateMic(stream, audioContext) {
   stream.getAudioTracks()[0].addEventListener('ended', () => {
     if (micStream !== stream) return;
     stopMic();
-    if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
     setMicMessage('Mic disconnected. F and G still work.');
     device.textContent = defaultStatus;
   });
-  setMicControls(true);
   setMicMessage('Mic on. Hum a steady note, then keep clapping to fire.');
   micLevel.hidden = false;
 }
 
 function stopMic() {
-  micRequestId++;
   stopTracks(micStream);
   micStream = null;
   audioInput = null;
@@ -364,26 +357,15 @@ function stopMic() {
   }
   if (context && context.state !== 'closed') void context.close().catch(() => {});
   context = null;
-  setMicControls(false);
   setMicMessage('');
   micLevel.value = 0;
   micLevel.hidden = true;
-}
-
-function setMicControls(active, busy = false) {
-  for (const button of micButtons) {
-    button.disabled = busy;
-    button.textContent = active ? 'Disable microphone' : 'Enable microphone';
-    button.setAttribute('aria-pressed', String(active));
-  }
 }
 
 function setMicMessage(message) {
   if (micStatus.textContent !== message) micStatus.textContent = message;
   delete micStatus.dataset.state;
   micStatus.hidden = !message;
-  if (micSetupStatus.textContent !== message) micSetupStatus.textContent = message;
-  micSetupStatus.hidden = !message;
 }
 
 function showMicInput(state, level) {
@@ -398,7 +380,6 @@ function resetRound() {
   requestId++;
   cancelAnimationFrame(animation);
   stopCamera();
-  stopMic();
   round = null;
   cameraBonusStatus.hidden = true;
   visuals.clear();
@@ -779,7 +760,7 @@ webcam.addEventListener('click', async () => {
   webcam.textContent = 'Starting camera…';
   exit.hidden = false;
   const automaticMic = beginCameraMic();
-  let micFallback = false;
+  let micFallback = !automaticMic;
   device.textContent = automaticMic ? 'Allow camera and microphone access when your browser asks.' :
     'Allow camera access when your browser asks.';
   try {
@@ -841,7 +822,7 @@ webcam.addEventListener('click', async () => {
     stopCamera();
     webcam.disabled = tutorialButton.disabled = false;
     webcam.textContent = 'Retry camera + mic';
-    exit.hidden = !micStream;
+    exit.hidden = true;
     const cameraError = error.name === 'NotAllowedError' || error.name === 'NotFoundError' ||
       error.name === 'NotReadableError' || !navigator.mediaDevices;
     device.textContent = cameraError
@@ -854,45 +835,9 @@ keyboard.addEventListener('click', () => {
   requestId++;
   stopCamera();
   updateStartButtons();
-  device.textContent = micStream ? 'Mic active. ' + defaultStatus : defaultStatus;
+  device.textContent = defaultStatus;
   startRound('keyboard', tutorialSelected);
 });
-
-async function toggleMic() {
-  if (micStream) {
-    stopMic();
-    device.textContent = defaultStatus;
-    if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
-    return;
-  }
-  const request = ++micRequestId;
-  setMicControls(false, true);
-  exit.hidden = false;
-  setMicMessage('Allow microphone access when your browser asks.');
-  try {
-    const Audio = window.AudioContext || window.webkitAudioContext;
-    context = new Audio();
-    const audioContext = context;
-    await audioContext.resume();
-    if (request !== micRequestId) return;
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: audioInputOptions });
-    if (request !== micRequestId) return stopTracks(stream);
-    try {
-      activateMic(stream, audioContext);
-    } catch (error) {
-      stopTracks(stream);
-      throw error;
-    }
-    device.textContent = 'Mic active. Hum to build aura, then keep clapping to fire.';
-  } catch {
-    if (request !== micRequestId) return;
-    stopMic();
-    if (!round && !cameraStream && !webcam.disabled) exit.hidden = true;
-    setMicMessage(micUnavailable);
-  }
-}
-
-for (const button of micButtons) button.addEventListener('click', toggleMic);
 
 exit.addEventListener('click', () => {
   resetRound();

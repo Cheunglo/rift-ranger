@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=30">
-  <script type="module" src="./game.mjs?v=31"></script>
+  <link rel="stylesheet" href="./style.css?v=32">
+  <script type="module" src="./game.mjs?v=32"></script>
 </head>
 <body>
   <main>
@@ -59,7 +59,6 @@
           <div class="audio-tools">
             <div class="aura-meter"><label id="aura-caption" class="label" for="aura">Aura</label><progress id="aura" max="100" value="0"></progress></div>
             <div class="mic-control">
-              <button id="mic" class="secondary" type="button" aria-pressed="false">Enable microphone</button>
               <p id="mic-status" hidden></p>
               <progress id="mic-level" aria-label="Microphone input level" max="100" value="0" hidden></progress>
             </div>
@@ -104,9 +103,7 @@
             <button id="webcam" type="button">Enable camera + mic</button>
             <button id="keyboard" class="secondary" type="button">Play with keyboard</button>
             <button id="tutorial" class="secondary" type="button">Start Tutorial</button>
-            <button id="mic-setup" class="secondary" type="button" aria-pressed="false">Enable microphone</button>
           </div>
-          <p id="mic-setup-status" role="status" hidden></p>
         </div>
       </div>
     </section>

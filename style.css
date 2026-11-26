@@ -140,11 +140,9 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 #aura::-webkit-progress-value { background: #d8abfa; }
 #aura::-moz-progress-bar { background: #d8abfa; }
 .mic-control { display: grid; gap: 4px; margin-top: 3px; }
-.mic-control button { justify-self: start; padding: 4px 7px; font-size: .875rem; text-align: left; }
 #mic-status { color: var(--muted); }
 #mic-status[data-state="humming"] { color: var(--acid); }
 #mic-level { height: 4px; margin: 0; }
-#mic-setup-status { margin: 8px 0 0; }
 #tracking { color: #f6f3ff; }
 #tracking[data-state="accepted"] { color: var(--acid); }
 #tracking[data-state="waiting"] { color: #ffdca2; }
