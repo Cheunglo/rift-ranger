@@ -1,5 +1,5 @@
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=42';
+import { lessons } from './tutorial.mjs?v=44';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
 import { combatArt } from './combat-art.mjs?v=43';
@@ -62,12 +62,12 @@ const cameraBonusPercent = 20;
 const warningColors = ['green', 'yellow', 'red'];
 const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
 const eyeWarningDuration = () => (warningColors.length - round.warningStart) * battleTiming.warningStep;
-// Each phase stores its exclusive end time and the move that can interrupt it.
+// Each phase stores its exclusive end time and which hits can interrupt it.
 const flamePhases = [
-  { until: 1400, color: '#ff352d', move: 'basic', hint: 'Slash to interrupt' },
-  { until: 2800, color: '#ff8b28', move: 'beam', stage: 1, hint: 'Stage 1+ laser to interrupt' },
-  { until: 4200, color: '#ffdd39', move: 'beam', stage: 2, hint: 'Stage 2+ laser to interrupt' },
-  { until: 6600, color: '#43a8ff', move: 'beam', stage: 3, hint: 'Stage 3 laser to interrupt' },
+  { until: 1400, name: 'red', color: '#ff352d', minLaserStage: 1, hint: 'Slash or laser to interrupt' },
+  { until: 2800, name: 'orange', color: '#ff8b28', minLaserStage: 1, hint: 'Slash to cool · Stage 1+ laser' },
+  { until: 4200, name: 'yellow', color: '#ffdd39', minLaserStage: 2, hint: 'Slash to cool · Stage 2+ laser' },
+  { until: 6600, name: 'blue', color: '#43a8ff', minLaserStage: 3, hint: 'Slash to cool · Stage 3 laser' },
   { until: 7100, color: '#ffffff', halo: '#43a8ff', hint: 'White-hot · guard now' },
 ];
 const flameChargeTime = flamePhases.at(-1).until;
@@ -614,14 +614,26 @@ function resolveComboLaser(now, guarded, cameraLeftHeld) {
   }
 }
 
-function interruptFlame(move, now, stage) {
+function hitFlameCharge(move, now, stage) {
   const phase = flamePhase(now);
-  if (phase?.move !== move || (move === 'beam' && stage < phase.stage)) return false;
+  if (!phase?.minLaserStage) return '';
+  if (move === 'basic') {
+    const priorIndex = flamePhases.indexOf(phase) - 1;
+    if (priorIndex >= 0) {
+      const priorStart = flamePhases[priorIndex - 1]?.until ?? 0;
+      round.strike = now + flameChargeTime - priorStart;
+      // Move a pending combo with the charge. A laser that fired stays spent.
+      if (round.comboLaserAt < Infinity) round.comboLaserAt = round.strike - comboLaserLeadTime;
+      return 'Fireball cooled to ' + flamePhases[priorIndex].name;
+    }
+  } else if (move !== 'beam' || stage < phase.minLaserStage) {
+    return '';
+  }
   scheduleNextStrike(now);
   round.strikeNotice = 'Flamethrower interrupted!';
   round.strikeNoticeUntil = now + 1400;
   if (isTutorial() && lesson().id === 'flame') advanceLesson(now);
-  return true;
+  return 'Flamethrower interrupted!';
 }
 
 function hurtPlayer(amount, now) {
@@ -650,13 +662,12 @@ function attack(move, now, fromCamera = false) {
   }
   round.attackPose = { move, until: now + 360 };
   visuals.play(move, now);
-  const interrupted = interruptFlame(move, now);
+  const flameOutcome = hitFlameCharge(move, now);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
   const damageText = isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP';
-  const outcome = interrupted ? 'Flamethrower interrupted!' :
-    lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
+  const outcome = flameOutcome || lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
   confirmPose(move, outcome, now);
-  if (fromCamera) cameraNotice(outcome, hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
+  if (fromCamera) cameraNotice(outcome, !flameOutcome && hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
   if (current && (current.id === 'slash' || current.id === 'counter' ||
       (hit.credited && hit.lock.done === hit.lock.total))) advanceLesson(now);
   else if (enemy.value === 0) round.finished = { won: true, at: now, until: now + (move === 'power' ? 800 : 510) };
@@ -722,11 +733,10 @@ function fireBeam(now) {
   const baseDamage = now < (round.counterUntil ?? 0) ? 8 : 6;
   const damage = Math.max(1, Math.round(baseDamage * playerDamageScale())) * stage.multiplier;
   const hit = damageBoss(damage, 'beam', now, stage.level);
-  const interrupted = interruptFlame('beam', now, stage.level);
+  const flameOutcome = hitFlameCharge('beam', now, stage.level);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
-  const outcome = interrupted ? 'Flamethrower interrupted!' :
-    lockImpact(hit) || stage.multiplier + '× laser · ' +
-      (isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP');
+  const outcome = flameOutcome || lockImpact(hit) || stage.multiplier + '× laser · ' +
+    (isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP');
   confirmPose('clap', outcome, now);
   if (current === 'beam' || (current === 'beam-lock' && hit.credited && hit.lock.done === hit.lock.total)) {
     advanceLesson(now);
