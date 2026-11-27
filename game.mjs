@@ -12,10 +12,10 @@ import {
 } from './boss-attacks.mjs?v=64';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
 import { lessons } from './tutorial.mjs?v=68';
-import { paintBoss } from './boss-bodies.mjs?v=67';
-import { parseFightId } from './boss-fights.mjs?v=67';
+import { paintBoss } from './boss-bodies.mjs?v=69';
+import { parseFightId } from './boss-fights.mjs?v=69';
 import { attackDamage } from './boss-profiles.mjs?v=64';
-import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=67';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=69';
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { combatArt } from './combat-art.mjs?v=62';
 import { gestures } from './controls.mjs?v=68';
