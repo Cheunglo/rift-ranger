@@ -1,5 +1,5 @@
 // Owns the round and connects input, attack rules, and presentation.
-import { createCameraSession, defaultStatus } from './camera-session.mjs?v=66';
+import { createCameraSession, defaultStatus } from './camera-session.mjs?v=67';
 import {
   arena, burnStatus, byId, hideOverlay, lockMarkers,
   lockStatus, mobileControls, powerStock, renderAura, renderBossLabel,
@@ -12,13 +12,13 @@ import {
 } from './boss-attacks.mjs?v=64';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
 import { lessons } from './tutorial.mjs?v=66';
-import { paintBoss } from './boss-bodies.mjs?v=65';
-import { parseFightId } from './boss-fights.mjs?v=65';
+import { paintBoss } from './boss-bodies.mjs?v=67';
+import { parseFightId } from './boss-fights.mjs?v=67';
 import { attackDamage } from './boss-profiles.mjs?v=64';
-import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=65';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=67';
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { combatArt } from './combat-art.mjs?v=62';
-import { gestures } from './controls.mjs?v=66';
+import { gestures } from './controls.mjs?v=67';
 
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');

@@ -137,10 +137,43 @@ export function gestures() {
   };
 }
 
+// Recover a completed burst that started and finished between render frames.
+function hasRecentBurst(samples, sampleRate, roomLevel) {
+  const blockSize = Math.round(sampleRate * .012);
+  const maxLength = sampleRate * .240;
+  const maxAge = sampleRate * .175;
+  const threshold = Math.max(.022, roomLevel * 4.5);
+  let previousRms;
+  let start = -1;
+  let loudest = 0;
+  for (let offset = samples.length % blockSize; offset < samples.length; offset += blockSize) {
+    let energy = 0;
+    for (let i = offset; i < offset + blockSize; i++) energy += samples[i] ** 2;
+    const rms = Math.sqrt(energy / blockSize);
+    if (start >= 0) {
+      const length = offset - start;
+      if (rms < loudest * .35) {
+        if (length <= maxLength && samples.length - offset <= maxAge) return true;
+        start = -1;
+      } else if (length > maxLength) {
+        start = -1;
+      } else {
+        loudest = Math.max(loudest, rms);
+      }
+    } else if (previousRms !== undefined && rms > Math.max(threshold, previousRms * 2.8)) {
+      start = offset;
+      loudest = rms;
+    }
+    previousRms = rms;
+  }
+  return false;
+}
+
 // The analyser reads the microphone without routing it to the speakers.
 export function listen(context, stream) {
   const analyser = context.createAnalyser();
-  analyser.fftSize = 2 ** Math.ceil(Math.log2(context.sampleRate * .064));
+  const chargeWindow = 2 ** Math.ceil(Math.log2(context.sampleRate * .064));
+  analyser.fftSize = 2 ** Math.ceil(Math.log2(context.sampleRate * .32));
   const source = context.createMediaStreamSource(stream);
   // Keep the analyser in the audio graph even in browsers that skip unused nodes.
   // A zero-gain output prevents microphone playback.
@@ -151,6 +184,8 @@ export function listen(context, stream) {
   muted.connect(context.destination);
   const samples = new Float32Array(analyser.fftSize);
   const shotWindow = Math.round(context.sampleRate * .042);
+  const startCharge = samples.length - chargeWindow;
+  const startRecent = samples.length - shotWindow;
   let calibrationUntil;
   let roomLevel = .001;
   let previousRms = 0;
@@ -169,8 +204,7 @@ export function listen(context, stream) {
     let energy = 0;
     let recentEnergy = 0;
     let peak = 0;
-    const startRecent = samples.length - shotWindow;
-    for (let i = 0; i < samples.length; i++) {
+    for (let i = startCharge; i < samples.length; i++) {
       const sample = samples[i];
       sum += sample;
       energy += sample ** 2;
@@ -179,11 +213,12 @@ export function listen(context, stream) {
         peak = Math.max(peak, Math.abs(sample));
       }
     }
-    const average = sum / samples.length;
-    const rms = Math.sqrt(Math.max(0, energy / samples.length - average ** 2));
+    const average = sum / chargeWindow;
+    const rms = Math.sqrt(Math.max(0, energy / chargeWindow - average ** 2));
     const recentRms = Math.sqrt(recentEnergy / shotWindow);
     let fireLaser = false;
-    if (calibrating || suppressHum || now - lastShot < 220) {
+    const armed = !calibrating && !suppressHum && now - lastShot >= 220;
+    if (!armed) {
       burst = undefined;
     } else if (recentRms > Math.max(.013, roomLevel * 3.5, previousRms * 2.2) &&
                peak > Math.max(.09, recentRms * 3.1)) {
@@ -201,6 +236,9 @@ export function listen(context, stream) {
       }
     } else if (recentRms > Math.max(.022, roomLevel * 4.5, previousRms * 2.8)) {
       burst = { startedAt: now, loudest: recentRms };
+    }
+    if (armed && !fireLaser && recentRms < .022) {
+      fireLaser = hasRecentBurst(samples, context.sampleRate, roomLevel);
     }
     previousRms = recentRms;
     if (fireLaser) {

@@ -1,5 +1,5 @@
 // Owns device permissions, stream lifetimes, and input sampling for a camera session.
-import { listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=66';
+import { listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=67';
 
 export const defaultStatus = 'Camera and mic stay on your device.';
 

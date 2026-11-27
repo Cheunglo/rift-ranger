@@ -8,7 +8,11 @@ function microphone(sampleRate) {
   const analyser = {
     connect() {},
     getFloatTimeDomainData(samples) {
-      for (let i = 0; i < samples.length; i++) samples[i] = input(i / sampleRate, i);
+      const recentWindow = 2 ** Math.ceil(Math.log2(sampleRate * .064));
+      for (let i = 0; i < samples.length; i++) {
+        const relative = i - samples.length + recentWindow;
+        samples[i] = input(relative / sampleRate, relative);
+      }
     },
   };
   const read = listen({
@@ -119,4 +123,30 @@ test('firing cues are ignored during the beam', () => {
   const shout = hum(145, .085);
   for (let i = 0; i < 7; i++) assert.equal(read(shout, true).fireLaser, false);
   assert.equal(read().fireLaser, false);
+});
+
+test('audio history catches a burst that ended between render frames', () => {
+  const read = microphone(48000);
+  for (let i = 0; i < 22; i++) read();
+  // The 100 ms vocal burst ended 90 ms before this frame, outside the
+  // charge meter and the immediate snap/clap detection window.
+  const history = time => time > -.105 && time < -.005 ? .1 * Math.sin(time * 2 * Math.PI * 150) : 0;
+  assert.equal(read(history).fireLaser, true);
+  assert.equal(read(history).fireLaser, false);
+});
+
+test('audio history catches a snap just outside the immediate firing window', () => {
+  const read = microphone(48000);
+  for (let i = 0; i < 22; i++) read();
+  const snap = (_, index) => index >= 800 && index < 816 ? (index % 2 ? .55 : -.55) : 0;
+  assert.equal(read(snap).fireLaser, true);
+});
+
+test('a short low-frequency thump can also fire Laser', () => {
+  const read = microphone(48000);
+  for (let i = 0; i < 22; i++) read();
+  const thump = time => time > -.065 && time < -.005
+    ? .18 * Math.sin(2 * Math.PI * 68 * time) * Math.exp(-(time + .065) * 30)
+    : 0;
+  assert.equal(read(thump).fireLaser, true);
 });
