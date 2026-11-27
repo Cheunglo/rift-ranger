@@ -67,3 +67,39 @@ test('mobile tutorial shows touch instructions and advances on Slash', { timeout
   await page.waitForFunction(() => document.querySelector('#tutorial-title').textContent === 'Block the laser');
   assert.match(await page.locator('#tutorial-instruction').textContent(), /hold Block/);
 });
+
+test('boss selection and a shared fight ID restore the body and first lock', { timeout: 25000 }, async t => {
+  const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
+  await page.locator('#fight-options summary').click();
+  await page.locator('#boss-choice').selectOption('T');
+  await page.locator('#mobile').click();
+  assert.equal(await page.locator('#boss-name').textContent(), 'Barkjaw');
+  const treeId = await page.locator('#current-fight-id').inputValue();
+  const firstLock = await page.locator('#lock-remaining').textContent();
+  assert.match(treeId, /^RR1-T-LFS-[SPL]{3}$/);
+  await page.locator('#exit').click();
+  await page.locator('#fight-id-input').fill('RR1-T-LFS-SSS');
+  await page.locator('#mobile').click();
+  assert(await page.locator('#overlay').isVisible());
+  assert.equal(await page.locator('#fight-id-input').getAttribute('aria-invalid'), 'true');
+  await page.locator('#fight-id-input').fill(treeId);
+  await page.locator('#mobile').click();
+  assert.equal(await page.locator('#boss-name').textContent(), 'Barkjaw');
+  assert.equal(await page.locator('#lock-remaining').textContent(), firstLock);
+  await page.locator('#exit').click();
+  await page.locator('#boss-choice').selectOption('B');
+  await page.locator('#mobile').click();
+  assert.equal(await page.locator('#boss-name').textContent(), 'Iron Beetle');
+  assert.match(await page.locator('#current-fight-id').inputValue(), /^RR1-B-LFS-/);
+});
+
+test('a link can prefill a fight ID', { timeout: 15000 }, async t => {
+  const page = await openGame(t, { viewport: { width: 1280, height: 720 } });
+  const link = new URL(url);
+  link.searchParams.set('boss', 'RR1-B-LFS-LPS');
+  await page.goto(link.href);
+  assert.equal(await page.locator('#fight-id-input').inputValue(), 'RR1-B-LFS-LPS');
+  await page.locator('#keyboard').click();
+  assert.equal(await page.locator('#boss-name').textContent(), 'Iron Beetle');
+  assert.equal(await page.locator('#lock-remaining').textContent(), '2 laser credits left');
+});

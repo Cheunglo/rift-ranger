@@ -1,7 +1,7 @@
 import { bossEffectDurations, createBossEffects } from './boss-effects.mjs?v=58';
 
 // Canvas coordinates are CSS pixels. The boss anchors follow its existing sprite.
-export function combatArt(canvas, beast, reducedMotion, anchors) {
+export function combatArt(canvas, beast, reducedMotion) {
   const ctx = canvas.getContext('2d');
   const effects = [];
   let leftLift = 0;
@@ -257,7 +257,7 @@ export function combatArt(canvas, beast, reducedMotion, anchors) {
       previousTime = undefined;
       leftLift = rightLift = kneel = 0;
     },
-    render(now, { left, right, guard, aura, auraStage = 0, flash, beamStrength, beamStage, flame, inhale, shaken, burning }) {
+    render(now, { left, right, guard, aura, auraStage = 0, flash, beamStrength, beamStage, flame, inhale, shaken, burning, anchors }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();

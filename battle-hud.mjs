@@ -1,5 +1,5 @@
 // Paints DOM battle state. The game decides when that state changes.
-import { lockRequirement, nextBossLock } from './boss-locks.mjs?v=58';
+import { lockRequirement, nextBossLock } from './boss-locks.mjs?v=62';
 
 export const byId = id => document.getElementById(id);
 export const arena = byId('arena');
@@ -64,6 +64,11 @@ export function showBattleWarning(message, incoming, hint, showGuardPose) {
   warningPose.toggleAttribute('hidden', !incoming || !showGuardPose);
   warningHint.hidden = !incoming;
   if (incoming && warningHint.textContent !== hint) warningHint.textContent = hint;
+}
+
+export function renderBossName(name) {
+  byId('boss-name').textContent = name;
+  enemy.setAttribute('aria-label', name + ' health');
 }
 
 export function renderHealth(fighter, hp, maxHp) {

@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=56">
-  <script type="module" src="./game.mjs?v=61"></script>
+  <link rel="stylesheet" href="./style.css?v=62">
+  <script type="module" src="./game.mjs?v=62"></script>
 </head>
 <body>
   <main>
@@ -33,7 +33,7 @@
         </div>
         <strong id="tutorial-badge" hidden>Tutorial</strong>
         <div class="enemy-health">
-          <div class="health-heading"><span class="label">The Riftbeast</span><span class="hp" id="enemy-hp" aria-hidden="true">100 / 100 HP</span></div>
+          <div class="health-heading"><span class="label" id="boss-name">The Riftbeast</span><span class="hp" id="enemy-hp" aria-hidden="true">100 / 100 HP</span></div>
           <div class="enemy-meter">
             <progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress>
             <div id="lock-markers" aria-hidden="true" hidden>
@@ -98,6 +98,23 @@
               <dd id="result-camera-formula"></dd>
             </div>
           </dl>
+          <details id="fight-options">
+            <summary>Boss options</summary>
+            <div class="fight-options-fields">
+              <label>Boss
+                <select id="boss-choice">
+                  <option value="R">The Riftbeast</option>
+                  <option value="T">Barkjaw (tree)</option>
+                  <option value="B">Iron Beetle</option>
+                  <option value="random">Random body</option>
+                </select>
+              </label>
+              <label>Fight ID
+                <input id="fight-id-input" maxlength="24" placeholder="RR1-T-LFS-SPL" spellcheck="false" autocomplete="off" aria-describedby="fight-id-error">
+              </label>
+            </div>
+            <p id="fight-id-error" role="status"></p>
+          </details>
           <div class="actions">
             <button id="webcam" type="button">Enable camera + mic</button>
             <button id="keyboard" class="secondary" type="button">Play with keyboard</button>
@@ -127,6 +144,12 @@
         <button id="warning-toggle" class="secondary" type="button" aria-expanded="true" aria-controls="boss-panel" hidden>Hide warning</button>
         <button id="exit" class="secondary" type="button" hidden>End session</button>
       </div>
+    </div>
+    <div id="fight-share" hidden>
+      <label for="current-fight-id">Fight ID</label>
+      <input id="current-fight-id" readonly>
+      <button id="copy-fight-id" class="secondary" type="button">Copy ID</button>
+      <output id="fight-share-message" role="status"></output>
     </div>
     <p class="footer">Mic optional. <span id="camera-bonus-note">Keyboard controls work in either mode.</span></p>
   </main>

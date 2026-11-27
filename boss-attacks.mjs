@@ -14,7 +14,7 @@ const flamePhases = [
 const flameChargeTime = flamePhases.at(-1).until;
 const comboLaserLeadTime = 2300;
 // Slots are distinct from attack IDs so scheduling can be shared by future bosses.
-const riftbeastMoves = { regular: 'laser', special: 'flame', status: 'shout' };
+export const riftbeastMoves = { regular: 'laser', special: 'flame', status: 'shout' };
 const bossPace = {
   camera: { firstLaser: 7000, slowLaser: 6600, fastLaser: 3650, flamePause: 1000, openingFlame: 0, comboOdds: [.15, .40, .75, 1] },
   keyboard: { firstLaser: 5000, slowLaser: 4900, fastLaser: 3200, flamePause: 300, openingFlame: .35, comboOdds: [.45, .65, .90, 1] },
@@ -60,15 +60,15 @@ function flameDelay(pace) {
 export const warningDuration = round => currentAttack(round).warningDuration(round);
 export const strikeOutcome = round => currentAttack(round).hit;
 
-export function openingStrike(mode, learning, now) {
+export function openingStrike(mode, learning, now, bossMoves = riftbeastMoves) {
   const pace = bossPace[mode];
   const openingSpecial = !learning && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
-  const strikeKind = openingSpecial ? riftbeastMoves.special : riftbeastMoves.regular;
+  const strikeKind = openingSpecial ? bossMoves.special : bossMoves.regular;
   const move = attacks[strikeKind];
   return {
     pace,
     strike: learning ? Infinity : now + move.firstDelay(pace),
-    bossMoves: riftbeastMoves,
+    bossMoves,
     strikeKind,
     comboLaserAt: move.rollCombo ? undefined : Infinity,
     turnsSinceStatus: 0,

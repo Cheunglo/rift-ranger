@@ -18,7 +18,10 @@ function shuffle(items, random) {
 
 export function createBossLocks(random = Math.random) {
   // Every move gets one gate. The laser gate counts credits from any charge stage.
-  const moves = shuffle(Object.keys(lockMoves), random);
+  return bossLocksForOrder(shuffle(Object.keys(lockMoves), random));
+}
+
+export function bossLocksForOrder(moves) {
   return thresholds.map((hp, i) => ({
     hp, move: moves[i], total: (i + 1) * 2, done: 0, engaged: false,
   }));

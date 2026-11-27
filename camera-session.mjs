@@ -13,7 +13,7 @@ const audioHints = {
   humming: 'Charging Aura from mic.',
 };
 
-export function createCameraSession({ onReady, onLost, onMicStopped }) {
+export function createCameraSession({ onLost, onMicStopped }) {
   const byId = id => document.getElementById(id);
   const camera = byId('camera');
   const cameraFrame = byId('camera-frame');
@@ -156,7 +156,7 @@ export function createCameraSession({ onReady, onLost, onMicStopped }) {
     micLevel.value = level;
   }
 
-  async function start(learning) {
+  async function start(onReady) {
     const request = ++requestId;
     webcam.disabled = tutorialButton.disabled = true;
     webcam.textContent = 'Starting camera…';
@@ -200,7 +200,7 @@ export function createCameraSession({ onReady, onLost, onMicStopped }) {
         stop();
         onLost('Camera disconnected', 'Camera disconnected. Keyboard controls are available.');
       });
-      onReady(learning);
+      onReady();
       device.textContent = 'Camera active. ' + defaultStatus;
       if (micFallback) setMicMessage(micUnavailable);
       if (pendingCameraMic && pendingCameraMic === automaticMic) {

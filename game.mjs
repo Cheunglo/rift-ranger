@@ -1,20 +1,22 @@
 // Owns the round and connects input, attack rules, and presentation.
-import { createCameraSession, defaultStatus } from './camera-session.mjs?v=60';
+import { createCameraSession, defaultStatus } from './camera-session.mjs?v=62';
 import {
   arena, burnStatus, byId, hideOverlay, lockMarkers,
   lockStatus, mobileControls, powerStock, renderAura, renderBossLabel,
-  renderBossLocks, renderPose, renderPowerStock, renderHealth, resetHud, setBattleHudVisible,
+  renderBossLocks, renderBossName, renderPose, renderPowerStock, renderHealth, resetHud, setBattleHudVisible,
   setMobileHud, shakenStatus, showBattleResult, showBattleWarning, showOverlay,
-} from './battle-hud.mjs?v=61';
+} from './battle-hud.mjs?v=62';
 import {
   attackTell, coolFlame, openingStrike, randomWarningStart, scheduleNextStrike,
   scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
-} from './boss-attacks.mjs?v=61';
+} from './boss-attacks.mjs?v=62';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
 import { lessons } from './tutorial.mjs?v=61';
-import { paintBeast, riftbeastAnchors } from './beast.mjs?v=58';
-import { bossHit, createBossLocks, lockRequirement } from './boss-locks.mjs?v=58';
-import { combatArt } from './combat-art.mjs?v=58';
+import { paintBoss } from './boss-bodies.mjs?v=62';
+import { parseFightId } from './boss-fights.mjs?v=62';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=62';
+import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=62';
+import { combatArt } from './combat-art.mjs?v=62';
 import { gestures } from './controls.mjs?v=57';
 
 const cameraBonusStatus = byId('camera-bonus-status');
@@ -51,7 +53,9 @@ const auraCapacity = auraStages.at(-1).chargeMs;
 const micAuraChargeRate = 1.4;
 const beamDuration = 420;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const visuals = combatArt(byId('combat-fx'), byId('beast'), reducedMotion, riftbeastAnchors);
+const bossCanvas = byId('beast');
+const visuals = combatArt(byId('combat-fx'), bossCanvas, reducedMotion);
+const defaultFight = parseFightId('RR1-R-LFS-SPL');
 const trackingHints = {
   framing: 'Move back so the camera can see your shoulders.',
   'hands-hidden': 'Show your raised hand above your shoulder. Your resting hand can be out of view.',
@@ -66,7 +70,7 @@ const trackingHints = {
 let round;
 let tutorialSelected = false;
 let animation;
-paintBeast(byId('beast'));
+paintBoss(bossCanvas, defaultFight.body);
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
 
@@ -143,6 +147,7 @@ function confirmPose(move, label, now) {
 
 function updateStartButtons() {
   webcam.disabled = tutorialButton.disabled = false;
+  showFightOptions(!tutorialSelected);
   webcam.textContent = tutorialSelected ? 'Tutorial with camera + mic' : 'Enable camera + mic';
   keyboard.textContent = tutorialSelected ? 'Tutorial with keyboard' : 'Play with keyboard';
   mobile.textContent = tutorialSelected ? 'Tutorial on mobile' : 'Play on mobile';
@@ -173,6 +178,7 @@ function resetRound() {
   setMobileHud(false);
   document.body.classList.remove('mobile-play');
   round = null;
+  showFightId();
   burnStatus.hidden = shakenStatus.hidden = powerStock.hidden = true;
   cameraBonusStatus.hidden = true;
   visuals.clear();
@@ -186,14 +192,15 @@ function resetRound() {
   device.textContent = defaultStatus;
 }
 
-function startRound(mode, learning, mobileMode = false) {
+function startRound(mode, learning, mobileMode = false, fight = defaultFight) {
   combatInputs.reset();
   mobileControls.hidden = !mobileMode;
   setMobileHud(mobileMode);
   document.body.classList.toggle('mobile-play', mobileMode);
   const now = performance.now();
   round = {
-    ...openingStrike(mode, learning, now),
+    ...openingStrike(mode, learning, now, fight.moves),
+    fight,
     mode, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
     hp: { ...startingHP },
     maxHp: { ...startingHP },
@@ -201,9 +208,12 @@ function startRound(mode, learning, mobileMode = false) {
     powerCharges: 0, blockBonusUntil: 0, nextPower: now,
     keyboardGuard: false, shaken: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
-    locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
+    locks: learning ? [] : bossLocksForOrder(fight.lockOrder), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(), burnTickAt: Infinity,
   };
+  paintBoss(bossCanvas, fight.body);
+  renderBossName(fight.body.name);
+  showFightId(learning ? '' : fight.id);
   resetHud(round.maxHp);
   updatePowerStock();
   powerStock.hidden = false;
@@ -294,11 +304,13 @@ function endRound(won) {
   const elapsed = won ? Math.round(round.finished.at - round.startedAt) / 1000 : 0;
   const damage = round.damageTaken;
   const maxHealth = round.maxHp.player;
+  const { id: fightId, body } = round.fight;
   const cameraBonusEligible = round.cameraBonusEligible;
   resetRound();
+  showFightId(fightId);
   arena.dataset.state = won ? 'win' : 'ready';
   showOverlay(won ? 'City saved!' : 'Ranger down',
-    won ? 'The Riftbeast has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
+    won ? body.name + ' has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
   if (won) {
     showBattleResult(elapsed, damage, maxHealth, cameraBonusEligible, cameraBonusPercent);
   }
@@ -511,7 +523,7 @@ function drawBattle(now, guard, flash = null, flame = null, inhale = null) {
     left: Boolean(tracked?.left || guard || bothArms),
     right: !round.shaken && Boolean(tracked?.right || attack === 'basic' || bothArms),
     guard, aura: round.auraMs / auraCapacity, auraStage: readyAuraStage()?.level ?? 0, flash, beamStrength, beamStage: round.beamFlash?.stage, flame, inhale, shaken: round.shaken,
-    burning: round.burnTickAt !== Infinity,
+    burning: round.burnTickAt !== Infinity, anchors: round.fight.body.anchors,
   });
 }
 
@@ -658,7 +670,6 @@ function tick(now) {
 }
 
 const cameraSession = createCameraSession({
-  onReady: learning => startRound('camera', learning),
   onLost(reason, message) {
     forfeitCameraBonus(reason);
     if (round) round.mode = 'keyboard';
@@ -669,13 +680,19 @@ const cameraSession = createCameraSession({
   },
 });
 
-webcam.addEventListener('click', () => void cameraSession.start(tutorialSelected));
+webcam.addEventListener('click', () => {
+  const learning = tutorialSelected;
+  const fight = learning ? defaultFight : chooseFight();
+  if (fight) void cameraSession.start(() => startRound('camera', learning, false, fight));
+});
 
 function startManual(mobileMode) {
+  const fight = tutorialSelected ? defaultFight : chooseFight();
+  if (!fight) return;
   cameraSession.stop();
   updateStartButtons();
   device.textContent = mobileMode ? 'Hold Block to guard and Aura to charge. Tap the other moves.' : defaultStatus;
-  startRound('keyboard', tutorialSelected, mobileMode);
+  startRound('keyboard', tutorialSelected, mobileMode, fight);
 }
 // Some phones/tablets report a fine primary pointer when a mouse is connected.
 keyboard.addEventListener('click', () => startManual(
@@ -687,6 +704,8 @@ exit.addEventListener('click', () => {
   resetRound();
   arena.dataset.state = 'ready';
   showStartMenu();
+  paintBoss(bossCanvas, defaultFight.body);
+  renderBossName(defaultFight.body.name);
   resetHud(startingHP);
   webcam.focus({ preventScroll: true });
 });
