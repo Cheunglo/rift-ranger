@@ -1,7 +1,7 @@
 import { paintBeast, riftbeastAnchors } from './beast.mjs?v=58';
 import {
   paintBeetle, paintHound, paintHuman, paintOwl, paintSerpent, paintSlime, paintTree, paintWhale,
-} from './boss-body-art.mjs?v=63';
+} from './boss-body-art.mjs?v=65';
 
 // Bodies describe where existing effects originate. Keep these on the same
 // pixels as the eyes and mouth when editing a sprite.
@@ -14,7 +14,7 @@ function normalize([x, y]) {
 }
 
 export const bossBodies = {
-  R: { name: 'The Riftbeast', paint: paintBeast, anchors: riftbeastAnchors },
+  R: { name: 'The Riftbeast', pixelScale: 1, paint: paintBeast, anchors: riftbeastAnchors },
   T: { name: 'Barkjaw', label: 'Barkjaw (tree)', paint: paintTree, anchors: anchors([[16.5,19.5],[24.5,19.5]], [20.5,26], [20,19]) },
   B: { name: 'Iron Beetle', paint: paintBeetle, anchors: anchors([[15.5,22],[24.5,22]], [20,27], [20,18]) },
   H: { name: 'The Duelist', label: 'The Duelist (human)', paint: paintHuman, anchors: anchors([[17,11.5],[23,11.5]], [20,14.5], [20,23]) },
@@ -26,6 +26,8 @@ export const bossBodies = {
 };
 
 export function paintBoss(canvas, body) {
-  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  const scale = body.pixelScale ?? 2;
+  canvas.width = 40 * scale;
+  canvas.height = 36 * scale;
   body.paint(canvas);
 }
