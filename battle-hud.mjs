@@ -20,11 +20,12 @@ const moveNotice = byId('move-notice');
 const battleFeedback = byId('battle-feedback');
 const auraStatus = byId('aura-status');
 const auraButtonCaption = byId('aura-button-caption');
-export const player = byId('player');
+const player = byId('player');
 export const burnStatus = byId('burn-status');
 export const shakenStatus = byId('shaken-status');
 export const powerStock = byId('power-stock');
-export const enemy = byId('enemy');
+const enemy = byId('enemy');
+const healthBars = { player, enemy };
 export const lockMarkers = byId('lock-markers');
 export const lockStatus = byId('lock-status');
 const lockTitle = byId('lock-title');
@@ -65,14 +66,16 @@ export function showBattleWarning(message, incoming, hint, showGuardPose) {
   if (incoming && warningHint.textContent !== hint) warningHint.textContent = hint;
 }
 
-export function setHealth(bar, value) {
-  bar.value = value;
-  byId(bar.id + '-hp').textContent = bar.value + ' / ' + bar.max + ' HP';
+export function renderHealth(fighter, hp, maxHp) {
+  const bar = healthBars[fighter];
+  bar.max = maxHp;
+  bar.value = hp;
+  byId(bar.id + '-hp').textContent = hp + ' / ' + maxHp + ' HP';
 }
 
-export function resetHud() {
-  setHealth(player, player.max);
-  setHealth(enemy, enemy.max);
+export function resetHud(maxHp) {
+  renderHealth('player', maxHp.player, maxHp.player);
+  renderHealth('enemy', maxHp.enemy, maxHp.enemy);
   burnStatus.hidden = shakenStatus.hidden = true;
   arena.dataset.auraStage = mobileControls.dataset.auraStage = '0';
   auraCaption.textContent = 'Aura · charge to 1';

@@ -47,6 +47,28 @@ Choose **Start Tutorial**, then start with camera or keyboard. Complete each pro
 - `controls.mjs` turns camera landmarks and microphone samples into pose, hum, and clap events.
 - `beast.mjs` draws the boss sprite and defines its effect attachment points. `combat-art.mjs` composes the scene and player effects. `boss-effects.mjs` draws attacks using the boss’s eye and mouth anchors. `poses.svg` provides the small pose icons.
 
+## Working on the game
+
+Start at `startRound()` and `tick()` in `game.mjs`. Touch and key input arrives as named actions. The camera session emits pose and audio samples. The round resolves those inputs with boss scheduling, locks, and status rules. It owns HP and other combat state. The HUD renders that state, and the canvas draws the active effects from the boss's attachment points.
+
+To add a boss attack, add its timing, tell, and outcome to the move definitions in `boss-attacks.mjs`, then put its ID in a boss's Regular, Special, or Status slot. Reuse the guardable outcome for ordinary damage and choose a distinct resolver only for a new game rule. Put new canvas effects in `boss-effects.mjs`. Both tell and hit graphics should use the boss's anchors. Tutorial lessons can provide a separate `mobileHint` when a touch instruction differs.
+
+Run the unit tests with Node 20 or newer:
+
+```sh
+npm test
+```
+
+For the Firefox smoke tests, install the pinned Playwright dependency and its browser once:
+
+```sh
+npm ci
+npx playwright install firefox
+npm run test:browser
+```
+
+The smoke tests load the local game directly and exercise desktop combat and the mobile tutorial. Set `RANGER_TEST_URL` to check a preview or deployed build instead.
+
 ## Publish on GitHub Pages
 
 Push these files to a repository. Under **Settings → Pages**, choose **Deploy from a branch** and select your branch and **/(root)**. Open the HTTPS URL shown by Pages. No build or application server is needed. [GitHub Pages setup](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)

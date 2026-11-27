@@ -1,17 +1,17 @@
 // Owns the round and connects input, attack rules, and presentation.
 import { createCameraSession, defaultStatus } from './camera-session.mjs?v=60';
 import {
-  arena, burnStatus, byId, enemy, hideOverlay, lockMarkers,
-  lockStatus, mobileControls, player, powerStock, renderAura, renderBossLabel,
-  renderBossLocks, renderPose, renderPowerStock, resetHud, setBattleHudVisible, setHealth,
+  arena, burnStatus, byId, hideOverlay, lockMarkers,
+  lockStatus, mobileControls, powerStock, renderAura, renderBossLabel,
+  renderBossLocks, renderPose, renderPowerStock, renderHealth, resetHud, setBattleHudVisible,
   setMobileHud, shakenStatus, showBattleResult, showBattleWarning, showOverlay,
-} from './battle-hud.mjs?v=60';
+} from './battle-hud.mjs?v=61';
 import {
   attackTell, coolFlame, openingStrike, randomWarningStart, scheduleNextStrike,
-  scheduleTutorialFlame, updateFlameCombo, warningDuration,
-} from './boss-attacks.mjs?v=58';
+  scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
+} from './boss-attacks.mjs?v=61';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
-import { lessons } from './tutorial.mjs?v=60';
+import { lessons } from './tutorial.mjs?v=61';
 import { paintBeast, riftbeastAnchors } from './beast.mjs?v=58';
 import { bossHit, createBossLocks, lockRequirement } from './boss-locks.mjs?v=58';
 import { combatArt } from './combat-art.mjs?v=58';
@@ -39,6 +39,7 @@ const attacks = {
   power: [22, 'Power strike'],
 };
 const cameraBonusPercent = 20;
+const startingHP = { player: 100, enemy: 100 };
 const burnInterval = 1000;
 // Each additional stage takes twice as long to fill as the last one.
 const auraStages = [
@@ -69,19 +70,25 @@ paintBeast(byId('beast'));
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
 
-function showWarning(message, incoming = false, hint = round?.mobile ? 'Hold Block through the shot.' : 'Left hand up, or hold S.') {
-  showBattleWarning(message, incoming, hint, round?.strikeKind !== 'shout');
+function showWarning(message, incoming = false, hint = round?.mobile ? 'Hold Block through the shot.' : 'Left hand up, or hold S.', showGuardPose = true) {
+  showBattleWarning(message, incoming, hint, showGuardPose);
 }
 
 function showPose(move, label, state) {
   renderPose(round?.mode === 'camera', move, label, state);
 }
 
+function setHealth(fighter, hp) {
+  const maxHp = round.maxHp[fighter];
+  round.hp[fighter] = Math.max(0, Math.min(hp, maxHp));
+  renderHealth(fighter, round.hp[fighter], maxHp);
+}
+
 function damageBoss(damage, move, now, auraStage) {
   // The move drills use the real effects. Health gates only appear in the lock lessons.
-  if (isTutorial() && !lesson().lock) return { dealt: Math.min(enemy.value, damage), lock: null };
-  const hit = bossHit(round.locks, enemy.value, damage, move, auraStage);
-  if (hit.dealt) setHealth(enemy, hit.hp);
+  if (isTutorial() && !lesson().lock) return { dealt: Math.min(round.hp.enemy, damage), lock: null };
+  const hit = bossHit(round.locks, round.hp.enemy, damage, move, auraStage);
+  if (hit.dealt) setHealth('enemy', hit.hp);
   if (hit.dealt || hit.credited) {
     round.nextHeal = now + battleTiming.healQuietTime + healInterval();
     renderBossLocks(round.locks);
@@ -93,12 +100,12 @@ function healInterval() {
   // Each tick restores one HP. The interval grows with health, so the rate
   // falls as the boss heals. The minimum keeps low-HP recovery bounded.
   const { healMinInterval, healFullInterval } = battleTiming;
-  return healMinInterval + (healFullInterval - healMinInterval) * enemy.value / enemy.max;
+  return healMinInterval + (healFullInterval - healMinInterval) * round.hp.enemy / round.maxHp.enemy;
 }
 
 function healBoss(now) {
-  if (isTutorial() || now < round.nextHeal || enemy.value <= 0 || enemy.value >= enemy.max) return;
-  setHealth(enemy, enemy.value + 1);
+  if (isTutorial() || now < round.nextHeal || round.hp.enemy <= 0 || round.hp.enemy >= round.maxHp.enemy) return;
+  setHealth('enemy', round.hp.enemy + 1);
   round.nextHeal = now + healInterval();
   renderBossLocks(round.locks);
 }
@@ -188,6 +195,8 @@ function startRound(mode, learning, mobileMode = false) {
   round = {
     ...openingStrike(mode, learning, now),
     mode, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
+    hp: { ...startingHP },
+    maxHp: { ...startingHP },
     cameraBonusEligible: mode === 'camera' && !learning,
     powerCharges: 0, blockBonusUntil: 0, nextPower: now,
     keyboardGuard: false, shaken: false,
@@ -195,7 +204,7 @@ function startRound(mode, learning, mobileMode = false) {
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(), burnTickAt: Infinity,
   };
-  resetHud();
+  resetHud(round.maxHp);
   updatePowerStock();
   powerStock.hidden = false;
   cameraBonusStatus.hidden = !round.cameraBonusEligible;
@@ -229,17 +238,11 @@ function lesson() {
 
 function showLesson(now) {
   const current = lesson();
-  if (current.id === 'heal') setHealth(player, 80);
+  if (current.id === 'heal') setHealth('player', 80);
   tutorialPanel.hidden = false;
   byId('tutorial-step').textContent = 'Tutorial · ' + (round.lessonIndex + 1) + ' / ' + lessons.length;
   byId('tutorial-title').textContent = current.title;
-  byId('tutorial-instruction').textContent = round.mobile ? current.hint
-    .replace('Raise your right hand above your shoulder, or press K', 'Tap Slash')
-    .replace('hold your left hand up or hold S', 'hold Block')
-    .replaceAll('raise both hands or press D', 'tap Powerwave / Heal')
-    .replace('Hum, whistle, sing, or hold Space', 'Hold Aura')
-    .replace('Clap once or press J', 'Tap Laser')
-    .replace('Lower and raise your left hand, or release and re-press S,', 'Release and re-press Block') : current.hint;
+  byId('tutorial-instruction').textContent = round.mobile ? current.mobileHint ?? current.hint : current.hint;
   round.strike = Infinity;
   round.comboLaserAt = Infinity;
   round.strikeKind = current.id === 'flame' || current.id === 'guard-break' ? 'flame' : 'laser';
@@ -256,7 +259,7 @@ function showLesson(now) {
   if (current.lock) {
     // Retain earlier tutorial gates so their markers stay open in the HUD.
     round.locks.push({ ...current.lock, done: 0, engaged: false });
-    setHealth(enemy, current.startHp);
+    setHealth('enemy', current.startHp);
     renderBossLocks(round.locks);
   }
 }
@@ -275,7 +278,7 @@ function completeTutorial() {
   resetRound();
   arena.dataset.state = 'ready';
   showOverlay('Tutorial complete', 'You learned every move and opened all three locks. In battle, lock moves are shuffled and the boss can heal.');
-  resetHud();
+  resetHud(startingHP);
   webcam.focus({ preventScroll: true });
 }
 
@@ -290,13 +293,14 @@ function endRound(won) {
   // Use the frame that landed the final hit, excluding the victory animation.
   const elapsed = won ? Math.round(round.finished.at - round.startedAt) / 1000 : 0;
   const damage = round.damageTaken;
+  const maxHealth = round.maxHp.player;
   const cameraBonusEligible = round.cameraBonusEligible;
   resetRound();
   arena.dataset.state = won ? 'win' : 'ready';
   showOverlay(won ? 'City saved!' : 'Ranger down',
     won ? 'The Riftbeast has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
   if (won) {
-    showBattleResult(elapsed, damage, player.max, cameraBonusEligible, cameraBonusPercent);
+    showBattleResult(elapsed, damage, maxHealth, cameraBonusEligible, cameraBonusPercent);
   }
   webcam.focus({ preventScroll: true });
 }
@@ -317,12 +321,12 @@ function bankPowerCounter(now, kind) {
 
 function playerDamageScale(move) {
   const minimum = move === 'power' ? .16 : .55;
-  return minimum + (1 - minimum) * enemy.value / enemy.max;
+  return minimum + (1 - minimum) * round.hp.enemy / round.maxHp.enemy;
 }
 
-function resolveShout(now) {
+function resolveShout(outcome, now) {
   const protectedByAura = readyAuraStage()?.level === 3;
-  visuals.play('shout', now, protectedByAura);
+  visuals.play(outcome.effect, now, protectedByAura);
   if (protectedByAura) {
     round.auraMs = auraStages[1].chargeMs;
     renderAura(readyAuraStage());
@@ -335,7 +339,7 @@ function resolveShout(now) {
     round.strikeNotice = 'Shaken · Heal to attack again';
   }
   round.strikeNoticeUntil = now + 1300;
-  scheduleNextStrike(round, now, enemy.value, enemy.max);
+  scheduleNextStrike(round, now, round.hp.enemy, round.maxHp.enemy);
 }
 
 function resolveComboLaser(now, guarded, cameraLeftHeld) {
@@ -361,7 +365,7 @@ function hitFlameCharge(move, now, stage) {
   const result = coolFlame(round, move, now, stage);
   if (!result) return '';
   if (!result.interrupted) return 'Fireball cooled to ' + result.cooledTo;
-  scheduleNextStrike(round, now, enemy.value, enemy.max);
+  scheduleNextStrike(round, now, round.hp.enemy, round.maxHp.enemy);
   round.strikeNotice = 'Flamethrower interrupted!';
   round.strikeNoticeUntil = now + 1400;
   if (isTutorial() && lesson().id === 'flame') advanceLesson(now);
@@ -369,10 +373,10 @@ function hitFlameCharge(move, now, stage) {
 }
 
 function hurtPlayer(amount, now) {
-  const damage = Math.min(player.value, amount);
+  const damage = Math.min(round.hp.player, amount);
   round.damageTaken += damage;
-  setHealth(player, player.value - damage);
-  if (player.value === 0) round.finished = { won: false, until: now + 400 };
+  setHealth('player', round.hp.player - damage);
+  if (round.hp.player === 0) round.finished = { won: false, until: now + 400 };
   return damage;
 }
 
@@ -405,7 +409,7 @@ function attack(move, now, fromCamera = false) {
   if (fromCamera) cameraNotice(outcome, !flameOutcome && hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
   if (current && (current.id === 'slash' || current.id === 'counter' ||
       (hit.credited && hit.lock.done === hit.lock.total))) advanceLesson(now);
-  else if (enemy.value === 0) round.finished = { won: true, at: now, until: now + (move === 'power' ? 800 : 510) };
+  else if (round.hp.enemy === 0) round.finished = { won: true, at: now, until: now + (move === 'power' ? 800 : 510) };
   return true;
 }
 
@@ -415,7 +419,7 @@ function readyAuraStage() {
 
 function healBlockReason() {
   if (isTutorial() && lesson().id !== 'heal') return 'Follow the current lesson.';
-  if (!round.shaken && player.value >= player.max && round.burnTickAt === Infinity) {
+  if (!round.shaken && round.hp.player >= round.maxHp.player && round.burnTickAt === Infinity) {
     return 'Health is full. Block a strike to unlock a power counter.';
   }
   if (!readyAuraStage()) return 'Charge aura to Stage 1 to heal.';
@@ -434,14 +438,14 @@ function healPlayer(now, fromCamera = false) {
   confirmPose('heal', outcome, now);
   if (fromCamera) cameraNotice(outcome, 'accepted', now);
   if (isTutorial()) {
-    setHealth(player, player.max);
+    setHealth('player', round.maxHp.player);
     advanceLesson(now);
   }
   return true;
 }
 
 function applyAuraHeal(now) {
-  const restored = Math.min(player.max - player.value, readyAuraStage().multiplier * 5);
+  const restored = Math.min(round.maxHp.player - round.hp.player, readyAuraStage().multiplier * 5);
   const burned = round.burnTickAt !== Infinity;
   const wasShaken = round.shaken;
   round.shaken = false;
@@ -451,7 +455,7 @@ function applyAuraHeal(now) {
   burnStatus.hidden = true;
   round.auraMs = 0;
   renderAura(readyAuraStage());
-  setHealth(player, player.value + restored);
+  setHealth('player', round.hp.player + restored);
   visuals.play('heal', now);
   return (wasShaken && !restored ? 'Shaken cleared' : 'Healed +' + restored + ' HP' + (wasShaken ? ' · Shaken cleared' : '')) +
     (burned ? ' · Burn cleared' : '');
@@ -483,7 +487,7 @@ function fireBeam(now) {
   confirmPose('clap', outcome, now);
   if (current === 'beam' || (current === 'beam-lock' && hit.credited && hit.lock.done === hit.lock.total)) {
     advanceLesson(now);
-  } else if (enemy.value === 0) {
+  } else if (round.hp.enemy === 0) {
     round.finished = { won: true, at: now, until: now + beamDuration };
   }
 }
@@ -511,12 +515,12 @@ function drawBattle(now, guard, flash = null, flame = null, inhale = null) {
   });
 }
 
-function resolveRegularStrike(now, guard, cameraGuard) {
+function resolveGuardableStrike(outcome, now, guard, cameraGuard) {
   const kind = round.strikeKind;
   const guardDrill = isTutorial() && lesson().id === 'guard-break';
   const guardDrillDone = guardDrill && guard && round.comboGuardBlocked;
-  visuals.play(kind, now, guard);
-  scheduleNextStrike(round, now, enemy.value, enemy.max);
+  visuals.play(outcome.effect, now, guard);
+  scheduleNextStrike(round, now, round.hp.enemy, round.maxHp.enemy);
   round.strikeNotice = 'Strike finished';
   if (guard) {
     bankPowerCounter(now, kind);
@@ -528,9 +532,9 @@ function resolveRegularStrike(now, guard, cameraGuard) {
   } else if (isTutorial()) {
     round.strikeNotice = kind === 'flame' ? 'Flame hit · interrupt the next charge' : 'Missed block · try the next shot';
   } else {
-    const damage = hurtPlayer(kind === 'flame' ? 10 : 19, now);
-    round.strikeNotice = (kind === 'flame' ? 'Flame hit' : 'Laser hit') + ' · −' + damage + ' HP';
-    if (kind === 'flame' && !round.finished && round.burnTickAt === Infinity) {
+    const damage = hurtPlayer(outcome.damage, now);
+    round.strikeNotice = outcome.name + ' hit · −' + damage + ' HP';
+    if (outcome.burns && !round.finished && round.burnTickAt === Infinity) {
       round.burnTickAt = now + burnInterval;
       burnStatus.hidden = false;
     }
@@ -549,6 +553,11 @@ function resolveRegularStrike(now, guard, cameraGuard) {
   }
   round.strikeNoticeUntil = now + 1000;
 }
+
+const strikeResolvers = {
+  guardable: resolveGuardableStrike,
+  shout: resolveShout,
+};
 
 function tick(now) {
   // Sample devices at their own rates, resolve moves and the boss strike,
@@ -612,13 +621,12 @@ function tick(now) {
     }
   }
   if (now >= round.strike) {
-    if (round.strikeKind === 'shout') resolveShout(now);
-    else resolveRegularStrike(now, guard, cameraGuard);
+    const outcome = strikeOutcome(round);
+    strikeResolvers[outcome.type](outcome, now, guard, cameraGuard);
   }
 
   if (round.mode === 'camera') updateCameraStatus(now);
   const cameraPose = cameraMove?.state;
-  const { danger, flame, shouting, eyeWarning, flash, inhale } = attackTell(round, now);
   const guardBroken = round.keyboardGuardBroken || (round.mode === 'camera' && round.cameraGuardBroken);
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
@@ -636,19 +644,13 @@ function tick(now) {
   else if (cameraPose === 'basic') showPose('basic', 'Right hand seen · hold briefly');
   else if (cameraPose === 'reset' && round.cameraMove.right) showPose('basic', 'Lower right hand to slash again');
   else showPose();
+  const { danger, flame, flash, inhale, warning } = attackTell(round, now, {
+    guardBroken,
+    guardBreakDrill: isTutorial() && lesson().id === 'guard-break',
+  });
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
-  const bossLabel = shouting && danger ? 'Shockwave shout' : flame ? eyeWarning ? 'Flame + eye lasers' : 'Flamethrower' : 'Boss warning';
-  renderBossLabel(bossLabel);
-  if (flame) {
-    const incomingHint = eyeWarning ? 'Guard the eye lasers first.' :
-      guardBroken ? 'Release, then guard again.' :
-        now < round.strikeNoticeUntil && round.strikeNotice.startsWith('Eye laser hit') ? round.strikeNotice : undefined;
-    const drill = isTutorial() && lesson().id === 'guard-break';
-    const message = drill ? (round.comboLaserAt < Infinity ? 'Guard twice' : 'Guard the flames') : flame.hint;
-    showWarning(message, true, incomingHint);
-  }
-  else if (shouting && danger) showWarning('Incoming shout', true, 'Gold Aura absorbs it.');
-  else if (danger) showWarning('Incoming eye lasers', true);
+  renderBossLabel(warning?.label ?? 'Boss warning');
+  if (warning) showWarning(warning.message, true, warning.hint, warning.showGuardPose);
   else if (now < round.strikeNoticeUntil) showWarning(round.strikeNotice);
   else showWarning('No attack incoming');
   drawBattle(now, guard, flash, flame, inhale);
@@ -685,7 +687,7 @@ exit.addEventListener('click', () => {
   resetRound();
   arena.dataset.state = 'ready';
   showStartMenu();
-  resetHud();
+  resetHud(startingHP);
   webcam.focus({ preventScroll: true });
 });
 

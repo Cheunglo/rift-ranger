@@ -24,21 +24,53 @@ const shoutPause = 120;
 const shoutTell = shoutInhale + shoutPause;
 const shoutGap = 450;
 
-export function warningDuration(round) {
-  if (round.strikeKind === 'shout') return shoutTell;
-  return round.strikeKind === 'flame' ? flameChargeTime : eyeWarningDuration(round);
+// A move supplies scheduling, warning presentation and its hit outcome. The
+// rotation chooses a slot without knowing how the move in it works.
+const attacks = {
+  laser: {
+    firstDelay: pace => pace.firstLaser,
+    delay: ({ fastLaser, slowLaser }, hpRatio) => Math.round(fastLaser + (slowLaser - fastLaser) * hpRatio),
+    warningDuration: eyeWarningDuration,
+    tell: readLaserTell,
+    hit: { type: 'guardable', effect: 'laser', damage: 19, name: 'Laser' },
+  },
+  flame: {
+    firstDelay: flameDelay,
+    delay: flameDelay,
+    warningDuration: () => flameChargeTime,
+    tell: readFlameTell,
+    rollCombo: true,
+    hit: { type: 'guardable', effect: 'flame', damage: 10, name: 'Flame', burns: true },
+  },
+  shout: {
+    delay: () => shoutGap + shoutTell,
+    warningDuration: () => shoutTell,
+    tell: readShoutTell,
+    canSchedule: round => !round.shaken,
+    randomizeWarning: false,
+    hit: { type: 'shout', effect: 'shout' },
+  },
+};
+
+const currentAttack = round => attacks[round.strikeKind];
+function flameDelay(pace) {
+  return flameChargeTime + pace.flamePause;
 }
+
+export const warningDuration = round => currentAttack(round).warningDuration(round);
+export const strikeOutcome = round => currentAttack(round).hit;
 
 export function openingStrike(mode, learning, now) {
   const pace = bossPace[mode];
-  const openingFlame = !learning && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
-  const firstStrike = openingFlame ? flameChargeTime + pace.flamePause : pace.firstLaser;
+  const openingSpecial = !learning && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
+  const strikeKind = openingSpecial ? riftbeastMoves.special : riftbeastMoves.regular;
+  const move = attacks[strikeKind];
   return {
     pace,
-    strike: learning ? Infinity : now + firstStrike,
+    strike: learning ? Infinity : now + move.firstDelay(pace),
     bossMoves: riftbeastMoves,
-    strikeKind: openingFlame ? riftbeastMoves.special : riftbeastMoves.regular,
-    comboLaserAt: openingFlame ? undefined : Infinity,
+    strikeKind,
+    comboLaserAt: move.rollCombo ? undefined : Infinity,
     turnsSinceStatus: 0,
   };
 }
@@ -64,19 +96,16 @@ export function scheduleNextStrike(round, now, hp, maxHp) {
     const statusInterval = hp <= 40 ? 3 : 4;
     if (round.turnsSinceStatus >= statusInterval) {
       round.turnsSinceStatus = 0;
-      if (!round.shaken) {
+      if (attacks[status].canSchedule?.(round) ?? true) {
         round.afterStatus = round.strikeKind;
         round.strikeKind = status;
-        round.strike = now + shoutGap + shoutTell;
-        return;
       }
     }
   }
-  round.warningStart = randomWarningStart();
-  const { fastLaser, slowLaser, flamePause } = round.pace;
-  const laserInterval = fastLaser + (slowLaser - fastLaser) * hp / maxHp;
-  round.strike = now + (round.strikeKind === 'flame' ? flameChargeTime + flamePause : Math.round(laserInterval));
-  if (round.strikeKind === 'flame') round.comboLaserAt = undefined;
+  const move = currentAttack(round);
+  if (move.randomizeWarning !== false) round.warningStart = randomWarningStart();
+  round.strike = now + move.delay(round.pace, hp / maxHp);
+  if (move.rollCombo) round.comboLaserAt = undefined;
 }
 
 export function scheduleTutorialFlame(round, now, pause, guardBreak) {
@@ -87,7 +116,9 @@ export function scheduleTutorialFlame(round, now, pause, guardBreak) {
 }
 
 export function updateFlameCombo(round, now) {
-  // Roll once as the charge begins, using the locks the player has already opened.
+  // undefined means the combo roll is pending. Infinity means there is no
+  // pending shot (none was rolled, it fired, or the charge was cancelled).
+  // A finite value is the shot's deadline on the animation clock.
   if (round.comboLaserAt !== undefined || now < round.strike - flameChargeTime) return;
   const opened = round.locks.filter(lock => lock.done === lock.total).length;
   round.comboLaserAt = Math.random() < round.pace.comboOdds[opened]
@@ -110,20 +141,53 @@ export function coolFlame(round, move, now, stage) {
   return { interrupted: true };
 }
 
-export function attackTell(round, now) {
-  const untilStrike = round.strike - now;
-  const leadTime = warningDuration(round);
-  const danger = untilStrike <= leadTime;
-  const warningElapsed = leadTime - untilStrike;
-  const flame = flamePhase(round, now);
-  const shouting = round.strikeKind === 'shout';
-  const eyeElapsed = eyeWarningDuration(round) - ((flame ? round.comboLaserAt : round.strike) - now);
-  const eyeWarning = !shouting && eyeElapsed >= 0;
-  const flashIndex = round.warningStart + Math.floor(eyeElapsed / warningStep);
-  const flash = eyeWarning && eyeElapsed % warningStep < 235 ? warningColors[flashIndex] : null;
-  const inhale = shouting && danger && warningElapsed < shoutInhale ? warningElapsed / shoutInhale : null;
+function readEyeFlashes(round, now, fireAt) {
+  const elapsed = eyeWarningDuration(round) - (fireAt - now);
+  const eyeWarning = elapsed >= 0;
+  const index = round.warningStart + Math.floor(elapsed / warningStep);
+  return { eyeWarning, flash: eyeWarning && elapsed % warningStep < 235 ? warningColors[index] : null };
+}
+
+function readLaserTell(round, now, timing) {
   return {
-    danger, shouting, eyeWarning, flash, inhale,
-    flame: flame && { ...flame, charge: warningElapsed / leadTime },
+    ...readEyeFlashes(round, now, round.strike),
+    warning: timing.danger ? { message: 'Incoming eye lasers' } : null,
+  };
+}
+
+function readFlameTell(round, now, timing, { guardBroken, guardBreakDrill }) {
+  const flame = flamePhase(round, now);
+  const eyes = readEyeFlashes(round, now, flame ? round.comboLaserAt : round.strike);
+  if (!flame) {
+    // The charge is not visible during the pause after the preceding attack.
+    return { ...eyes, warning: timing.danger ? { message: 'Incoming eye lasers' } : null };
+  }
+  const hint = eyes.eyeWarning ? 'Guard the eye lasers first.' :
+    guardBroken ? 'Release, then guard again.' :
+      now < round.strikeNoticeUntil && round.strikeNotice.startsWith('Eye laser hit') ? round.strikeNotice : undefined;
+  const message = guardBreakDrill ? (round.comboLaserAt < Infinity ? 'Guard twice' : 'Guard the flames') : flame.hint;
+  return {
+    ...eyes,
+    flame: { ...flame, charge: timing.elapsed / timing.duration },
+    warning: { label: eyes.eyeWarning ? 'Flame + eye lasers' : 'Flamethrower', message, hint },
+  };
+}
+
+function readShoutTell(round, now, { danger, elapsed }) {
+  return {
+    inhale: danger && elapsed < shoutInhale ? elapsed / shoutInhale : null,
+    warning: danger ? {
+      label: 'Shockwave shout', message: 'Incoming shout', hint: 'Gold Aura absorbs it.', showGuardPose: false,
+    } : null,
+  };
+}
+
+export function attackTell(round, now, options = {}) {
+  const duration = warningDuration(round);
+  const elapsed = duration - (round.strike - now);
+  const timing = { danger: elapsed >= 0, duration, elapsed };
+  return {
+    danger: timing.danger, eyeWarning: false, flash: null, flame: null, inhale: null,
+    ...currentAttack(round).tell(round, now, timing, options),
   };
 }
