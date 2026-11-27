@@ -196,3 +196,46 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 @media (max-width: 360px) {
   .arena[data-tutorial] { --lesson-height: 128px; }
 }
+
+/* Five combat buttons: two left, one centered, two right. */
+#mobile-controls {
+  display: grid;
+  grid-template: "power aura laser" 1fr "block aura slash" 1fr / 1fr .9fr 1fr;
+  gap: 10px;
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom));
+  max-width: 620px;
+  margin: 0 auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+#mobile-controls button {
+  min-height: 64px;
+  padding: 10px 5px;
+  border: 1px solid #7e6b99;
+  background: #30233f;
+  color: #f6f3ff;
+  line-height: 1.15;
+  touch-action: none;
+}
+#mobile-controls small { display: block; margin-top: 5px; font-size: .7rem; font-weight: 500; color: #c4bbd4; }
+#mobile-controls .touch-power { grid-area: power; }
+#mobile-controls .touch-block { grid-area: block; border-color: #80caff; }
+#mobile-controls .touch-aura { grid-area: aura; align-self: center; min-height: 82px; border-color: #d8abfa; }
+#mobile-controls .touch-laser { grid-area: laser; }
+#mobile-controls .touch-slash { grid-area: slash; border-color: var(--acid); }
+#mobile-controls button.is-held { background: var(--acid); color: var(--ink); box-shadow: 0 0 16px #e8ff7540; }
+#mobile-controls button.is-held small { color: var(--ink); }
+.mobile-play .moves, .mobile-play header, .mobile-play .footer { display: none; }
+.mobile-play main { margin-block: 8px; }
+.mobile-play .toolbar { margin-top: 0; font-size: .8rem; }
+@media (max-width: 670px) {
+  .mobile-play main { width: calc(100% - 16px); }
+  .mobile-play .arena { --arena-height: clamp(390px, calc(100svh - 230px), 550px); }
+  #mobile-controls { gap: 8px; }
+  #mobile-controls button { font-size: .875rem; }
+}
+@media (pointer: coarse) {
+  body:not(.mobile-play) .moves { display: none; }
+}

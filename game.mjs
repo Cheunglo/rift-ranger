@@ -1,3 +1,4 @@
+import { bindCombatInputs } from './mobile-controls.mjs?v=46';
 // Owns the match state, connects input to moves, and updates the HUD and arena.
 import { lessons } from './tutorial.mjs?v=45';
 import { paintBeast } from './beast.mjs';
@@ -17,6 +18,8 @@ const battleResult = byId('battle-result');
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
+const mobile = byId('mobile');
+const mobileControls = byId('mobile-controls');
 const tutorialButton = byId('tutorial');
 const tutorialPanel = byId('tutorial-panel');
 const micStatus = byId('mic-status');
@@ -131,7 +134,7 @@ paintBeast(byId('beast'));
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
 
-function showWarning(message, incoming = false, hint = 'Left hand up, or hold S.') {
+function showWarning(message, incoming = false, hint = round?.mobile ? 'Hold Block through the shot.' : 'Left hand up, or hold S.') {
   if (prompt.textContent !== message) prompt.textContent = message;
   const state = incoming ? 'danger' : '';
   if (bossPanel.dataset.state !== state) bossPanel.dataset.state = state;
@@ -303,13 +306,14 @@ function updateStartButtons() {
   webcam.disabled = tutorialButton.disabled = false;
   webcam.textContent = tutorialSelected ? 'Tutorial with camera + mic' : 'Enable camera + mic';
   keyboard.textContent = tutorialSelected ? 'Tutorial with keyboard' : 'Play with keyboard';
+  mobile.textContent = tutorialSelected ? 'Tutorial on mobile' : 'Play on mobile';
   tutorialButton.textContent = tutorialSelected ? 'Back to battle' : 'Start Tutorial';
 }
 
 function showStartMenu() {
   updateStartButtons();
   if (tutorialSelected) {
-    showOverlay('Guided tutorial', 'Choose camera or keyboard to learn the moves and open the boss locks.');
+    showOverlay('Guided tutorial', 'Choose camera, keyboard, or mobile to learn the moves and open the boss locks.');
   } else {
     showOverlay('Defend the city.', 'Keep your shoulders and any raised hand in view. You can play sitting or standing.');
   }
@@ -404,6 +408,9 @@ function resetRound() {
   requestId++;
   cancelAnimationFrame(animation);
   stopCamera();
+  combatInputs.reset();
+  mobileControls.hidden = true;
+  document.body.classList.remove('mobile-play');
   round = null;
   burnStatus.hidden = true;
   cameraBonusStatus.hidden = true;
@@ -420,10 +427,13 @@ function resetRound() {
   device.textContent = defaultStatus;
 }
 
-function startRound(mode, learning) {
+function startRound(mode, learning, mobileMode = false) {
+  combatInputs.reset();
+  mobileControls.hidden = !mobileMode;
+  document.body.classList.toggle('mobile-play', mobileMode);
   const now = performance.now();
   round = {
-    mode, lessonIndex: learning ? 0 : null, startedAt: now, strike: learning ? Infinity : now + battleTiming.firstStrike,
+    mode, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now, strike: learning ? Infinity : now + battleTiming.firstStrike,
     cameraBonusEligible: mode === 'camera' && !learning,
     nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
@@ -452,6 +462,7 @@ function startRound(mode, learning) {
   if (mode === 'camera') cameraStatus('Waiting for tracking…', 'waiting');
   exit.hidden = false;
   animation = requestAnimationFrame(tick);
+  if (mobileMode) arena.scrollIntoView({ block: 'start' });
 }
 
 function isTutorial() {
@@ -468,7 +479,13 @@ function showLesson(now) {
   tutorialPanel.hidden = false;
   byId('tutorial-step').textContent = 'Tutorial · ' + (round.lessonIndex + 1) + ' / ' + lessons.length;
   byId('tutorial-title').textContent = current.title;
-  byId('tutorial-instruction').textContent = current.hint;
+  byId('tutorial-instruction').textContent = round.mobile ? current.hint
+    .replace('Raise your right hand above your shoulder, or press A', 'Tap Slash')
+    .replace('hold your left hand up or hold S', 'hold Block')
+    .replaceAll('raise both hands or press D', 'tap Powerwave / Heal')
+    .replace('Hum a steady note or hold G', 'Hold Aura')
+    .replace('Clap once or press F', 'Tap Laser')
+    .replace('Lower and raise your left hand, or release and re-press S,', 'Release and re-press Block') : current.hint;
   round.strike = Infinity;
   round.comboLaserAt = Infinity;
   round.strikeKind = current.id === 'flame' || current.id === 'guard-break' ? 'flame' : 'laser';
@@ -1014,13 +1031,18 @@ webcam.addEventListener('click', async () => {
   }
 });
 
-keyboard.addEventListener('click', () => {
+function startManual(mobileMode) {
   requestId++;
   stopCamera();
   updateStartButtons();
-  device.textContent = defaultStatus;
-  startRound('keyboard', tutorialSelected);
-});
+  device.textContent = mobileMode ? 'Hold Block to guard and Aura to charge. Tap the other moves.' : defaultStatus;
+  startRound('keyboard', tutorialSelected, mobileMode);
+}
+// Some phones/tablets report a fine primary pointer when a mouse is connected.
+keyboard.addEventListener('click', () => startManual(
+  navigator.maxTouchPoints > 0 || matchMedia('(any-pointer: coarse), (max-width: 820px)').matches,
+));
+mobile.addEventListener('click', () => startManual(true));
 
 exit.addEventListener('click', () => {
   resetRound();
@@ -1030,25 +1052,20 @@ exit.addEventListener('click', () => {
   webcam.focus({ preventScroll: true });
 });
 
-const keys = { a: 'basic', d: 'power' };
-window.addEventListener('keydown', event => {
-  if (!round || round.finished || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-  const key = event.key.toLowerCase();
-  if (!Object.hasOwn(keys, key) && key !== 's' && key !== 'g' && key !== 'f') return;
-  forfeitCameraBonus('Keyboard used');
-  if (key === 's') round.keyboardGuard = true;
-  else if (key === 'g') round.keyboardHum = true;
-  else if (key === 'f') fireBeam(performance.now());
-  else attack(keys[key], performance.now());
-});
-window.addEventListener('keyup', event => {
-  if (!round) return;
-  const key = event.key.toLowerCase();
-  if (key === 's') round.keyboardGuard = round.keyboardGuardBroken = false;
-  if (key === 'g') round.keyboardHum = false;
-});
-window.addEventListener('blur', () => {
-  if (round) round.keyboardGuard = round.keyboardGuardBroken = round.keyboardHum = false;
+const combatInputs = bindCombatInputs(mobileControls, {
+  active: () => !!round && !round.finished,
+  press(key, touch) {
+    forfeitCameraBonus(touch ? 'Touch controls used' : 'Keyboard used');
+    if (key === 's') round.keyboardGuard = true;
+    else if (key === 'g') round.keyboardHum = true;
+    else if (key === 'f') fireBeam(performance.now());
+    else attack(key === 'a' ? 'basic' : 'power', performance.now());
+  },
+  release(key) {
+    if (!round) return;
+    if (key === 's') round.keyboardGuard = round.keyboardGuardBroken = false;
+    if (key === 'g') round.keyboardHum = false;
+  },
 });
 window.addEventListener('pagehide', () => {
   if (round || !exit.hidden) exit.click();

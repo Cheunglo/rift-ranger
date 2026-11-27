@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=40">
-  <script type="module" src="./game.mjs?v=45"></script>
+  <link rel="stylesheet" href="./style.css?v=46">
+  <script type="module" src="./game.mjs?v=47"></script>
 </head>
 <body>
   <main>
@@ -98,6 +98,7 @@
           <div class="actions">
             <button id="webcam" type="button">Enable camera + mic</button>
             <button id="keyboard" class="secondary" type="button">Play with keyboard</button>
+            <button id="mobile" class="secondary" type="button">Play on mobile</button>
             <button id="tutorial" class="secondary" type="button">Start Tutorial</button>
           </div>
         </div>
@@ -107,6 +108,13 @@
         <h2 id="tutorial-title"></h2>
         <p id="tutorial-instruction"></p>
       </section>
+    </section>
+    <section id="mobile-controls" aria-label="Mobile combat controls" hidden>
+      <button type="button" data-key="d" class="touch-power">Powerwave / Heal<small>Tap</small></button>
+      <button type="button" data-key="s" class="touch-block">Block<small>Hold</small></button>
+      <button type="button" data-key="g" class="touch-aura">Aura<small>Hold to charge</small></button>
+      <button type="button" data-key="f" class="touch-laser">Laser<small>Tap</small></button>
+      <button type="button" data-key="a" class="touch-slash">Slash<small>Tap</small></button>
     </section>
     <div class="toolbar">
       <div id="device" role="status">Camera and mic stay on your device.</div>

@@ -24,6 +24,8 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 | F | Fire a short laser |
 | Hold G | Build aura |
 
+Choose **Play on mobile** for five touch buttons in a 2–1–2 layout: Powerwave / Heal above Block on the left, Aura in the center, and Laser above Slash on the right. Hold Block to guard and hold Aura to charge; tap the other three buttons. Multiple fingers can hold and attack at the same time. The keyboard start option also enables these controls on touch-first devices. Mobile mode works with **Start Tutorial**, with touch-specific instructions.
+
 Raise both hands to power counter if one is ready. Otherwise, the same pose spends aura to heal 5, 10, or 20 HP at stages 1, 2, or 3. Healing never erases damage already taken from the Power Level calculation.
 
 Camera mode requests the camera and microphone together and can run without the mic if access fails. In keyboard mode, hold G to charge aura and press F to fire. Stay quiet briefly while the mic calibrates. The left panel shows the aura meter, mic input level, and whether the game hears a steady hum. Humming is ignored during a beam and briefly afterward so steady background noise can settle. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
@@ -34,6 +36,7 @@ Choose **Start Tutorial**, then start with camera or keyboard. Complete each pro
 
 - `index.html` defines the HUD, controls, and canvases. `style.css` lays them out and keeps the arena fixed during play.
 - `game.mjs` owns the round and ties input, damage, healing, score, and display together. Start with `startRound()` and `tick()`.
+- `mobile-controls.mjs` handles simultaneous touch and keyboard inputs, including cancellation and focus loss. Run its checks with `node --test tests/mobile-controls.test.mjs`.
 - `controls.mjs` turns camera landmarks and microphone samples into pose, hum, and clap events.
 - `boss-locks.mjs` owns the shuffled health gates and their persistent progress.
 - `beast.mjs` draws the boss sprite. `combat-art.mjs` animates the ranger, shield, beams, and ripples. `poses.svg` provides the small pose icons.
