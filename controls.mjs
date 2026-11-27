@@ -137,34 +137,31 @@ export function gestures() {
   };
 }
 
-// Recover a completed burst that started and finished between render frames.
-function hasRecentBurst(samples, sampleRate, roomLevel) {
-  const blockSize = Math.round(sampleRate * .012);
-  const maxLength = sampleRate * .240;
-  const maxAge = sampleRate * .175;
-  const threshold = Math.max(.022, roomLevel * 4.5);
-  let previousRms;
-  let start = -1;
-  let loudest = 0;
-  for (let offset = samples.length % blockSize; offset < samples.length; offset += blockSize) {
+// Look behind the latest frame for a click or clap. A qualifying peak must
+// stand out from the sound before it and fall away in the next short block.
+function hasRecentClick(samples, sampleRate, roomLevel) {
+  const blockSize = Math.round(sampleRate * .008);
+  const lookback = Math.floor(sampleRate * .175 / blockSize) * blockSize;
+  const start = samples.length - lookback;
+  let baseline = 0;
+  let previousRms = 0;
+  let previousPeak = 0;
+  for (let offset = start; offset < samples.length; offset += blockSize) {
     let energy = 0;
-    for (let i = offset; i < offset + blockSize; i++) energy += samples[i] ** 2;
-    const rms = Math.sqrt(energy / blockSize);
-    if (start >= 0) {
-      const length = offset - start;
-      if (rms < loudest * .35) {
-        if (length <= maxLength && samples.length - offset <= maxAge) return true;
-        start = -1;
-      } else if (length > maxLength) {
-        start = -1;
-      } else {
-        loudest = Math.max(loudest, rms);
-      }
-    } else if (previousRms !== undefined && rms > Math.max(threshold, previousRms * 2.8)) {
-      start = offset;
-      loudest = rms;
+    let peak = 0;
+    for (let i = offset; i < offset + blockSize; i++) {
+      const sample = samples[i];
+      energy += sample ** 2;
+      peak = Math.max(peak, Math.abs(sample));
     }
+    const rms = Math.sqrt(energy / blockSize);
+    if (offset >= start + 2 * blockSize &&
+        previousPeak > Math.max(.045, roomLevel * 6, baseline * 4, previousRms * 2.6) &&
+        previousRms > Math.max(.0035, roomLevel * 1.4) &&
+        rms < Math.max(baseline * 1.4, previousPeak * .32)) return true;
+    baseline = previousRms;
     previousRms = rms;
+    previousPeak = peak;
   }
   return false;
 }
@@ -183,13 +180,9 @@ export function listen(context, stream) {
   analyser.connect(muted);
   muted.connect(context.destination);
   const samples = new Float32Array(analyser.fftSize);
-  const shotWindow = Math.round(context.sampleRate * .042);
   const startCharge = samples.length - chargeWindow;
-  const startRecent = samples.length - shotWindow;
   let calibrationUntil;
   let roomLevel = .001;
-  let previousRms = 0;
-  let burst;
   let soundSince = 0;
   let lastSound = -Infinity;
   let previousSampleHadSound = false;
@@ -202,49 +195,16 @@ export function listen(context, stream) {
     analyser.getFloatTimeDomainData(samples);
     let sum = 0;
     let energy = 0;
-    let recentEnergy = 0;
-    let peak = 0;
     for (let i = startCharge; i < samples.length; i++) {
       const sample = samples[i];
       sum += sample;
       energy += sample ** 2;
-      if (i >= startRecent) {
-        recentEnergy += sample ** 2;
-        peak = Math.max(peak, Math.abs(sample));
-      }
     }
     const average = sum / chargeWindow;
     const rms = Math.sqrt(Math.max(0, energy / chargeWindow - average ** 2));
-    const recentRms = Math.sqrt(recentEnergy / shotWindow);
-    let fireLaser = false;
-    const armed = !calibrating && !suppressHum && now - lastShot >= 220;
-    if (!armed) {
-      burst = undefined;
-    } else if (recentRms > Math.max(.013, roomLevel * 3.5, previousRms * 2.2) &&
-               peak > Math.max(.09, recentRms * 3.1)) {
-      // A clap or snap has a narrow peak and can fire immediately.
-      fireLaser = true;
-    } else if (burst) {
-      if (now - burst.startedAt > 240) {
-        // A loud note that carries on is charge input.
-        burst = undefined;
-      } else if (recentRms < burst.loudest * .35) {
-        // A sharp shout can be less peaky. Wait for it to fall away first.
-        fireLaser = true;
-      } else {
-        burst.loudest = Math.max(recentRms, burst.loudest);
-      }
-    } else if (recentRms > Math.max(.022, roomLevel * 4.5, previousRms * 2.8)) {
-      burst = { startedAt: now, loudest: recentRms };
-    }
-    if (armed && !fireLaser && recentRms < .022) {
-      fireLaser = hasRecentBurst(samples, context.sampleRate, roomLevel);
-    }
-    previousRms = recentRms;
-    if (fireLaser) {
-      lastShot = now;
-      burst = undefined;
-    }
+    const fireLaser = !calibrating && !suppressHum && now - lastShot >= 220 &&
+      hasRecentClick(samples, context.sampleRate, roomLevel);
+    if (fireLaser) lastShot = now;
     const afterShot = now - lastShot < 110;
     const level = Math.max(0, Math.min(100, Math.round((20 * Math.log10(rms) + 65) * 2)));
 
@@ -274,8 +234,7 @@ export function listen(context, stream) {
     }
 
     previousSampleHadSound = sound;
-    const humming = wasHumming && !burst;
-    const state = humming ? 'humming' : sound ? 'sustaining' : level > 6 ? 'sound' : 'quiet';
-    return { fireLaser, humming, level, state };
+    const state = wasHumming ? 'humming' : sound ? 'sustaining' : level > 6 ? 'sound' : 'quiet';
+    return { fireLaser, humming: wasHumming, level, state };
   };
 }

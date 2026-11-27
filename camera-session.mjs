@@ -1,5 +1,5 @@
 // Owns device permissions, stream lifetimes, and input sampling for a camera session.
-import { listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=67';
+import { listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=68';
 
 export const defaultStatus = 'Camera and mic stay on your device.';
 
@@ -127,7 +127,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
       setMicMessage('Mic disconnected. J and Space still work.');
       device.textContent = defaultStatus;
     });
-    setMicMessage('Mic on. Sustain a sound to charge, then clap, snap, or give a short shout to fire.');
+    setMicMessage('Mic on. Sustain a sound to charge, then click your tongue or clap to fire.');
     micLevel.hidden = false;
   }
 

@@ -80,32 +80,19 @@ test('clap fires once without charging and a held hum can resume after a beam', 
   assert.equal(result.humming, true);
 });
 
-test('a short snap fires directly from its narrow peak', () => {
+test('a quiet tongue-click shape fires once when it is above the room level', () => {
   const read = microphone(48000);
   for (let i = 0; i < 22; i++) read();
-  const snap = (_, index) => index >= 3960 && index < 3970 ? (index % 2 ? .46 : -.46) : 0;
-  assert.equal(read(snap).fireLaser, true);
-  assert.equal(read(snap).fireLaser, false);
+  const click = (_, index) => index >= 3300 && index < 3312 ? (index % 2 ? .065 : -.065) : 0;
+  assert.equal(read(click).fireLaser, true);
+  assert.equal(read(click).fireLaser, false);
 });
 
-test('a sharp vocal burst fires on release without also charging Aura', () => {
+test('a short voiced burst and loud sustained singing do not fire Laser', () => {
   const read = microphone(48000);
   for (let i = 0; i < 22; i++) read();
-  const shout = hum(145, .085);
-  for (let i = 0; i < 7; i++) {
-    const result = read(shout);
-    assert.equal(result.fireLaser, false);
-    assert.equal(result.humming, false);
-  }
-  const falling = read();
-  assert.equal(falling.fireLaser, true);
-  assert.equal(falling.humming, false);
-  assert.equal(read().fireLaser, false);
-});
-
-test('loud sustained singing remains charge input and does not fire on release', () => {
-  const read = microphone(48000);
-  for (let i = 0; i < 22; i++) read();
+  const shout = time => time > -.105 && time < -.005 ? .1 * Math.sin(time * 2 * Math.PI * 150) : 0;
+  assert.equal(read(shout).fireLaser, false);
   let result;
   for (let i = 0; i < 25; i++) {
     result = read(hum(260, .085));
@@ -120,33 +107,13 @@ test('firing cues are ignored during the beam', () => {
   for (let i = 0; i < 22; i++) read();
   const peak = (_, index) => index > 3500 && index < 3510 ? .8 : 0;
   assert.equal(read(peak, true).fireLaser, false);
-  const shout = hum(145, .085);
-  for (let i = 0; i < 7; i++) assert.equal(read(shout, true).fireLaser, false);
   assert.equal(read().fireLaser, false);
 });
 
-test('audio history catches a burst that ended between render frames', () => {
+test('audio history catches a click that ended between render frames', () => {
   const read = microphone(48000);
   for (let i = 0; i < 22; i++) read();
-  // The 100 ms vocal burst ended 90 ms before this frame, outside the
-  // charge meter and the immediate snap/clap detection window.
-  const history = time => time > -.105 && time < -.005 ? .1 * Math.sin(time * 2 * Math.PI * 150) : 0;
-  assert.equal(read(history).fireLaser, true);
-  assert.equal(read(history).fireLaser, false);
-});
-
-test('audio history catches a snap just outside the immediate firing window', () => {
-  const read = microphone(48000);
-  for (let i = 0; i < 22; i++) read();
-  const snap = (_, index) => index >= 800 && index < 816 ? (index % 2 ? .55 : -.55) : 0;
-  assert.equal(read(snap).fireLaser, true);
-});
-
-test('a short low-frequency thump can also fire Laser', () => {
-  const read = microphone(48000);
-  for (let i = 0; i < 22; i++) read();
-  const thump = time => time > -.065 && time < -.005
-    ? .18 * Math.sin(2 * Math.PI * 68 * time) * Math.exp(-(time + .065) * 30)
-    : 0;
-  assert.equal(read(thump).fireLaser, true);
+  const click = (_, index) => index >= -900 && index < -888 ? (index % 2 ? .08 : -.08) : 0;
+  assert.equal(read(click).fireLaser, true);
+  assert.equal(read(click).fireLaser, false);
 });
