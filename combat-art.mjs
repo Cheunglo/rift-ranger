@@ -4,8 +4,10 @@ export function combatArt(canvas, beast, reducedMotion) {
   const effects = [];
   let leftLift = 0;
   let rightLift = 0;
+  let kneel = 0;
   let previousTime;
-  const duration = { basic: 480, power: 780, heal: 850, laser: 360, flame: 650, 'guard-break': 460 };
+  const duration = { basic: 480, power: 780, heal: 850, laser: 360, flame: 650, shout: 540, 'guard-break': 460 };
+  const auraColors = ['#b7adc8', '#68dfff', '#ce8cff', '#ffe477'];
   const eyeColors = { green: '#69ff77', yellow: '#ffe663', red: '#ff243c' };
   const mix = (from, to, amount) => from + (to - from) * amount;
 
@@ -42,8 +44,8 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.ellipse(0, -2, 36, 8, 0, 0, Math.PI * 2);
     ctx.fill();
     if (aura > .01) {
-      const color = ['#b7adc8', '#68dfff', '#ce8cff', '#ffe477'][auraStage];
-      const glow = ctx.createRadialGradient(0, -48, 17, 0, -48, 43 + aura * 35);
+      const color = auraColors[auraStage];
+      const glow = ctx.createRadialGradient(0, -48 + 21 * kneel, 17, 0, -48 + 21 * kneel, 43 + aura * 35);
       glow.addColorStop(0, color + '90');
       glow.addColorStop(.55, color + '70');
       glow.addColorStop(1, color + '00');
@@ -55,9 +57,23 @@ export function combatArt(canvas, beast, reducedMotion) {
       ctx.ellipse(0, -6, 31 + aura * 30, 8 + aura * 8, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
-    polygon('#171326', [[-17,-34],[17,-34],[20,-8],[28,-3],[27,1],[8,1],[4,-22],[-4,-22],[-8,1],[-27,1],[-28,-3],[-20,-8]]);
-    polygon('#8183bd', [[-17,-32],[-5,-27],[-9,-8],[-19,-5]]);
-    polygon('#a6a7df', [[17,-32],[5,-27],[9,-8],[19,-5]]);
+    if (kneel > .01) {
+      // Rear view: the right knee touches the floor while the left foot stays planted.
+      const leftLeg = [[-10, -32 + 22 * kneel], [-22, -18], [-24, -3]];
+      const rightLeg = [[10, -32 + 22 * kneel], [mix(18, 13, kneel), mix(-18, -4, kneel)], [29, -3]];
+      for (const joints of [leftLeg, rightLeg]) {
+        line(joints, '#171326', 14);
+        line(joints, '#8183bd', 8);
+        line(joints.slice(1), '#5c578f', 7);
+      }
+      line([[-31, -3], [-23, -3]], '#171326', 8);
+      line([[26, -3], [34, -3]], '#171326', 7);
+    } else {
+      polygon('#171326', [[-17,-34],[17,-34],[20,-8],[28,-3],[27,1],[8,1],[4,-22],[-4,-22],[-8,1],[-27,1],[-28,-3],[-20,-8]]);
+      polygon('#8183bd', [[-17,-32],[-5,-27],[-9,-8],[-19,-5]]);
+      polygon('#a6a7df', [[17,-32],[5,-27],[9,-8],[19,-5]]);
+    }
+    ctx.translate(0, 22 * kneel);
     for (const [side, lift] of [[-1, leftLift], [1, rightLift]]) {
       const joints = arm(side, lift);
       line(joints, '#171326', 17);
@@ -127,13 +143,55 @@ export function combatArt(canvas, beast, reducedMotion) {
     }
   }
 
-  function beam(scene, strength) {
+  function beam(scene, strength, stage) {
     const origin = [scene.x, scene.floor - 78 * scene.scale];
     const target = [scene.target.x, scene.target.y];
     const width = (12 + strength * 34) * scene.scale;
-    line([origin, target], '#8c58ff7d', width + 12);
-    line([origin, target], '#d4a1ff', width);
-    line([origin, target], '#fff1ff', width * .28);
+    const color = auraColors[stage];
+    line([origin, target], color + '7d', width + 12);
+    line([origin, target], color, width);
+    line([origin, target], '#fff9f1', width * .28);
+  }
+
+  function inhaleAir(scene, progress) {
+    const [x, y] = scene.mouth;
+    const reach = Math.max(38, scene.boss.width * .52);
+    const still = reducedMotion.matches;
+    ctx.fillStyle = '#161326';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 8 + progress * 5, 3 + progress * 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (let i = 0; i < 12; i++) {
+      const angle = Math.PI * 2 * i / 12;
+      const travel = still ? .4 : (progress * 1.6 + i * .137) % 1;
+      const radius = 14 + reach * (1 - travel);
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle) * .68;
+      line([[x + dx * radius, y + dy * radius], [x + dx * (radius + 13), y + dy * (radius + 13)]], '#c1f2ffb8', 2);
+    }
+  }
+
+  function shoutWave(scene, elapsed, absorbed) {
+    const [x, y] = scene.mouth;
+    const progress = reducedMotion.matches ? .7 : Math.min(1, elapsed / 420);
+    const radius = 20 + progress * Math.hypot(scene.width * .55, scene.floor - y);
+    ctx.strokeStyle = '#d6f7ff';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, -.15, Math.PI + .15);
+    ctx.stroke();
+    ctx.strokeStyle = '#72c6ee90';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(5, radius - 12), -.15, Math.PI + .15);
+    ctx.stroke();
+    if (absorbed && progress >= .5) {
+      ctx.strokeStyle = '#ffe477';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(scene.x, scene.floor - 42 * scene.scale, 40 * scene.scale, 51 * scene.scale, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   function heal(scene, elapsed) {
@@ -308,9 +366,9 @@ export function combatArt(canvas, beast, reducedMotion) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       effects.length = 0;
       previousTime = undefined;
-      leftLift = rightLift = 0;
+      leftLift = rightLift = kneel = 0;
     },
-    render(now, { left, right, guard, aura, auraStage = 0, flash, beamStrength, flame, burning }) {
+    render(now, { left, right, guard, aura, auraStage = 0, flash, beamStrength, beamStage, flame, inhale, shaken, burning }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
@@ -328,7 +386,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       const point = (x, y) => [boss.x + x / 40 * boss.width, boss.y + y / 36 * boss.height];
       const [targetX, targetY] = point(20, 20);
       const scene = {
-        x: rect.width * .5, floor: rect.height * .95,
+        width: rect.width, x: rect.width * .5, floor: rect.height * .95,
         scale: Math.min(1.3, rect.width / 500, rect.height / 420),
         boss, eyes: [point(13, 15.6), point(27, 15.6)], mouth: point(20, 23), target: { x: targetX, y: targetY },
       };
@@ -337,6 +395,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       const settle = reducedMotion.matches ? 1 : 1 - Math.exp(-delta / 34);
       leftLift = mix(leftLift, Number(left), settle);
       rightLift = mix(rightLift, Number(right), settle);
+      kneel = mix(kneel, Number(shaken), settle);
       const eyeColor = eyeColors[flash];
       if (eyeColor) {
         for (const [x, y] of scene.eyes) {
@@ -352,13 +411,15 @@ export function combatArt(canvas, beast, reducedMotion) {
       effects.splice(0, effects.length, ...active);
       if (guard || active.some(effect => (effect.kind === 'laser' || effect.kind === 'flame') && effect.strength)) shield(boss);
       if (flame) fireball(scene, flame);
-      if (beamStrength > 0) beam(scene, beamStrength);
+      if (inhale !== null) inhaleAir(scene, inhale);
+      if (beamStrength > 0) beam(scene, beamStrength, beamStage);
       for (const effect of active) {
         const elapsed = now - effect.now;
         ctx.globalAlpha = Math.min(1, (duration[effect.kind] - elapsed) / 130);
         if (effect.kind === 'basic') slash(scene, elapsed);
         else if (effect.kind === 'power') ripples(scene, elapsed);
         else if (effect.kind === 'heal') heal(scene, elapsed);
+        else if (effect.kind === 'shout') shoutWave(scene, elapsed, effect.strength);
         else if (effect.kind === 'flame') flamethrower(scene, elapsed, effect.strength);
         else if (effect.kind === 'guard-break') {
           if (elapsed < duration.laser) lasers(scene, true);
