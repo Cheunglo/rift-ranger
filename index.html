@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=46">
-  <script type="module" src="./game.mjs?v=47"></script>
+  <link rel="stylesheet" href="./style.css?v=48">
+  <script type="module" src="./game.mjs?v=48"></script>
 </head>
 <body>
   <main>
@@ -53,21 +53,15 @@
           <svg id="warning-pose" class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use href="./poses.svg?v=7#guard"></use></svg>
           <p id="warning-hint" hidden>Left hand up, or hold S.</p>
           <div class="audio-tools">
-            <div class="aura-meter"><label id="aura-caption" class="label" for="aura">Aura</label><progress id="aura" max="100" value="0"></progress></div>
             <div class="mic-control">
               <p id="mic-status" hidden></p>
               <progress id="mic-level" aria-label="Microphone input level" max="100" value="0" hidden></progress>
             </div>
           </div>
         </div>
-        <div id="ranger-pose" class="combat-panel" hidden>
-          <span class="label">Action detected</span>
-          <div class="pose-readout">
-            <svg class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use id="pose-art" href="./poses.svg?v=7#basic"></use></svg>
-            <output id="pose-label" aria-live="polite">No action detected</output>
-          </div>
-          <p id="tracking" hidden></p>
-        </div>
+      </div>
+      <div id="camera-pose" aria-label="Recognized camera pose" hidden>
+        <svg class="combat-icon" aria-hidden="true" viewBox="0 0 96 88" hidden><use id="pose-art" href="./poses.svg?v=7#basic"></use></svg>
       </div>
       <div class="battle-stage">
         <div class="eclipse"></div>
@@ -75,6 +69,14 @@
         <canvas id="beast" width="40" height="36" aria-hidden="true"></canvas>
         <canvas id="combat-fx" aria-hidden="true"></canvas>
         <div id="camera-frame" class="camera-frame" hidden><video id="camera" muted playsinline aria-label="Mirrored camera preview"></video><canvas id="tracking-points" aria-hidden="true"></canvas><span>LIVE</span></div>
+        <div id="battle-feedback" hidden>
+          <output id="move-notice" role="status" hidden></output>
+          <p id="tracking" hidden></p>
+        </div>
+        <div id="aura-strip" hidden>
+          <label id="aura-caption" for="aura">Aura</label>
+          <progress id="aura" aria-label="Aura charge toward next stage" max="100" value="0"></progress>
+        </div>
         <div class="overlay" id="overlay">
           <h2 id="overlay-title">Defend the city.</h2>
           <p id="overlay-copy">Keep your shoulders and any raised hand in view. You can play sitting or standing.</p>
@@ -108,6 +110,9 @@
         <h2 id="tutorial-title"></h2>
         <p id="tutorial-instruction"></p>
       </section>
+    </section>
+    <section id="mobile-status" aria-label="Battle status" hidden>
+      <button id="mobile-details" class="secondary" type="button" aria-expanded="false" aria-controls="boss-panel lock-status">Show details</button>
     </section>
     <section id="mobile-controls" aria-label="Mobile combat controls" hidden>
       <button type="button" data-key="d" class="touch-power">Powerwave / Heal<small>Tap</small></button>

@@ -20,6 +20,8 @@ const webcam = byId('webcam');
 const keyboard = byId('keyboard');
 const mobile = byId('mobile');
 const mobileControls = byId('mobile-controls');
+const mobileStatus = byId('mobile-status');
+const mobileDetails = byId('mobile-details');
 const tutorialButton = byId('tutorial');
 const tutorialPanel = byId('tutorial-panel');
 const micStatus = byId('mic-status');
@@ -31,10 +33,12 @@ const bossPanel = byId('boss-panel');
 const bossPanelLabel = byId('boss-panel-label');
 const warningPose = byId('warning-pose');
 const warningHint = byId('warning-hint');
-const poseCard = byId('ranger-pose');
+const cameraPosePreview = byId('camera-pose');
 const poseArt = byId('pose-art');
 const poseIcon = poseArt.ownerSVGElement;
-const poseLabel = byId('pose-label');
+const moveNotice = byId('move-notice');
+const battleFeedback = byId('battle-feedback');
+const auraStrip = byId('aura-strip');
 const player = byId('player');
 const burnStatus = byId('burn-status');
 const enemy = byId('enemy');
@@ -46,6 +50,22 @@ const lockInstruction = byId('lock-instruction');
 const tutorialBadge = byId('tutorial-badge');
 const auraMeter = byId('aura');
 const auraCaption = byId('aura-caption');
+const bossPanelHome = bossPanel.parentElement;
+const lockStatusHome = lockStatus.parentElement;
+
+function setMobileHud(enabled) {
+  mobileStatus.hidden = !enabled;
+  document.body.classList.remove('mobile-details');
+  mobileDetails.setAttribute('aria-expanded', 'false');
+  mobileDetails.textContent = 'Show details';
+  (enabled ? mobileStatus : bossPanelHome).append(bossPanel);
+  (enabled ? mobileStatus : lockStatusHome).append(lockStatus);
+}
+mobileDetails.addEventListener('click', () => {
+  const expanded = document.body.classList.toggle('mobile-details');
+  mobileDetails.setAttribute('aria-expanded', String(expanded));
+  mobileDetails.textContent = expanded ? 'Hide details' : 'Show details';
+});
 // All timing values are milliseconds. The animation loop uses one clock.
 const battleTiming = {
   firstStrike: 7000,
@@ -123,7 +143,6 @@ let micStream;
 let pendingCameraMic;
 let context;
 let audioInput;
-let poseAnimation;
 // Stale permission or model requests must not reopen a device after you exit.
 let requestId = 0;
 const defaultStatus = 'Camera and mic stay on your device.';
@@ -273,26 +292,19 @@ function cameraNotice(message, state, now) {
   round.cameraNotice = { message, state, until: now + 950 };
 }
 
-function showPose(move, label = 'No action detected', state = '') {
+// The character shows successful moves; only explain blocked moves in text.
+function showPose(move, label = '', state = '') {
+  cameraPosePreview.hidden = round?.mode !== 'camera';
   poseIcon.toggleAttribute('hidden', !move);
-  if (move) {
-    const href = './poses.svg?v=34#' + move;
-    if (poseArt.getAttribute('href') !== href) poseArt.setAttribute('href', href);
-  }
-  if (poseLabel.textContent !== label) poseLabel.textContent = label;
-  if (poseCard.dataset.state !== state) poseCard.dataset.state = state;
+  if (move) poseArt.setAttribute('href', './poses.svg?v=7#' + move);
+  cameraPosePreview.setAttribute('aria-label', label || 'Recognized camera pose');
+  moveNotice.hidden = state !== 'locked';
+  if (state === 'locked' && moveNotice.textContent !== label) moveNotice.textContent = label;
 }
 
 function confirmPose(move, label, now) {
   round.poseFeedback = { move, label, until: now + 850 };
   showPose(move, label, 'active');
-  poseAnimation?.cancel();
-  if (!reducedMotion.matches) {
-    poseAnimation = poseIcon.animate(
-      [{ transform: 'scale(.88)' }, { transform: 'scale(1.1)' }, { transform: 'scale(1)' }],
-      { duration: 350, easing: 'ease-out' },
-    );
-  }
 }
 
 function showOverlay(title, copy) {
@@ -410,13 +422,13 @@ function resetRound() {
   stopCamera();
   combatInputs.reset();
   mobileControls.hidden = true;
+  setMobileHud(false);
   document.body.classList.remove('mobile-play');
   round = null;
   burnStatus.hidden = true;
   cameraBonusStatus.hidden = true;
   visuals.clear();
-  poseAnimation?.cancel();
-  poseCard.hidden = true;
+  cameraPosePreview.hidden = battleFeedback.hidden = auraStrip.hidden = true;
   bossPanel.hidden = true;
   tutorialPanel.hidden = true;
   arena.removeAttribute('data-tutorial');
@@ -430,6 +442,7 @@ function resetRound() {
 function startRound(mode, learning, mobileMode = false) {
   combatInputs.reset();
   mobileControls.hidden = !mobileMode;
+  setMobileHud(mobileMode);
   document.body.classList.toggle('mobile-play', mobileMode);
   const now = performance.now();
   round = {
@@ -456,7 +469,7 @@ function startRound(mode, learning, mobileMode = false) {
   overlay.hidden = true;
   showPose();
   showWarning('No attack incoming');
-  poseCard.hidden = false;
+  battleFeedback.hidden = auraStrip.hidden = false;
   bossPanel.hidden = false;
   tracking.hidden = mode !== 'camera';
   if (mode === 'camera') cameraStatus('Waiting for tracking…', 'waiting');
@@ -923,7 +936,7 @@ function tick(now) {
   else if (now < round.guardBreakNoticeUntil && !guard) showPose('guard', 'Raise guard again', 'locked');
   else if (cameraPose === 'power') {
     const counter = canPowerCounter(now);
-    showPose(counter ? 'power' : 'heal', 'Both arms detected', counter || !healBlockReason(now) ? '' : 'locked');
+    showPose('heal', healBlockReason(now), counter || !healBlockReason(now) ? '' : 'locked');
   }
   else if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
   else if (guard) showPose('guard', 'Guard detected', 'active');

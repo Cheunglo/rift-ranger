@@ -125,21 +125,12 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
   line-height: 1.25;
 }
 #boss-panel { grid-column: 1; grid-row: 2; }
-#ranger-pose { grid-column: 3; grid-row: 2; justify-self: end; }
 .combat-panel .label { color: var(--muted); }
 .combat-panel output { font-weight: 850; }
 .combat-panel p { margin: 0; font-size: .875rem; }
 .combat-icon { width: 70px; max-width: 100%; height: auto; justify-self: center; }
-.pose-readout { display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
-.pose-readout .combat-icon { flex: none; width: clamp(35px, 6vw, 58px); }
 #boss-panel[data-state="danger"] { color: #ffd3df; border-color: #ff849e; background: #501a35; }
-#ranger-pose[data-state="active"] { color: var(--acid); border-color: var(--acid); box-shadow: 0 0 22px #e8ff7540; }
-#ranger-pose[data-state="locked"] { color: #ffdca2; }
 .audio-tools { border-top: 1px solid #785d8780; padding-top: 5px; }
-.aura-meter { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
-#aura { flex: 1; min-width: 26px; margin-top: 0; height: 6px; accent-color: #d8abfa; }
-#aura::-webkit-progress-value { background: #d8abfa; }
-#aura::-moz-progress-bar { background: #d8abfa; }
 .mic-control { display: grid; gap: 4px; margin-top: 3px; }
 #mic-status { color: var(--muted); }
 #mic-status[data-state="humming"] { color: var(--acid); }
@@ -190,8 +181,6 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
   #tutorial-panel { padding-block: 8px; font-size: .9375rem; }
   .arena[data-tutorial] .combat-panel { gap: 3px; font-size: .875rem; }
   .arena[data-tutorial] .combat-panel :is(.label, p) { font-size: .75rem; }
-  .arena[data-tutorial] .pose-readout { gap: 4px; }
-  .arena[data-tutorial] .pose-readout .combat-icon { width: 30px; }
 }
 @media (max-width: 360px) {
   .arena[data-tutorial] { --lesson-height: 128px; }
@@ -232,10 +221,41 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play .toolbar { margin-top: 0; font-size: .8rem; }
 @media (max-width: 670px) {
   .mobile-play main { width: calc(100% - 16px); }
-  .mobile-play .arena { --arena-height: clamp(390px, calc(100svh - 230px), 550px); }
+  .mobile-play .arena { --arena-height: clamp(390px, calc(100svh - 290px), 550px); }
   #mobile-controls { gap: 8px; }
   #mobile-controls button { font-size: .875rem; }
 }
 @media (pointer: coarse) {
   body:not(.mobile-play) .moves { display: none; }
 }
+
+/* Keep charge at the stage edge; the character supplies action feedback. */
+#aura-strip { position: absolute; inset: auto 0 0; z-index: 3; pointer-events: none; }
+#aura-caption { display: block; width: fit-content; margin: 0 10px 5px; padding: 2px 6px; border-radius: 4px; background: #171326dc; color: #e3c5ff; font: 700 .7rem/1.2 ui-monospace, monospace; }
+#aura { width: 100%; height: 5px; margin: 0; border-radius: 0; background: #372448; accent-color: #d8abfa; }
+#aura::-webkit-progress-bar { background: #372448; }
+#aura::-webkit-progress-value { background: #d8abfa; }
+#aura::-moz-progress-bar { background: #d8abfa; }
+#battle-feedback { position: absolute; inset: auto 10px 36px; z-index: 3; text-align: center; pointer-events: none; }
+#move-notice, #tracking { width: fit-content; max-width: 100%; margin: 4px auto 0; padding: 4px 8px; border-radius: 5px; background: #171326ed; color: #ffdca2; font-size: .8125rem; }
+#move-notice { display: block; }
+.audio-tools:has(.mic-control > [hidden] + [hidden]) { display: none; }
+.mobile-play #boss-panel { grid-column: 1 / -1; grid-row: 2; width: 100%; grid-template-columns: 1fr auto; align-items: center; padding: 6px 9px; gap: 2px 8px; font-size: .8125rem; }
+.mobile-play #boss-panel-label, .mobile-play #warning-pose { display: none; }
+.mobile-play #warning-hint { text-align: right; font-size: .75rem; }
+.mobile-play #boss-panel .audio-tools { grid-column: 1 / -1; }
+
+/* Mobile status lives below the arena, never over the boss. */
+#mobile-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding-top: 8px; }
+#mobile-details { grid-column: 2; grid-row: 1; padding: 7px 9px; min-height: 36px; font-size: .75rem; }
+.mobile-play #mobile-status #boss-panel { grid-column: 1; grid-row: 1; padding: 6px 8px; border-color: transparent; background: transparent; grid-template-columns: 1fr; }
+.mobile-play #mobile-status #boss-panel[data-state="danger"] { border-color: #ff849e; background: #501a35; }
+.mobile-play #mobile-status #warning-hint { text-align: left; }
+.mobile-play #mobile-status #lock-status { grid-column: 1 / -1; width: 100%; justify-items: start; margin: 0; }
+.mobile-play #mobile-status #lock-remaining { text-align: left; }
+.mobile-play:not(.mobile-details) :is(#warning-hint, #mobile-status .audio-tools, #lock-instruction, #tracking) { display: none; }
+.mobile-play:not(.mobile-details) #lock-status:not([data-active="true"]) { display: none; }
+.mobile-play:not(.mobile-details) #lock-status[data-active="true"] { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: .75rem; }
+
+#camera-pose { position: absolute; right: 5%; top: 150px; z-index: 3; color: var(--acid); pointer-events: none; }
+#camera-pose .combat-icon { display: block; width: clamp(44px, 7vw, 70px); }
