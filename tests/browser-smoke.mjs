@@ -109,7 +109,7 @@ test('a link can prefill a fight ID', { timeout: 15000 }, async t => {
 test('each new body is selectable and paints a distinct sprite', { timeout: 35000 }, async t => {
   const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
   await page.locator('#fight-options summary').click();
-  const bodies = { H: 'The Duelist', D: 'Rift Hound', S: 'Coilfang', G: 'Rift Slime', W: 'Tidewhale', O: 'Moon Owl' };
+  const bodies = { H: 'The Duelist', D: 'Rift Raccoon', S: 'Coilfang', G: 'Rift Slime', W: 'Tidewhale', O: 'Moon Owl' };
   const sprites = new Set();
   for (const [code, name] of Object.entries(bodies)) {
     await page.locator('#boss-choice').selectOption(code);

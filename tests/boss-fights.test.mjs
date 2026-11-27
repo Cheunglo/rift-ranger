@@ -33,7 +33,7 @@ test('reject unsupported versions, unknown parts, and repeated lock moves', () =
 test('every released body has a stable RR1 body letter', () => {
   const names = {
     R: 'The Riftbeast', T: 'Barkjaw', B: 'Iron Beetle', H: 'The Duelist',
-    D: 'Rift Hound', S: 'Coilfang', G: 'Rift Slime', W: 'Tidewhale', O: 'Moon Owl',
+    D: 'Rift Raccoon', S: 'Coilfang', G: 'Rift Slime', W: 'Tidewhale', O: 'Moon Owl',
   };
   for (const [body, name] of Object.entries(names)) {
     assert.equal(parseFightId('RR1-' + body + '-LFS-' + (body === 'B' ? 'SSPL' : body === 'G' ? 'SL' : 'SPL')).body.name, name);

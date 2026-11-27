@@ -12,12 +12,12 @@ import {
 } from './boss-attacks.mjs?v=64';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
 import { lessons } from './tutorial.mjs?v=68';
-import { paintBoss } from './boss-bodies.mjs?v=69';
-import { parseFightId } from './boss-fights.mjs?v=69';
+import { paintBoss } from './boss-bodies.mjs?v=70';
+import { parseFightId } from './boss-fights.mjs?v=70';
 import { attackDamage } from './boss-profiles.mjs?v=64';
-import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=69';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=70';
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
-import { combatArt } from './combat-art.mjs?v=62';
+import { combatArt } from './combat-art.mjs?v=70';
 import { gestures } from './controls.mjs?v=68';
 
 const cameraBonusStatus = byId('camera-bonus-status');

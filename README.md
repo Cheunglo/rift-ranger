@@ -38,14 +38,14 @@ Choose **Start Tutorial**, then start with camera or keyboard. Complete each pro
 
 ## Boss options and fight IDs
 
-Open **Boss options** to pick a body or roll one at random. The roster includes the Riftbeast, Barkjaw, Iron Beetle, The Duelist, Rift Hound, Coilfang, Rift Slime, Tidewhale, and Moon Owl. All nine use the same prototype moves, while their body stats change the fight. The effects attach to each body's own eyes and mouth.
+Open **Boss options** to pick a body or roll one at random. The roster includes the Riftbeast, Barkjaw, Iron Beetle, The Duelist, Rift Raccoon, Coilfang, Rift Slime, Tidewhale, and Moon Owl. All nine use the same prototype moves, while their body stats change the fight. The effects attach to each body's own eyes and mouth.
 
 Copy the **Fight ID** below the battle and send it to a friend. They can paste it under **Boss options** or open a URL such as `?boss=RR1-T-LFS-SPL`. Attack rolls still vary within the same configuration.
 
 | Piece | Meaning |
 | --- | --- |
 | `RR1` | Rift Ranger fight ID format, version 1. |
-| `T` | The body. The letters are `R` Riftbeast, `T` tree, `B` beetle, `H` human, `D` hound, `S` serpent, `G` slime, `W` whale, and `O` owl. |
+| `T` | The body. The letters are `R` Riftbeast, `T` tree, `B` beetle, `H` human, `D` raccoon, `S` serpent, `G` slime, `W` whale, and `O` owl. |
 | `LFS` | Eye Lasers, Flame Breath, and Shout in the Regular, Special, and Status slots. |
 | `SPL` | Slash, Powerwave, and Laser locks in order from highest HP to lowest. Iron Beetle adds its 65 HP lock at the front. Rift Slime skips the 20 HP lock. |
 
@@ -57,7 +57,7 @@ The parser checks the body, move set, and lock count. Iron Beetle requires four 
 | Barkjaw | 30% shorter healing intervals and 25% weaker hits. |
 | Iron Beetle | An extra lock at 65 HP, with 650 ms longer gaps before attacks. |
 | The Duelist | 250 ms shorter gaps before Status moves and 20% weaker Specials. |
-| Rift Hound | 85 HP and gaps up to 450 ms shorter. |
+| Rift Raccoon | 85 HP and gaps up to 450 ms shorter. |
 | Coilfang | 25% harder Regular hits and 35% longer healing intervals. |
 | Rift Slime | 150 HP and two locks at 40 and 10 HP. |
 | Tidewhale | Specials hit 35% harder, followed by 650 ms extra recovery. |

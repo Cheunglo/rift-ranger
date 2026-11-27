@@ -271,8 +271,12 @@ export function combatArt(canvas, beast, reducedMotion) {
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       ctx.clearRect(0, 0, rect.width, rect.height);
       const bounds = beast.getBoundingClientRect();
-      const boss = { x: bounds.left - rect.left, y: bounds.top - rect.top, width: bounds.width, height: bounds.height };
-      const point = ([x, y]) => [boss.x + x * boss.width, boss.y + y * boss.height];
+      const spriteX = bounds.left - rect.left;
+      const spriteY = bounds.top - rect.top;
+      // Extra wing space extends the sprite without widening the shield or flashes.
+      const coreWidth = bounds.width * (anchors.coreWidth ?? 1);
+      const boss = { x: spriteX + (bounds.width - coreWidth) / 2, y: spriteY, width: coreWidth, height: bounds.height };
+      const point = ([x, y]) => [spriteX + x * bounds.width, spriteY + y * bounds.height];
       const [targetX, targetY] = point(anchors.target);
       const scene = {
         width: rect.width, x: rect.width * .5, floor: rect.height * .95,
