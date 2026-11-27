@@ -2,8 +2,8 @@ const rangerKeys = {
   s: 'guard',
   d: 'power',
   ' ': 'aura',
-  j: 'basic',
-  k: 'beam',
+  j: 'beam',
+  k: 'basic',
 };
 
 // Track each finger and physical key independently so simultaneous holds are safe.

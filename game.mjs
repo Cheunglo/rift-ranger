@@ -1,17 +1,17 @@
 // Owns the round and connects input, attack rules, and presentation.
-import { createCameraSession, defaultStatus } from './camera-session.mjs?v=59';
+import { createCameraSession, defaultStatus } from './camera-session.mjs?v=60';
 import {
   arena, burnStatus, byId, enemy, hideOverlay, lockMarkers,
   lockStatus, mobileControls, player, powerStock, renderAura, renderBossLabel,
   renderBossLocks, renderPose, renderPowerStock, resetHud, setBattleHudVisible, setHealth,
   setMobileHud, shakenStatus, showBattleResult, showBattleWarning, showOverlay,
-} from './battle-hud.mjs?v=59';
+} from './battle-hud.mjs?v=60';
 import {
   attackTell, coolFlame, openingStrike, randomWarningStart, scheduleNextStrike,
   scheduleTutorialFlame, updateFlameCombo, warningDuration,
 } from './boss-attacks.mjs?v=58';
-import { bindCombatInputs } from './mobile-controls.mjs?v=59';
-import { lessons } from './tutorial.mjs?v=59';
+import { bindCombatInputs } from './mobile-controls.mjs?v=60';
+import { lessons } from './tutorial.mjs?v=60';
 import { paintBeast, riftbeastAnchors } from './beast.mjs?v=58';
 import { bossHit, createBossLocks, lockRequirement } from './boss-locks.mjs?v=58';
 import { combatArt } from './combat-art.mjs?v=58';
@@ -234,11 +234,11 @@ function showLesson(now) {
   byId('tutorial-step').textContent = 'Tutorial · ' + (round.lessonIndex + 1) + ' / ' + lessons.length;
   byId('tutorial-title').textContent = current.title;
   byId('tutorial-instruction').textContent = round.mobile ? current.hint
-    .replace('Raise your right hand above your shoulder, or press J', 'Tap Slash')
+    .replace('Raise your right hand above your shoulder, or press K', 'Tap Slash')
     .replace('hold your left hand up or hold S', 'hold Block')
     .replaceAll('raise both hands or press D', 'tap Powerwave / Heal')
     .replace('Hum, whistle, sing, or hold Space', 'Hold Aura')
-    .replace('Clap once or press K', 'Tap Laser')
+    .replace('Clap once or press J', 'Tap Laser')
     .replace('Lower and raise your left hand, or release and re-press S,', 'Release and re-press Block') : current.hint;
   round.strike = Infinity;
   round.comboLaserAt = Infinity;

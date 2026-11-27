@@ -52,9 +52,9 @@ test('cancellation, lost capture, focus loss, and hidden page release holds', ()
 test('power and laser fire once per press, with repeat keydown ignored', () => {
   const { down, up, send, target, log } = setup();
   down('power', 1); up('power', 1); down('beam', 2); up('beam', 2);
-  send(target, 'keydown', { key: 'j' });
-  send(target, 'keydown', { key: 'j', repeat: true });
-  send(target, 'keyup', { key: 'j' });
+  send(target, 'keydown', { key: 'k' });
+  send(target, 'keydown', { key: 'k', repeat: true });
+  send(target, 'keyup', { key: 'k' });
   assert.deepEqual(log, ['+power', '-power', '+beam', '-beam', '+basic', '-basic']);
 });
 
@@ -66,11 +66,11 @@ test('space holds Aura and suppresses native actions even on key repeat', () => 
   assert.deepEqual(log, ['+aura', '-aura']);
 });
 
-test('right-hand keys fire Slash and Laser, with the old bindings inactive', () => {
+test('right-hand keys fire Laser and Slash, with the old bindings inactive', () => {
   const { send, target, log } = setup();
   for (const key of ['a', 'f', 'g', 'j', 'k']) {
     send(target, 'keydown', { key });
     send(target, 'keyup', { key });
   }
-  assert.deepEqual(log, ['+basic', '-basic', '+beam', '-beam']);
+  assert.deepEqual(log, ['+beam', '-beam', '+basic', '-basic']);
 });
