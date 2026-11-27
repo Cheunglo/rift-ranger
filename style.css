@@ -221,7 +221,7 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play .toolbar { margin-top: 0; font-size: .8rem; }
 @media (max-width: 670px) {
   .mobile-play main { width: calc(100% - 16px); }
-  .mobile-play .arena { --arena-height: clamp(390px, calc(100svh - 290px), 550px); }
+  .mobile-play .arena { --arena-height: clamp(390px, calc(100svh - 330px), 550px); }
   #mobile-controls { gap: 8px; }
   #mobile-controls button { font-size: .875rem; }
 }
@@ -253,9 +253,10 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play #mobile-status #warning-hint { text-align: left; }
 .mobile-play #mobile-status #lock-status { grid-column: 1 / -1; width: 100%; justify-items: start; margin: 0; }
 .mobile-play #mobile-status #lock-remaining { text-align: left; }
-.mobile-play:not(.mobile-details) :is(#warning-hint, #mobile-status .audio-tools, #lock-instruction, #tracking) { display: none; }
-.mobile-play:not(.mobile-details) #lock-status:not([data-active="true"]) { display: none; }
-.mobile-play:not(.mobile-details) #lock-status[data-active="true"] { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: .75rem; }
+.mobile-play:not(.mobile-details) :is(#warning-hint, #mobile-status .audio-tools, #tracking) { display: none; }
 
 #camera-pose { position: absolute; right: 5%; top: 150px; z-index: 3; color: var(--acid); pointer-events: none; }
 #camera-pose .combat-icon { display: block; width: clamp(44px, 7vw, 70px); }
+
+.mobile-play #mobile-status #lock-status { grid-template-columns: auto 1fr; gap: 2px 8px; }
+.mobile-play #mobile-status #lock-instruction { grid-column: 1 / -1; }
