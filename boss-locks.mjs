@@ -41,3 +41,8 @@ export function bossHit(locks, hp, damage, move, auraStage) {
   if (credited) lock.done = Math.min(lock.total, lock.done + credits);
   return { hp: next, dealt: hp - next, lock: lock?.engaged ? lock : null, credited };
 }
+
+export function lockRequirement(lock) {
+  const remaining = lock.total - lock.done;
+  return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];
+}

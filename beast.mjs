@@ -1,5 +1,12 @@
 // Draw the boss once onto a 40×36 canvas. Later layers add highlights over the
 // silhouette, and combat-art.mjs uses the eye pixels as its laser origins.
+// Normalized positions follow the existing sprite at any display size.
+export const riftbeastAnchors = {
+  eyes: [[13 / 40, 15.6 / 36], [27 / 40, 15.6 / 36]],
+  mouth: [20 / 40, 23 / 36],
+  target: [20 / 40, 20 / 36],
+};
+
 export function paintBeast(canvas) {
   const context = canvas.getContext('2d');
   const pixels = (color, rects) => {

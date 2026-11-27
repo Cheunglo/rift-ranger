@@ -1,78 +1,34 @@
+// Owns the round and connects input, attack rules, and presentation.
+import { createCameraSession, defaultStatus } from './camera-session.mjs?v=58';
+import {
+  arena, burnStatus, byId, enemy, hideOverlay, lockMarkers,
+  lockStatus, mobileControls, player, powerStock, renderAura, renderBossLabel,
+  renderBossLocks, renderPose, renderPowerStock, resetHud, setBattleHudVisible, setHealth,
+  setMobileHud, shakenStatus, showBattleResult, showBattleWarning, showOverlay,
+} from './battle-hud.mjs?v=58';
+import {
+  attackTell, coolFlame, openingStrike, randomWarningStart, scheduleNextStrike,
+  scheduleTutorialFlame, updateFlameCombo, warningDuration,
+} from './boss-attacks.mjs?v=58';
 import { bindCombatInputs } from './mobile-controls.mjs?v=46';
-// Owns the match state, connects input to moves, and updates the HUD and arena.
 import { lessons } from './tutorial.mjs?v=57';
-import { paintBeast } from './beast.mjs';
-import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
-import { combatArt } from './combat-art.mjs?v=56';
-import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=57';
+import { paintBeast, riftbeastAnchors } from './beast.mjs?v=58';
+import { bossHit, createBossLocks, lockRequirement } from './boss-locks.mjs?v=58';
+import { combatArt } from './combat-art.mjs?v=58';
+import { gestures } from './controls.mjs?v=57';
 
-const byId = id => document.getElementById(id);
-const arena = byId('arena');
-const camera = byId('camera');
-const cameraFrame = byId('camera-frame');
-const tracking = byId('tracking');
-const trackingPoints = byId('tracking-points');
-const poseContext = trackingPoints.getContext('2d');
-const overlay = byId('overlay');
-const battleResult = byId('battle-result');
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
 const keyboard = byId('keyboard');
 const mobile = byId('mobile');
-const mobileControls = byId('mobile-controls');
-const mobileStatus = byId('mobile-status');
-const warningToggle = byId('warning-toggle');
 const tutorialButton = byId('tutorial');
 const tutorialPanel = byId('tutorial-panel');
-const micStatus = byId('mic-status');
-const micLevel = byId('mic-level');
 const exit = byId('exit');
 const device = byId('device');
-const prompt = byId('prompt');
-const bossPanel = byId('boss-panel');
-const bossPanelLabel = byId('boss-panel-label');
-const warningPose = byId('warning-pose');
-const warningHint = byId('warning-hint');
-const cameraPosePreview = byId('camera-pose');
-const poseArt = byId('pose-art');
-const poseIcon = poseArt.ownerSVGElement;
-const moveNotice = byId('move-notice');
-const battleFeedback = byId('battle-feedback');
-const auraStatus = byId('aura-status');
-const auraButtonCaption = byId('aura-button-caption');
-const player = byId('player');
-const burnStatus = byId('burn-status');
-const shakenStatus = byId('shaken-status');
-const powerStock = byId('power-stock');
-const enemy = byId('enemy');
-const lockMarkers = byId('lock-markers');
-const lockStatus = byId('lock-status');
-const lockTitle = byId('lock-title');
-const lockRemaining = byId('lock-remaining');
-const lockInstruction = byId('lock-instruction');
 const tutorialBadge = byId('tutorial-badge');
-const auraCaption = byId('aura-caption');
-const bossPanelHome = bossPanel.parentElement;
-const lockStatusHome = lockStatus.parentElement;
 
-function setWarningVisible(visible) {
-  bossPanel.classList.toggle('warnings-hidden', !visible);
-  warningToggle.setAttribute('aria-expanded', String(visible));
-  warningToggle.textContent = visible ? 'Hide warning' : 'Show warning';
-}
-
-function setMobileHud(enabled) {
-  mobileStatus.hidden = !enabled;
-  setWarningVisible(true);
-  (enabled ? mobileStatus : bossPanelHome).append(bossPanel);
-  (enabled ? mobileStatus : lockStatusHome).append(lockStatus);
-}
-warningToggle.addEventListener('click', () => {
-  setWarningVisible(warningToggle.getAttribute('aria-expanded') === 'false');
-});
 // All timing values are milliseconds. The animation loop uses one clock.
 const battleTiming = {
-  warningStep: 1000,
   blockBonusWindow: 2400,
   healQuietTime: 1800,
   healMinInterval: 700,
@@ -83,38 +39,7 @@ const attacks = {
   power: [22, 'Power strike'],
 };
 const cameraBonusPercent = 20;
-const warningColors = ['green', 'yellow', 'red'];
-const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
-const eyeWarningDuration = () => (warningColors.length - round.warningStart) * battleTiming.warningStep;
-// Each phase stores its exclusive end time and the warning shown during it.
-const flamePhases = [
-  { until: 1400, name: 'red', color: '#ff352d', hint: 'Slash or laser to interrupt' },
-  { until: 2800, name: 'orange', color: '#ff8b28', hint: 'Cool it · Stage 1+ laser cancels' },
-  { until: 4200, name: 'yellow', color: '#ffdd39', hint: 'Cool it · Stage 2+ laser cancels' },
-  { until: 6600, name: 'blue', color: '#43a8ff', hint: 'Cool it · Stage 3 laser cancels' },
-  { until: 7100, name: 'white', color: '#ffffff', halo: '#43a8ff', hint: 'White-hot · guard now' },
-];
-const flameChargeTime = flamePhases.at(-1).until;
-const comboLaserLeadTime = 2300;
-const bossPace = {
-  camera: { firstLaser: 7000, slowLaser: 6600, fastLaser: 3650, flamePause: 1000, openingFlame: 0, comboOdds: [.15, .40, .75, 1] },
-  keyboard: { firstLaser: 5000, slowLaser: 4900, fastLaser: 3200, flamePause: 300, openingFlame: .35, comboOdds: [.45, .65, .90, 1] },
-};
 const burnInterval = 1000;
-const shoutInhale = 800;
-const shoutPause = 120;
-const shoutTell = shoutInhale + shoutPause;
-const shoutGap = 450;
-
-function warningDuration() {
-  if (round.strikeKind === 'shout') return shoutTell;
-  return round.strikeKind === 'flame' ? flameChargeTime : eyeWarningDuration();
-}
-const lockInstructions = {
-  basic: 'Right hand up · A',
-  power: 'Block to bank Powerwaves',
-  beam: 'Stages 1–3 earn 1, 2, 4',
-};
 // Each additional stage takes twice as long to fill as the last one.
 const auraStages = [
   { level: 1, chargeMs: 800, multiplier: 1 },
@@ -125,8 +50,7 @@ const auraCapacity = auraStages.at(-1).chargeMs;
 const micAuraChargeRate = 1.4;
 const beamDuration = 420;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const visuals = combatArt(byId('combat-fx'), byId('beast'), reducedMotion);
-const armLines = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
+const visuals = combatArt(byId('combat-fx'), byId('beast'), reducedMotion, riftbeastAnchors);
 const trackingHints = {
   framing: 'Move back so the camera can see your shoulders.',
   'hands-hidden': 'Show your raised hand above your shoulder. Your resting hand can be out of view.',
@@ -138,83 +62,19 @@ const trackingHints = {
   'power-held': 'Power registered. Lower both hands to reset.',
   reset: 'Lower your right hand to attack again.',
 };
-const audioHints = {
-  calibrating: 'Calibrating mic · stay quiet briefly.',
-  beam: 'Beam input · charging resumes after firing.',
-  quiet: 'Mic on · hum, whistle, or sing.',
-  sound: 'Sound heard · keep it going to charge.',
-  sustaining: 'Sound heard · keep it going.',
-  humming: 'Charging Aura from mic.',
-};
-
 let round;
 let tutorialSelected = false;
 let animation;
-let tracker;
-let cameraStream;
-let micStream;
-let pendingCameraMic;
-let context;
-let audioInput;
-// Stale permission or model requests must not reopen a device after you exit.
-let requestId = 0;
-const defaultStatus = 'Camera and mic stay on your device.';
-const videoInputOptions = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } };
-const audioInputOptions = { autoGainControl: false, noiseSuppression: false, echoCancellation: true };
-const micUnavailable = 'Microphone unavailable. Check browser permission, or use F and G.';
 paintBeast(byId('beast'));
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
 
 function showWarning(message, incoming = false, hint = round?.mobile ? 'Hold Block through the shot.' : 'Left hand up, or hold S.') {
-  if (prompt.textContent !== message) prompt.textContent = message;
-  const state = incoming ? 'danger' : '';
-  if (bossPanel.dataset.state !== state) bossPanel.dataset.state = state;
-  warningPose.toggleAttribute('hidden', !incoming || round?.strikeKind === 'shout');
-  warningHint.hidden = !incoming;
-  if (incoming && warningHint.textContent !== hint) warningHint.textContent = hint;
+  showBattleWarning(message, incoming, hint, round?.strikeKind !== 'shout');
 }
 
-function setHealth(bar, value) {
-  bar.value = value;
-  byId(bar.id + '-hp').textContent = bar.value + ' / ' + bar.max + ' HP';
-}
-
-function resetHud() {
-  setHealth(player, player.max);
-  setHealth(enemy, enemy.max);
-  burnStatus.hidden = shakenStatus.hidden = true;
-  arena.dataset.auraStage = mobileControls.dataset.auraStage = '0';
-  auraCaption.textContent = 'Aura · charge to 1';
-  auraButtonCaption.textContent = 'Hold to charge';
-  for (const marker of lockMarkers.children) marker.dataset.state = 'closed';
-}
-
-// The HUD previews the next gate and keeps an engaged lock highlighted if the boss heals.
-function showBossLocks() {
-  const next = nextBossLock(round.locks);
-  const active = Boolean(next?.engaged);
-  for (const lock of round.locks) {
-    byId('lock-' + lock.hp).dataset.state = lock.done === lock.total ? 'open' :
-      lock === next && active ? 'active' : 'closed';
-  }
-  let title = 'All three locks opened';
-  if (next) {
-    title = active ? next.hp + ' HP lock' : 'Next lock · ' + next.hp + ' HP';
-  }
-  const remaining = next ? lockRequirement(next) + ' left' : '';
-  const instruction = active ? lockInstructions[next.move] : '';
-  if (lockTitle.textContent !== title) lockTitle.textContent = title;
-  if (lockRemaining.textContent !== remaining) lockRemaining.textContent = remaining;
-  if (lockInstruction.textContent !== instruction) lockInstruction.textContent = instruction;
-  lockRemaining.hidden = !remaining;
-  lockInstruction.hidden = !instruction;
-  lockStatus.dataset.active = String(active);
-}
-
-function lockRequirement(lock) {
-  const remaining = lock.total - lock.done;
-  return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];
+function showPose(move, label, state) {
+  renderPose(round?.mode === 'camera', move, label, state);
 }
 
 function damageBoss(damage, move, now, auraStage) {
@@ -224,7 +84,7 @@ function damageBoss(damage, move, now, auraStage) {
   if (hit.dealt) setHealth(enemy, hit.hp);
   if (hit.dealt || hit.credited) {
     round.nextHeal = now + battleTiming.healQuietTime + healInterval();
-    showBossLocks();
+    renderBossLocks(round.locks);
   }
   return hit;
 }
@@ -240,7 +100,7 @@ function healBoss(now) {
   if (isTutorial() || now < round.nextHeal || enemy.value <= 0 || enemy.value >= enemy.max) return;
   setHealth(enemy, enemy.value + 1);
   round.nextHeal = now + healInterval();
-  showBossLocks();
+  renderBossLocks(round.locks);
 }
 
 function lockImpact(hit) {
@@ -250,82 +110,28 @@ function lockImpact(hit) {
   return '';
 }
 
-function cameraStatus(message, state = '') {
-  const text = 'Camera: ' + message;
-  if (tracking.textContent !== text) tracking.textContent = text;
-  if (tracking.dataset.state !== state) tracking.dataset.state = state;
-}
-
-function drawTracking(points) {
-  // The overlay shares the video dimensions; CSS mirrors both together.
-  const { videoWidth: width, videoHeight: height } = camera;
-  if (!width || !height) return;
-  if (trackingPoints.width !== width || trackingPoints.height !== height) {
-    trackingPoints.width = width;
-    trackingPoints.height = height;
-  }
-  poseContext.clearRect(0, 0, width, height);
-  poseContext.lineWidth = width * .005;
-  poseContext.strokeStyle = '#e8ff75';
-  poseContext.fillStyle = '#e8ff75';
-  const visibleJoint = (point, index) => index === 15 || index === 16 ? wristPoint(point) : posePoint(point);
-  for (const [start, end] of armLines) {
-    const from = points?.[start];
-    const to = points?.[end];
-    if (!visibleJoint(from, start) || !visibleJoint(to, end)) continue;
-    poseContext.beginPath();
-    poseContext.moveTo(from.x * width, from.y * height);
-    poseContext.lineTo(to.x * width, to.y * height);
-    poseContext.stroke();
-  }
-  for (const index of [0, 11, 12, 13, 14, 15, 16]) {
-    const point = points?.[index];
-    if (!visibleJoint(point, index)) continue;
-    poseContext.beginPath();
-    poseContext.arc(point.x * width, point.y * height, width * .009, 0, 2 * Math.PI);
-    poseContext.fill();
-  }
-}
-
 function updateCameraStatus(now) {
   const move = round.cameraMove;
-  if (!move || now - round.lastPose > 400) return cameraStatus('Waiting for tracking…', 'waiting');
-  if (round.cameraGuardBroken) return cameraStatus('Guard broken. Lower your left hand, then raise it.', 'waiting');
+  if (!move || now - round.lastPose > 400) return cameraSession.showTracking('Waiting for tracking…', 'waiting');
+  if (round.cameraGuardBroken) return cameraSession.showTracking('Guard broken. Lower your left hand, then raise it.', 'waiting');
   if (move.state === 'power') {
     const hint = !round.shaken && canPowerCounter() ? 'Both arms detected. Power counter ready.' :
       healBlockReason() || 'Both arms detected. Heal ready.';
-    return cameraStatus(hint, 'waiting');
+    return cameraSession.showTracking(hint, 'waiting');
   }
   const notice = round.cameraNotice;
-  if (notice && now < notice.until) return cameraStatus(notice.message, notice.state);
+  if (notice && now < notice.until) return cameraSession.showTracking(notice.message, notice.state);
   const needsFraming = move.state === 'framing' || move.state === 'hands-hidden';
-  cameraStatus(trackingHints[move.state], move.state === 'guard' ? 'accepted' : needsFraming ? 'waiting' : '');
+  cameraSession.showTracking(trackingHints[move.state], move.state === 'guard' ? 'accepted' : needsFraming ? 'waiting' : '');
 }
 
 function cameraNotice(message, state, now) {
   round.cameraNotice = { message, state, until: now + 950 };
 }
 
-// The character shows successful moves; only explain blocked moves in text.
-function showPose(move, label = '', state = '') {
-  cameraPosePreview.hidden = round?.mode !== 'camera';
-  poseIcon.toggleAttribute('hidden', !move);
-  if (move) poseArt.setAttribute('href', './poses.svg?v=7#' + move);
-  cameraPosePreview.setAttribute('aria-label', label || 'Recognized camera pose');
-  moveNotice.hidden = state !== 'locked';
-  if (state === 'locked' && moveNotice.textContent !== label) moveNotice.textContent = label;
-}
-
 function confirmPose(move, label, now) {
   round.poseFeedback = { move, label, until: now + 850 };
   showPose(move, label, 'active');
-}
-
-function showOverlay(title, copy) {
-  battleResult.hidden = true;
-  byId('overlay-title').textContent = title;
-  byId('overlay-copy').textContent = copy;
-  overlay.hidden = false;
 }
 
 function updateStartButtons() {
@@ -351,89 +157,10 @@ tutorialButton.addEventListener('click', () => {
   (tutorialSelected ? webcam : tutorialButton).focus({ preventScroll: true });
 });
 
-function stopCamera() {
-  cancelCameraMic();
-  stopMic();
-  stopTracks(cameraStream);
-  cameraStream = null;
-  camera.srcObject = null;
-  cameraFrame.hidden = true;
-  tracking.hidden = true;
-  poseContext.clearRect(0, 0, trackingPoints.width, trackingPoints.height);
-  tracker?.close();
-  tracker = null;
-}
-
-function beginCameraMic() {
-  if (micStream || pendingCameraMic) return null;
-  const Audio = window.AudioContext || window.webkitAudioContext;
-  if (!Audio) return null;
-  try {
-    const audioContext = new Audio();
-    // Begin resuming inside the click gesture, before the permission prompt.
-    const ready = audioContext.resume().then(() => true, () => false);
-    pendingCameraMic = { audioContext, ready };
-    return pendingCameraMic;
-  } catch {
-    return null;
-  }
-}
-
-function cancelCameraMic() {
-  if (!pendingCameraMic) return;
-  const { audioContext, stream } = pendingCameraMic;
-  pendingCameraMic = null;
-  stopTracks(stream);
-  void audioContext.close().catch(() => {});
-}
-
-function activateMic(stream, audioContext) {
-  const read = listen(audioContext, stream);
-  micStream = stream;
-  context = audioContext;
-  audioInput = read;
-  stream.getAudioTracks()[0].addEventListener('ended', () => {
-    if (micStream !== stream) return;
-    stopMic();
-    setMicMessage('Mic disconnected. F and G still work.');
-    device.textContent = defaultStatus;
-  });
-  setMicMessage('Mic on. Sustain a sound to charge, then clap once to fire.');
-  micLevel.hidden = false;
-}
-
-function stopMic() {
-  stopTracks(micStream);
-  micStream = null;
-  audioInput = null;
-  if (round) {
-    round.micHumming = false;
-  }
-  if (context && context.state !== 'closed') void context.close().catch(() => {});
-  context = null;
-  setMicMessage('');
-  micLevel.value = 0;
-  micLevel.hidden = true;
-}
-
-function setMicMessage(message) {
-  if (micStatus.textContent !== message) micStatus.textContent = message;
-  delete micStatus.dataset.state;
-  micStatus.hidden = !message;
-}
-
-function showMicInput(state, level) {
-  const hint = audioHints[state];
-  if (micStatus.textContent !== hint) micStatus.textContent = hint;
-  micStatus.dataset.state = state;
-  micLevel.value = level;
-}
-
 function resetRound() {
   // Cancel the frame loop and release both devices before showing the menu.
-  requestId++;
   cancelAnimationFrame(animation);
-  stopCamera();
+  cameraSession.stop();
   combatInputs.reset();
   mobileControls.hidden = true;
   setMobileHud(false);
@@ -442,8 +169,7 @@ function resetRound() {
   burnStatus.hidden = shakenStatus.hidden = powerStock.hidden = true;
   cameraBonusStatus.hidden = true;
   visuals.clear();
-  cameraPosePreview.hidden = battleFeedback.hidden = auraStatus.hidden = true;
-  bossPanel.hidden = warningToggle.hidden = true;
+  setBattleHudVisible(false);
   tutorialPanel.hidden = true;
   arena.removeAttribute('data-tutorial');
   tutorialBadge.hidden = true;
@@ -459,19 +185,15 @@ function startRound(mode, learning, mobileMode = false) {
   setMobileHud(mobileMode);
   document.body.classList.toggle('mobile-play', mobileMode);
   const now = performance.now();
-  const pace = bossPace[mode];
-  const openingFlame = !learning && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
-  const firstStrike = openingFlame ? flameChargeTime + pace.flamePause : pace.firstLaser;
   round = {
-    mode, pace, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
-    strike: learning ? Infinity : now + firstStrike,
+    ...openingStrike(mode, learning, now),
+    mode, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
     cameraBonusEligible: mode === 'camera' && !learning,
-    powerCharges: 0, blockBonusUntil: 0, nextPower: now, lastAudioPoll: -Infinity, nextPosePoll: now, videoTime: -1,
-    keyboardGuard: false, shaken: false, attacksSinceShout: 0,
+    powerCharges: 0, blockBonusUntil: 0, nextPower: now,
+    keyboardGuard: false, shaken: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
-    warningStart: randomWarningStart(), strikeKind: openingFlame ? 'flame' : 'laser',
-    comboLaserAt: openingFlame ? undefined : Infinity, burnTickAt: Infinity,
+    warningStart: randomWarningStart(), burnTickAt: Infinity,
   };
   resetHud();
   updatePowerStock();
@@ -483,17 +205,15 @@ function startRound(mode, learning, mobileMode = false) {
   if (learning) showLesson(now);
   else {
     lockMarkers.hidden = lockStatus.hidden = false;
-    showBossLocks();
+    renderBossLocks(round.locks);
   }
   tutorialBadge.hidden = !learning;
   arena.dataset.state = 'ready';
-  overlay.hidden = true;
+  hideOverlay();
   showPose();
   showWarning('No attack incoming');
-  battleFeedback.hidden = auraStatus.hidden = false;
-  bossPanel.hidden = warningToggle.hidden = false;
-  tracking.hidden = mode !== 'camera';
-  if (mode === 'camera') cameraStatus('Waiting for tracking…', 'waiting');
+  setBattleHudVisible(true);
+  cameraSession.setTrackingVisible(mode === 'camera');
   exit.hidden = false;
   animation = requestAnimationFrame(tick);
   if (mobileMode) arena.scrollIntoView({ block: 'start' });
@@ -529,15 +249,15 @@ function showLesson(now) {
   }
   if (current.id === 'block' || current.id === 'power-lock') {
     round.warningStart = 0;
-    round.strike = now + warningDuration() + 1000;
+    round.strike = now + warningDuration(round) + 1000;
   }
-  if (round.strikeKind === 'flame') scheduleTutorialFlame(now, 1000);
+  if (round.strikeKind === 'flame') scheduleTutorialFlame(round, now, 1000, current.id === 'guard-break');
   lockMarkers.hidden = lockStatus.hidden = !current.lock;
   if (current.lock) {
     // Retain earlier tutorial gates so their markers stay open in the HUD.
     round.locks.push({ ...current.lock, done: 0, engaged: false });
     setHealth(enemy, current.startHp);
-    showBossLocks();
+    renderBossLocks(round.locks);
   }
 }
 
@@ -576,28 +296,7 @@ function endRound(won) {
   showOverlay(won ? 'City saved!' : 'Ranger down',
     won ? 'The Riftbeast has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
   if (won) {
-    const speedMax = 6000;
-    const healthMax = 4000;
-    const referenceSeconds = 60;
-    const timeBonus = Math.round(speedMax * referenceSeconds / (referenceSeconds + elapsed));
-    const healthBonus = Math.round(healthMax * Math.max(0, player.max - damage) / player.max);
-    const baseScore = timeBonus + healthBonus;
-    const cameraBonus = cameraBonusEligible ? Math.round(baseScore * cameraBonusPercent / 100) : 0;
-    const seconds = Math.floor(elapsed);
-    const points = value => value.toLocaleString();
-    byId('result-score').textContent = points(baseScore + cameraBonus);
-    byId('result-time').textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
-    byId('result-damage').textContent = damage + ' HP';
-    byId('result-speed-formula').textContent =
-      points(speedMax) + ' × ' + referenceSeconds + ' ÷ (' + referenceSeconds + ' + ' + points(elapsed) +
-      ') ≈ ' + points(timeBonus) + ' pts';
-    byId('result-health-formula').textContent =
-      points(healthMax) + ' × max(0, ' + player.max + ' − ' + damage + ') ÷ ' + player.max +
-      ' = ' + points(healthBonus) + ' pts';
-    byId('result-camera-bonus').hidden = !cameraBonusEligible;
-    byId('result-camera-formula').textContent =
-      points(baseScore) + ' × ' + cameraBonusPercent + '% ≈ +' + points(cameraBonus) + ' pts';
-    battleResult.hidden = false;
+    showBattleResult(elapsed, damage, player.max, cameraBonusEligible, cameraBonusPercent);
   }
   webcam.focus({ preventScroll: true });
 }
@@ -608,7 +307,7 @@ function canPowerCounter() {
 
 function updatePowerStock(charges = round.powerCharges) {
   round.powerCharges = charges;
-  powerStock.textContent = 'Powerwaves: ' + charges;
+  renderPowerStock(charges);
 }
 
 function bankPowerCounter(now, kind) {
@@ -621,47 +320,12 @@ function playerDamageScale(move) {
   return minimum + (1 - minimum) * enemy.value / enemy.max;
 }
 
-function flamePhase(now) {
-  if (round.strikeKind !== 'flame' || now >= round.strike) return;
-  const elapsed = now - (round.strike - flameChargeTime);
-  if (elapsed >= 0) return flamePhases.find(phase => elapsed < phase.until);
-}
-
-function scheduleNextStrike(now) {
-  round.comboLaserAt = Infinity;
-  if (isTutorial()) {
-    round.strike = Infinity;
-    return;
-  }
-  if (round.strikeKind === 'shout') {
-    round.strikeKind = round.afterShout;
-  } else {
-    round.strikeKind = round.strikeKind === 'laser' ? 'flame' : 'laser';
-    round.attacksSinceShout++;
-    const shoutEvery = enemy.value <= 40 ? 3 : 4;
-    if (round.attacksSinceShout >= shoutEvery) {
-      round.attacksSinceShout = 0;
-      if (!round.shaken) {
-        round.afterShout = round.strikeKind;
-        round.strikeKind = 'shout';
-        round.strike = now + shoutGap + shoutTell;
-        return;
-      }
-    }
-  }
-  round.warningStart = randomWarningStart();
-  const { fastLaser, slowLaser, flamePause } = round.pace;
-  const laserInterval = fastLaser + (slowLaser - fastLaser) * enemy.value / enemy.max;
-  round.strike = now + (round.strikeKind === 'flame' ? flameChargeTime + flamePause : Math.round(laserInterval));
-  if (round.strikeKind === 'flame') round.comboLaserAt = undefined;
-}
-
 function resolveShout(now) {
   const protectedByAura = readyAuraStage()?.level === 3;
   visuals.play('shout', now, protectedByAura);
   if (protectedByAura) {
     round.auraMs = auraStages[1].chargeMs;
-    showAura();
+    renderAura(readyAuraStage());
     round.strikeNotice = 'Gold Aura absorbed the shout';
   } else {
     round.shaken = true;
@@ -671,22 +335,7 @@ function resolveShout(now) {
     round.strikeNotice = 'Shaken · Heal to attack again';
   }
   round.strikeNoticeUntil = now + 1300;
-  scheduleNextStrike(now);
-}
-
-function scheduleTutorialFlame(now, pause) {
-  round.warningStart = 0;
-  round.strike = now + flameChargeTime + pause;
-  round.comboGuardBlocked = false;
-  round.comboLaserAt = lesson().id === 'guard-break' ? round.strike - comboLaserLeadTime : Infinity;
-}
-
-function updateFlameCombo(now) {
-  // Roll once as the charge begins, using the locks the player has already opened.
-  if (round.comboLaserAt !== undefined || now < round.strike - flameChargeTime) return;
-  const opened = round.locks.filter(lock => lock.done === lock.total).length;
-  round.comboLaserAt = Math.random() < round.pace.comboOdds[opened]
-    ? round.strike - comboLaserLeadTime : Infinity;
+  scheduleNextStrike(round, now, enemy.value, enemy.max);
 }
 
 function resolveComboLaser(now, guarded, cameraLeftHeld) {
@@ -709,19 +358,10 @@ function resolveComboLaser(now, guarded, cameraLeftHeld) {
 }
 
 function hitFlameCharge(move, now, stage) {
-  const phase = flamePhase(now);
-  if (!phase || phase.name === 'white') return '';
-  const drop = move === 'basic' ? 1 : move === 'beam' && stage > 0 ? stage + 1 : 0;
-  if (!drop) return '';
-  const priorIndex = flamePhases.indexOf(phase) - drop;
-  if (priorIndex >= 0) {
-    const priorStart = flamePhases[priorIndex - 1]?.until ?? 0;
-    round.strike = now + flameChargeTime - priorStart;
-    // Move a pending combo with the charge. A laser that fired stays spent.
-    if (round.comboLaserAt < Infinity) round.comboLaserAt = round.strike - comboLaserLeadTime;
-    return 'Fireball cooled to ' + flamePhases[priorIndex].name;
-  }
-  scheduleNextStrike(now);
+  const result = coolFlame(round, move, now, stage);
+  if (!result) return '';
+  if (!result.interrupted) return 'Fireball cooled to ' + result.cooledTo;
+  scheduleNextStrike(round, now, enemy.value, enemy.max);
   round.strikeNotice = 'Flamethrower interrupted!';
   round.strikeNoticeUntil = now + 1400;
   if (isTutorial() && lesson().id === 'flame') advanceLesson(now);
@@ -810,7 +450,7 @@ function applyAuraHeal(now) {
   round.burnTickAt = Infinity;
   burnStatus.hidden = true;
   round.auraMs = 0;
-  showAura();
+  renderAura(readyAuraStage());
   setHealth(player, player.value + restored);
   visuals.play('heal', now);
   return (wasShaken && !restored ? 'Shaken cleared' : 'Healed +' + restored + ' HP' + (wasShaken ? ' · Shaken cleared' : '')) +
@@ -832,7 +472,7 @@ function fireBeam(now) {
   round.auraMs = 0;
   round.humBlockedUntil = now + beamDuration + 200;
   round.beamFlash = { until: now + beamDuration, strength: stage.multiplier / 4, stage: stage.level };
-  showAura();
+  renderAura(readyAuraStage());
   const baseDamage = now < round.blockBonusUntil ? 8 : 6;
   const damage = Math.max(1, Math.round(baseDamage * playerDamageScale())) * stage.multiplier;
   const hit = damageBoss(damage, 'beam', now, stage.level);
@@ -848,16 +488,6 @@ function fireBeam(now) {
   }
 }
 
-function showAura() {
-  const ready = readyAuraStage();
-  const index = ready?.level ?? 0;
-  arena.dataset.auraStage = mobileControls.dataset.auraStage = String(index);
-  const caption = ready ? 'Aura ' + index + ' · ' + ready.multiplier + '×' : 'Aura · charge to 1';
-  const buttonCaption = ready ? 'Stage ' + index + ' · ' + ready.multiplier + '×' : 'Hold to charge';
-  if (auraCaption.textContent !== caption) auraCaption.textContent = caption;
-  if (auraButtonCaption.textContent !== buttonCaption) auraButtonCaption.textContent = buttonCaption;
-}
-
 function updateAura(now, chargeMs) {
   const current = isTutorial() ? lesson().id : null;
   if (chargeMs > 0 && (!current || current === 'hum' || current === 'heal' || current === 'beam' ||
@@ -865,7 +495,7 @@ function updateAura(now, chargeMs) {
     round.auraMs = Math.min(auraCapacity, round.auraMs + chargeMs);
     if (current === 'hum' && readyAuraStage()) advanceLesson(now);
   }
-  showAura();
+  renderAura(readyAuraStage());
 }
 
 function drawBattle(now, guard, flash = null, flame = null, inhale = null) {
@@ -886,7 +516,7 @@ function resolveRegularStrike(now, guard, cameraGuard) {
   const guardDrill = isTutorial() && lesson().id === 'guard-break';
   const guardDrillDone = guardDrill && guard && round.comboGuardBlocked;
   visuals.play(kind, now, guard);
-  scheduleNextStrike(now);
+  scheduleNextStrike(round, now, enemy.value, enemy.max);
   round.strikeNotice = 'Strike finished';
   if (guard) {
     bankPowerCounter(now, kind);
@@ -909,13 +539,13 @@ function resolveRegularStrike(now, guard, cameraGuard) {
     advanceLesson(now);
     round.strikeNotice = 'Both attacks blocked!';
   } else if (guardDrill) {
-    scheduleTutorialFlame(now, 1300);
+    scheduleTutorialFlame(round, now, 1300, guardDrill);
     round.strikeNotice = 'Block both attacks · try again';
   } else if (isTutorial() && kind === 'flame') {
-    scheduleTutorialFlame(now, 1300);
+    scheduleTutorialFlame(round, now, 1300, guardDrill);
   } else if (isTutorial() && !guard) {
     round.warningStart = 0;
-    round.strike = now + warningDuration() + 1300;
+    round.strike = now + warningDuration(round) + 1300;
   }
   round.strikeNoticeUntil = now + 1000;
 }
@@ -932,20 +562,10 @@ function tick(now) {
   }
   const delta = Math.min(70, now - round.lastTick);
   round.lastTick = now;
-  if (tracker && camera.readyState >= 2 && now >= round.nextPosePoll && camera.currentTime !== round.videoTime) {
-    round.videoTime = camera.currentTime;
-    round.nextPosePoll = now + 55;
-    let pose;
-    try {
-      pose = tracker.detectForVideo(camera, now).landmarks[0];
-    } catch {
-      stopCamera();
-      forfeitCameraBonus('Camera tracking stopped');
-      round.mode = 'keyboard';
-      device.textContent = 'Tracking stopped. You can finish with the keyboard.';
-    }
+  const poseFrame = cameraSession.readPose(now);
+  if (poseFrame) {
+    const { points: pose } = poseFrame;
     const move = round.readGesture(pose, now);
-    drawTracking(pose);
     round.lastPose = now;
     round.cameraMove = move;
     if (!move.left && move.state !== 'framing') round.cameraGuardBroken = false;
@@ -955,16 +575,12 @@ function tick(now) {
   }
 
   let micCharge = 0;
-  if (audioInput && now - round.lastAudioPoll >= 20) {
-    const audioElapsed = now - round.lastAudioPoll;
-    round.lastAudioPoll = now;
-    const suppressHum = now < (round.humBlockedUntil ?? 0);
-    const { clap, humming, level, state } = audioInput(now, suppressHum);
-    showMicInput(state, level);
-    // Charge for the sampled interval so slower animation frames do not slow the mic down.
-    if (humming && round.micHumming) micCharge = Math.min(audioElapsed, 350) * micAuraChargeRate;
-    round.micHumming = humming;
-    if (clap) fireBeam(now);
+  const audio = cameraSession.readAudio(now, now < (round.humBlockedUntil ?? 0));
+  if (audio) {
+    // Use the sampled interval so a slow render frame does not slow the mic down.
+    if (audio.humming && round.micHumming) micCharge = Math.min(audio.elapsed, 350) * micAuraChargeRate;
+    round.micHumming = audio.humming;
+    if (audio.clap) fireBeam(now);
   }
   if (round.finished) {
     animation = requestAnimationFrame(tick);
@@ -986,7 +602,7 @@ function tick(now) {
   const cameraMove = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
   const cameraGuard = cameraMove?.guard && !round.cameraGuardBroken;
   let guard = (round.keyboardGuard && !round.keyboardGuardBroken) || cameraGuard;
-  updateFlameCombo(now);
+  updateFlameCombo(round, now);
   if (now >= round.comboLaserAt) {
     resolveComboLaser(now, guard, Boolean(cameraMove?.left));
     guard = false;
@@ -1002,16 +618,7 @@ function tick(now) {
 
   if (round.mode === 'camera') updateCameraStatus(now);
   const cameraPose = cameraMove?.state;
-  const untilStrike = round.strike - now;
-  const leadTime = warningDuration();
-  const danger = untilStrike <= leadTime;
-  const warningElapsed = leadTime - untilStrike;
-  const flame = flamePhase(now);
-  const shouting = round.strikeKind === 'shout';
-  const eyeElapsed = eyeWarningDuration() - ((flame ? round.comboLaserAt : round.strike) - now);
-  const eyeWarning = !shouting && eyeElapsed >= 0;
-  const flashIndex = round.warningStart + Math.floor(eyeElapsed / battleTiming.warningStep);
-  const flash = eyeWarning && eyeElapsed % battleTiming.warningStep < 235 ? warningColors[flashIndex] : null;
+  const { danger, flame, shouting, eyeWarning, flash, inhale } = attackTell(round, now);
   const guardBroken = round.keyboardGuardBroken || (round.mode === 'camera' && round.cameraGuardBroken);
   const used = round.poseFeedback;
   const recentAction = used && now < used.until;
@@ -1031,7 +638,7 @@ function tick(now) {
   else showPose();
   arena.dataset.state = danger ? 'danger' : now < round.hitUntil ? 'hit' : 'ready';
   const bossLabel = shouting && danger ? 'Shockwave shout' : flame ? eyeWarning ? 'Flame + eye lasers' : 'Flamethrower' : 'Boss warning';
-  if (bossPanelLabel.textContent !== bossLabel) bossPanelLabel.textContent = bossLabel;
+  renderBossLabel(bossLabel);
   if (flame) {
     const incomingHint = eyeWarning ? 'Guard the eye lasers first.' :
       guardBroken ? 'Release, then guard again.' :
@@ -1044,93 +651,26 @@ function tick(now) {
   else if (danger) showWarning('Incoming eye lasers', true);
   else if (now < round.strikeNoticeUntil) showWarning(round.strikeNotice);
   else showWarning('No attack incoming');
-  drawBattle(now, guard, flash, flame && {
-    color: flame.color, halo: flame.halo, charge: warningElapsed / leadTime,
-  }, shouting && danger && warningElapsed < shoutInhale ? warningElapsed / shoutInhale : null);
+  drawBattle(now, guard, flash, flame, inhale);
   animation = requestAnimationFrame(tick);
 }
 
-webcam.addEventListener('click', async () => {
-  const request = ++requestId;
-  const learning = tutorialSelected;
-  webcam.disabled = tutorialButton.disabled = true;
-  webcam.textContent = 'Starting camera…';
-  exit.hidden = false;
-  const automaticMic = beginCameraMic();
-  let micFallback = !automaticMic;
-  device.textContent = automaticMic ? 'Allow camera and microphone access when your browser asks.' :
-    'Allow camera access when your browser asks.';
-  try {
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: videoInputOptions, audio: automaticMic ? audioInputOptions : false,
-      });
-    } catch (error) {
-      if (!automaticMic || request !== requestId) throw error;
-      cancelCameraMic();
-      micFallback = true;
-      stream = await navigator.mediaDevices.getUserMedia({ video: videoInputOptions });
-    }
-    if (request !== requestId) return stopTracks(stream);
-    // Separate tracks so turning off the mic cannot stop the webcam preview.
-    const audioTracks = stream.getAudioTracks();
-    if (automaticMic && pendingCameraMic === automaticMic && audioTracks.length) {
-      automaticMic.stream = new MediaStream(audioTracks);
-    } else {
-      audioTracks.forEach(track => track.stop());
-    }
-    const videoStream = new MediaStream(stream.getVideoTracks());
-    cameraStream = videoStream;
-    camera.srcObject = videoStream;
-    await camera.play();
-    if (request !== requestId) return;
-    cameraFrame.hidden = false;
-    device.textContent = 'Loading the pose model…';
-    const model = await loadTracker();
-    if (request !== requestId) return model.close();
-    tracker = model;
-    videoStream.getVideoTracks()[0].addEventListener('ended', () => {
-      if (cameraStream !== videoStream) return;
-      stopCamera();
-      forfeitCameraBonus('Camera disconnected');
-      if (round) round.mode = 'keyboard';
-      device.textContent = 'Camera disconnected. Keyboard controls are available.';
-    });
-    startRound('camera', learning);
-    device.textContent = 'Camera active. ' + defaultStatus;
-    if (micFallback) setMicMessage(micUnavailable);
-    if (pendingCameraMic && pendingCameraMic === automaticMic) {
-      void automaticMic.ready.then(ready => {
-        if (pendingCameraMic !== automaticMic) return;
-        try {
-          if (!ready || !automaticMic.stream) throw new Error('Microphone setup incomplete');
-          activateMic(automaticMic.stream, automaticMic.audioContext);
-          pendingCameraMic = null;
-          device.textContent = 'Camera and microphone active. ' + defaultStatus;
-        } catch {
-          cancelCameraMic();
-          setMicMessage(micUnavailable);
-        }
-      });
-    }
-  } catch (error) {
-    if (request !== requestId) return;
-    stopCamera();
-    webcam.disabled = tutorialButton.disabled = false;
-    webcam.textContent = 'Retry camera + mic';
-    exit.hidden = true;
-    const cameraError = error.name === 'NotAllowedError' || error.name === 'NotFoundError' ||
-      error.name === 'NotReadableError' || !navigator.mediaDevices;
-    device.textContent = cameraError
-      ? 'Camera unavailable. Check browser permissions, or play with the keyboard.'
-      : 'Could not start camera tracking. Check your connection, or play with the keyboard.';
-  }
+const cameraSession = createCameraSession({
+  onReady: learning => startRound('camera', learning),
+  onLost(reason, message) {
+    forfeitCameraBonus(reason);
+    if (round) round.mode = 'keyboard';
+    device.textContent = message;
+  },
+  onMicStopped() {
+    if (round) round.micHumming = false;
+  },
 });
 
+webcam.addEventListener('click', () => void cameraSession.start(tutorialSelected));
+
 function startManual(mobileMode) {
-  requestId++;
-  stopCamera();
+  cameraSession.stop();
   updateStartButtons();
   device.textContent = mobileMode ? 'Hold Block to guard and Aura to charge. Tap the other moves.' : defaultStatus;
   startRound('keyboard', tutorialSelected, mobileMode);

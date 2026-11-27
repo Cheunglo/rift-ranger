@@ -39,11 +39,13 @@ Choose **Start Tutorial**, then start with camera or keyboard. Complete each pro
 ## Reading the code
 
 - `index.html` defines the HUD, controls, and canvases. `style.css` lays them out and keeps the arena fixed during play.
-- `game.mjs` owns the round and ties input, damage, healing, score, and display together. Start with `startRound()` and `tick()`.
+- `game.mjs` owns the round and resolves combat. Start with `startRound()` and `tick()`.
+- `boss-attacks.mjs` owns the Riftbeast’s move slots, attack timing, and flame charge rules. `boss-locks.mjs` owns the shuffled health gates.
+- `battle-hud.mjs` renders warnings, health, Aura, locks, and the score.
+- `camera-session.mjs` handles permissions, starts and stops streams, and samples the camera and mic.
 - `mobile-controls.mjs` handles simultaneous touch and keyboard inputs, including cancellation and focus loss. Run its checks with `node --test tests/mobile-controls.test.mjs`.
 - `controls.mjs` turns camera landmarks and microphone samples into pose, hum, and clap events.
-- `boss-locks.mjs` owns the shuffled health gates and their persistent progress.
-- `beast.mjs` draws the boss sprite. `combat-art.mjs` animates the ranger, shield, beams, and ripples. `poses.svg` provides the small pose icons.
+- `beast.mjs` draws the boss sprite and defines its effect attachment points. `combat-art.mjs` composes the scene and player effects. `boss-effects.mjs` draws attacks using the boss’s eye and mouth anchors. `poses.svg` provides the small pose icons.
 
 ## Publish on GitHub Pages
 

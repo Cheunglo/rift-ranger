@@ -1,12 +1,14 @@
+import { bossEffectDurations, createBossEffects } from './boss-effects.mjs?v=58';
+
 // Canvas coordinates are CSS pixels. The boss anchors follow its existing sprite.
-export function combatArt(canvas, beast, reducedMotion) {
+export function combatArt(canvas, beast, reducedMotion, anchors) {
   const ctx = canvas.getContext('2d');
   const effects = [];
   let leftLift = 0;
   let rightLift = 0;
   let kneel = 0;
   let previousTime;
-  const duration = { basic: 480, power: 780, heal: 850, laser: 360, flame: 650, shout: 540, 'guard-break': 460 };
+  const duration = { basic: 480, power: 780, heal: 850, ...bossEffectDurations };
   const auraColors = ['#b7adc8', '#68dfff', '#ce8cff', '#ffe477'];
   const eyeColors = { green: '#69ff77', yellow: '#ffe663', red: '#ff243c' };
   const mix = (from, to, amount) => from + (to - from) * amount;
@@ -28,6 +30,8 @@ export function combatArt(canvas, beast, reducedMotion) {
     points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
     ctx.stroke();
   }
+
+  const bossEffects = createBossEffects(ctx, reducedMotion, { line, polygon, mix });
 
   function arm(side, lift) {
     // Side is -1 for the player's left and +1 for right on the rear-facing ranger.
@@ -153,47 +157,6 @@ export function combatArt(canvas, beast, reducedMotion) {
     line([origin, target], '#fff9f1', width * .28);
   }
 
-  function inhaleAir(scene, progress) {
-    const [x, y] = scene.mouth;
-    const reach = Math.max(38, scene.boss.width * .52);
-    const still = reducedMotion.matches;
-    ctx.fillStyle = '#161326';
-    ctx.beginPath();
-    ctx.ellipse(x, y, 8 + progress * 5, 3 + progress * 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    for (let i = 0; i < 12; i++) {
-      const angle = Math.PI * 2 * i / 12;
-      const travel = still ? .4 : (progress * 1.6 + i * .137) % 1;
-      const radius = 14 + reach * (1 - travel);
-      const dx = Math.cos(angle);
-      const dy = Math.sin(angle) * .68;
-      line([[x + dx * radius, y + dy * radius], [x + dx * (radius + 13), y + dy * (radius + 13)]], '#c1f2ffb8', 2);
-    }
-  }
-
-  function shoutWave(scene, elapsed, absorbed) {
-    const [x, y] = scene.mouth;
-    const progress = reducedMotion.matches ? .7 : Math.min(1, elapsed / 420);
-    const radius = 20 + progress * Math.hypot(scene.width * .55, scene.floor - y);
-    ctx.strokeStyle = '#d6f7ff';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, -.15, Math.PI + .15);
-    ctx.stroke();
-    ctx.strokeStyle = '#72c6ee90';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(x, y, Math.max(5, radius - 12), -.15, Math.PI + .15);
-    ctx.stroke();
-    if (absorbed && progress >= .5) {
-      ctx.strokeStyle = '#ffe477';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.ellipse(scene.x, scene.floor - 42 * scene.scale, 40 * scene.scale, 51 * scene.scale, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  }
-
   function heal(scene, elapsed) {
     const still = reducedMotion.matches;
     const buildup = still ? 1 : Math.min(1, elapsed / 180);
@@ -284,80 +247,6 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.restore();
   }
 
-  function lasers(scene, blocked) {
-    const endY = blocked ? scene.boss.y + scene.boss.height : scene.floor - 62 * scene.scale;
-    scene.eyes.forEach(([x, y], i) => {
-      const endX = scene.x + (i ? 1 : -1) * (blocked ? scene.boss.width * .20 : 8);
-      line([[x, y], [endX, endY]], '#ff204e8e', 14);
-      line([[x, y], [endX, endY]], '#ff3559', 7);
-      line([[x, y], [endX, endY]], '#fff0eb', 2);
-    });
-  }
-
-  function fireball(scene, flame) {
-    const [x, y] = scene.mouth;
-    const radius = mix(6, 22, flame.charge) * scene.scale;
-    const glow = ctx.createRadialGradient(x, y, radius * .2, x, y, radius * 2.3);
-    glow.addColorStop(0, flame.color);
-    glow.addColorStop(.4, (flame.halo ?? flame.color) + 'd0');
-    glow.addColorStop(1, (flame.halo ?? flame.color) + '00');
-    ctx.fillStyle = glow;
-    ctx.fillRect(x - radius * 2.3, y - radius * 2.3, radius * 4.6, radius * 4.6);
-    ctx.fillStyle = flame.color;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function shatteredShield(scene, elapsed) {
-    const progress = reducedMotion.matches ? .35 : elapsed / duration['guard-break'];
-    const { x, y, width, height } = scene.boss;
-    const center = x + width / 2;
-    const impactY = y + height * .82;
-    // Fragments scatter from the lower edge where the eye lasers hit the shield.
-    for (let i = 0; i < 12; i++) {
-      const offset = (i % 6 - 2.5) / 2.5;
-      const shardX = center + offset * width * (.32 + progress * .42);
-      const shardY = impactY - (i % 2) * height * .34 + progress * (i * 11 % 60 - 18);
-      const size = (5 + i % 4 * 2) * scene.scale;
-      polygon(i % 2 ? '#89ebff' : '#defaff', [[shardX - size,shardY - size],
-        [shardX + size,shardY - size * .4],[shardX - size * .3,shardY + size * 1.5]]);
-    }
-  }
-
-  function flamethrower(scene, elapsed, blocked) {
-    const [x, y] = scene.mouth;
-    const endY = blocked ? scene.boss.y + scene.boss.height : scene.floor - 30 * scene.scale;
-    const still = reducedMotion.matches;
-    const reach = still ? 1 : Math.min(1, elapsed / 130);
-    const length = Math.max(12, endY - y) * reach;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(scene.scale, 1);
-    // The jet fans out from the mouth. Its bright center stays attached to the sprite.
-    for (const side of [-1, 1]) {
-      const sway = still ? 0 : Math.sin(elapsed / 42 + side) * 9;
-      polygon('#ff5729b0', [[0,0],[side * 11,length * .19],[side * (24 + sway),length * .39],
-        [side * 19,length * .34],[side * 42,length * .65],[side * 34,length * .62],
-        [side * (60 + sway),length],[side * 17,length * .82],[0,length]]);
-      polygon('#ffbb32ed', [[0,0],[side * 8,length * .28],[side * 22,length * .51],
-        [side * 16,length * .44],[side * (37 + sway),length * .9],[side * 12,length * .68],[0,length * .98]]);
-    }
-    polygon('#fff4c3', [[-5,0],[5,0],[13,length * .42],[0,length * .73],[-14,length * .44]]);
-    polygon('#80c9ff', [[-10,0],[10,0],[0,length * .28]]);
-    if (!still) {
-      for (let i = 0; i < 14; i++) {
-        const drift = ((elapsed + i * 31) % 230) / 230;
-        const side = i % 2 ? 1 : -1;
-        const sparkX = side * (10 + (i * 17) % 55) * drift;
-        const sparkY = length * drift;
-        ctx.fillStyle = i % 3 ? '#ff853e' : '#fff4ae';
-        ctx.fillRect(sparkX, sparkY, 2 + i % 3, 3);
-      }
-    }
-    ctx.restore();
-  }
-
   return {
     play(kind, now, strength) {
       effects.push({ kind, now, strength });
@@ -383,12 +272,12 @@ export function combatArt(canvas, beast, reducedMotion) {
       ctx.clearRect(0, 0, rect.width, rect.height);
       const bounds = beast.getBoundingClientRect();
       const boss = { x: bounds.left - rect.left, y: bounds.top - rect.top, width: bounds.width, height: bounds.height };
-      const point = (x, y) => [boss.x + x / 40 * boss.width, boss.y + y / 36 * boss.height];
-      const [targetX, targetY] = point(20, 20);
+      const point = ([x, y]) => [boss.x + x * boss.width, boss.y + y * boss.height];
+      const [targetX, targetY] = point(anchors.target);
       const scene = {
         width: rect.width, x: rect.width * .5, floor: rect.height * .95,
         scale: Math.min(1.3, rect.width / 500, rect.height / 420),
-        boss, eyes: [point(13, 15.6), point(27, 15.6)], mouth: point(20, 23), target: { x: targetX, y: targetY },
+        boss, eyes: anchors.eyes.map(point), mouth: point(anchors.mouth), target: { x: targetX, y: targetY },
       };
       const delta = previousTime === undefined ? 16 : now - previousTime;
       previousTime = now;
@@ -410,8 +299,8 @@ export function combatArt(canvas, beast, reducedMotion) {
       const active = effects.filter(effect => now - effect.now < duration[effect.kind]);
       effects.splice(0, effects.length, ...active);
       if (guard || active.some(effect => (effect.kind === 'laser' || effect.kind === 'flame') && effect.strength)) shield(boss);
-      if (flame) fireball(scene, flame);
-      if (inhale !== null) inhaleAir(scene, inhale);
+      if (flame) bossEffects.fireball(scene, flame);
+      if (inhale !== null) bossEffects.inhaleAir(scene, inhale);
       if (beamStrength > 0) beam(scene, beamStrength, beamStage);
       for (const effect of active) {
         const elapsed = now - effect.now;
@@ -419,13 +308,7 @@ export function combatArt(canvas, beast, reducedMotion) {
         if (effect.kind === 'basic') slash(scene, elapsed);
         else if (effect.kind === 'power') ripples(scene, elapsed);
         else if (effect.kind === 'heal') heal(scene, elapsed);
-        else if (effect.kind === 'shout') shoutWave(scene, elapsed, effect.strength);
-        else if (effect.kind === 'flame') flamethrower(scene, elapsed, effect.strength);
-        else if (effect.kind === 'guard-break') {
-          if (elapsed < duration.laser) lasers(scene, true);
-          shatteredShield(scene, elapsed);
-        }
-        else lasers(scene, effect.strength);
+        else bossEffects.drawEffect(scene, elapsed, effect);
       }
       ctx.globalAlpha = 1;
       if (burning) burningRanger(scene, now);
