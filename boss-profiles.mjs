@@ -4,13 +4,14 @@ export const bossProfiles = {
   T: { summary: '30% shorter healing intervals · 25% weaker hits', healInterval: .7, damage: .75 },
   B: { summary: 'Extra lock at 65 HP · longer gaps between attacks', gap: 650, extraLock: { hp: 65, total: 2 } },
   H: {
-    summary: 'Shorter gap before Regulars · longer gap before Specials',
-    before: { regular: -350, special: 450 },
+    summary: 'Shorter gap before Status · 20% weaker Specials',
+    before: { status: -250 },
+    slotDamage: { special: .8 },
   },
   D: { summary: '85 HP · shorter gaps between attacks', maxHp: 85, gap: -450 },
-  S: { summary: '25% harder hits · 35% longer healing intervals', damage: 1.25, healInterval: 1.35 },
-  G: { summary: '120 HP · 15% weaker hits', maxHp: 120, damage: .85 },
-  W: { summary: '35% harder Specials · longer recovery after Specials', specialDamage: 1.35, after: { special: 650 } },
+  S: { summary: '25% harder Regulars · 35% longer healing intervals', slotDamage: { regular: 1.25 }, healInterval: 1.35 },
+  G: { summary: '150 HP · two locks', maxHp: 150, lockThresholds: [40, 10] },
+  W: { summary: '35% harder Specials · longer recovery after Specials', slotDamage: { special: 1.35 }, after: { special: 650 } },
   O: { summary: 'Shorter recovery after Specials · longer after Regulars', after: { special: -550, regular: 450 } },
 };
 
@@ -19,6 +20,5 @@ export function attackGapOffset(profile, previousSlot, nextSlot) {
 }
 
 export function attackDamage(profile, damage, slot) {
-  const special = slot === 'special' ? profile.specialDamage ?? 1 : 1;
-  return Math.round(damage * (profile.damage ?? 1) * special);
+  return Math.round(damage * (profile.damage ?? 1) * (profile.slotDamage?.[slot] ?? 1));
 }

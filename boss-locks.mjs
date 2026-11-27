@@ -21,10 +21,11 @@ export function createBossLocks(random = Math.random) {
   return bossLocksForOrder(shuffle(Object.keys(lockMoves), random));
 }
 
-export function bossLocksForOrder(moves, extraLock) {
+export function bossLocksForOrder(moves, { extraLock, lockThresholds = baseLockThresholds } = {}) {
   const offset = extraLock ? 1 : 0;
-  const locks = baseLockThresholds.map((hp, i) => ({
-    hp, move: moves[i + offset], total: (i + 1) * 2, done: 0, engaged: false,
+  const locks = lockThresholds.map((hp, i) => ({
+    // A skipped lock does not change the later gate's normal requirement.
+    hp, move: moves[i + offset], total: (baseLockThresholds.indexOf(hp) + 1) * 2, done: 0, engaged: false,
   }));
   if (extraLock) locks.unshift({ ...extraLock, move: moves[0], done: 0, engaged: false });
   return locks;

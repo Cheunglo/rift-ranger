@@ -115,10 +115,16 @@ test('each new body is selectable and paints a distinct sprite', { timeout: 3500
     await page.locator('#boss-choice').selectOption(code);
     await page.locator('#mobile').click();
     assert.equal(await page.locator('#boss-name').textContent(), name);
-    const maxHp = code === 'D' ? '85' : code === 'G' ? '120' : '100';
+    const maxHp = code === 'D' ? '85' : code === 'G' ? '150' : '100';
     assert.equal(await page.locator('#enemy').getAttribute('max'), maxHp);
     assert.equal(await page.locator('#enemy').getAttribute('value'), maxHp);
-    assert.match(await page.locator('#current-fight-id').inputValue(), new RegExp('^RR1-' + code + '-LFS-'));
+    const lockCount = code === 'G' ? 2 : 3;
+    assert.match(await page.locator('#current-fight-id').inputValue(), new RegExp('^RR1-' + code + '-LFS-[SPL]{' + lockCount + '}$'));
+    assert.equal(await page.locator('#lock-markers .lock-marker').count(), lockCount);
+    if (code === 'G') {
+      assert.equal(await page.locator('#lock-20').count(), 0);
+      assert.equal(await page.locator('#lock-10').count(), 1);
+    }
     const sprite = await page.locator('#beast').evaluate(canvas => {
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       return pixels.some((value, i) => i % 4 === 3 && value > 0) ? canvas.toDataURL() : '';

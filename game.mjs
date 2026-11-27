@@ -5,18 +5,18 @@ import {
   lockStatus, mobileControls, powerStock, renderAura, renderBossLabel,
   renderBossLocks, renderBossName, renderPose, renderPowerStock, renderHealth, resetHud, setBattleHudVisible,
   setMobileHud, shakenStatus, showBattleResult, showBattleWarning, showOverlay,
-} from './battle-hud.mjs?v=63';
+} from './battle-hud.mjs?v=64';
 import {
   attackTell, coolFlame, moveSlot, openingStrike, randomWarningStart, scheduleNextStrike,
   scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
-} from './boss-attacks.mjs?v=63';
+} from './boss-attacks.mjs?v=64';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
 import { lessons } from './tutorial.mjs?v=61';
 import { paintBoss } from './boss-bodies.mjs?v=63';
-import { parseFightId } from './boss-fights.mjs?v=63';
-import { attackDamage } from './boss-profiles.mjs?v=63';
-import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=63';
-import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=63';
+import { parseFightId } from './boss-fights.mjs?v=64';
+import { attackDamage } from './boss-profiles.mjs?v=64';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=64';
+import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { combatArt } from './combat-art.mjs?v=62';
 import { gestures } from './controls.mjs?v=57';
 
@@ -211,7 +211,7 @@ function startRound(mode, learning, mobileMode = false, fight = defaultFight) {
     powerCharges: 0, blockBonusUntil: 0, nextPower: now,
     keyboardGuard: false, shaken: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
-    locks: learning ? [] : bossLocksForOrder(fight.lockOrder, fight.profile.extraLock), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
+    locks: learning ? [] : bossLocksForOrder(fight.lockOrder, fight.profile), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(), burnTickAt: Infinity,
   };
   paintBoss(bossCanvas, fight.body);

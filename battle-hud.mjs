@@ -1,5 +1,5 @@
 // Paints DOM battle state. The game decides when that state changes.
-import { baseLockThresholds, lockRequirement, nextBossLock } from './boss-locks.mjs?v=63';
+import { baseLockThresholds, lockRequirement, nextBossLock } from './boss-locks.mjs?v=64';
 
 export const byId = id => document.getElementById(id);
 export const arena = byId('arena');

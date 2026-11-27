@@ -1,4 +1,4 @@
-import { attackGapOffset, bossProfiles } from './boss-profiles.mjs?v=63';
+import { attackGapOffset, bossProfiles } from './boss-profiles.mjs?v=64';
 
 // Owns boss attack timing, tells, and charge changes. The round applies hits and effects.
 const warningStep = 1000;

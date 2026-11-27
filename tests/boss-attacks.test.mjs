@@ -53,7 +53,30 @@ test('attack pace changes the gap while preserving the full flamethrower tell', 
 test('damage modifiers apply to the intended bodies and slots', () => {
   assert.equal(attackDamage(bossProfiles.T, 19, 'regular'), 14);
   assert.equal(attackDamage(bossProfiles.S, 19, 'regular'), 24);
+  assert.equal(attackDamage(bossProfiles.S, 10, 'special'), 10);
+  assert.equal(attackDamage(bossProfiles.H, 19, 'regular'), 19);
+  assert.equal(attackDamage(bossProfiles.H, 10, 'special'), 8);
+  assert.equal(attackDamage(bossProfiles.G, 19, 'regular'), 19);
   assert.equal(attackDamage(bossProfiles.W, 19, 'regular'), 19);
   assert.equal(attackDamage(bossProfiles.W, 10, 'special'), 14);
   assert.equal(attackDamage(bossProfiles.W, 0, 'status'), 0);
+});
+
+test('Duelist shortens the pause before a Status while Owl shortens recovery from a Special', () => {
+  for (const [body, laserToShout, flameToLaser] of [['H', 1120, 6600], ['O', 1820, 6050]]) {
+    const makeRound = () => ({
+      ...openingStrike('camera', false, 0, riftbeastMoves, bossProfiles[body]), lessonIndex: null,
+    });
+    const status = makeRound();
+    status.turnsSinceStatus = 2;
+    scheduleNextStrike(status, 10000, 40, 100);
+    assert.equal(status.strikeKind, 'shout');
+    assert.equal(status.strike - 10000, laserToShout);
+    assert.equal(warningDuration(status), 920);
+    const afterFlame = makeRound();
+    afterFlame.strikeKind = 'flame';
+    scheduleNextStrike(afterFlame, 10000, 100, 100);
+    assert.equal(afterFlame.strikeKind, 'laser');
+    assert.equal(afterFlame.strike - 10000, flameToLaser);
+  }
 });

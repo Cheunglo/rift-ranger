@@ -10,7 +10,7 @@ The Riftbeast shouts after four regular attacks above 40 HP, or three at 40 HP o
 
 Player lasers match the Aura they spend. Cyan, purple, and gold beams get progressively wider.
 
-The boss has locks at 40, 20, and 10 HP that require 2, 4, and 6 slashes, power waves, or laser credits respectively. Each run shuffles the required moves between those locks. Progress starts when you first reach each lock. The health display shows which move is needed and how many hits or credits are left. A Stage 1, 2, or 3 laser earns 1, 2, or 4 laser credits respectively. As the boss loses HP, its eye lasers come sooner and the player's attacks do less damage. An unblocked boss laser deals 19 HP at any boss health. Recovery begins sooner and restores HP more often when the boss is low. It can heal while a lock is active, but the lock keeps its progress. Opened locks stay open.
+The Riftbeast has locks at 40, 20, and 10 HP that require 2, 4, and 6 slashes, power waves, or laser credits respectively. Each run shuffles the required moves between those locks. Progress starts when you first reach each lock. The health display shows which move is needed and how many hits or credits are left. A Stage 1, 2, or 3 laser earns 1, 2, or 4 laser credits respectively. As the boss loses HP, its eye lasers come sooner and the player's attacks do less damage. An unblocked boss laser deals 19 HP at any boss health. Recovery begins sooner and restores HP more often when the boss is low. It can heal while a lock is active, but the lock keeps its progress. Opened locks stay open.
 
 Slash and aura beam damage scale down to a floor of 55% before rounding. Power waves taper more sharply and deal at most 9 damage at 20 boss HP or less. A slash or power counter that gets past the locks always deals at least 1 HP.
 
@@ -47,19 +47,19 @@ Copy the **Fight ID** below the battle and send it to a friend. They can paste i
 | `RR1` | Rift Ranger fight ID format, version 1. |
 | `T` | The body. The letters are `R` Riftbeast, `T` tree, `B` beetle, `H` human, `D` hound, `S` serpent, `G` slime, `W` whale, and `O` owl. |
 | `LFS` | Eye Lasers, Flame Breath, and Shout in the Regular, Special, and Status slots. |
-| `SPL` | Slash, Powerwave, and Laser locks in order from highest HP to lowest. Iron Beetle adds its 65 HP lock at the front. |
+| `SPL` | Slash, Powerwave, and Laser locks in order from highest HP to lowest. Iron Beetle adds its 65 HP lock at the front. Rift Slime skips the 20 HP lock. |
 
-The parser checks the body, move set, and lock count. Iron Beetle requires four letters, such as `RR1-B-LFS-PSPL`. Other bodies require three. The last three letters must contain one of each lock type.
+The parser checks the body, move set, and lock count. Iron Beetle requires four letters, such as `RR1-B-LFS-PSPL`. Rift Slime requires two distinct letters, such as `RR1-G-LFS-PL`. Other bodies require three distinct letters. Iron Beetle’s three standard locks must also be distinct.
 
 | Body | Starting balance |
 | --- | --- |
 | The Riftbeast | Baseline. |
 | Barkjaw | 30% shorter healing intervals and 25% weaker hits. |
 | Iron Beetle | An extra lock at 65 HP, with 650 ms longer gaps before attacks. |
-| The Duelist | 350 ms shorter gaps before Regulars and 450 ms longer gaps before Specials. |
+| The Duelist | 250 ms shorter gaps before Status moves and 20% weaker Specials. |
 | Rift Hound | 85 HP and gaps up to 450 ms shorter. |
-| Coilfang | 25% harder hits and 35% longer healing intervals. |
-| Rift Slime | 120 HP and 15% weaker hits. |
+| Coilfang | 25% harder Regular hits and 35% longer healing intervals. |
+| Rift Slime | 150 HP and two locks at 40 and 10 HP. |
 | Tidewhale | Specials hit 35% harder, followed by 650 ms extra recovery. |
 | Moon Owl | Up to 550 ms shorter recovery after Specials and 450 ms longer after Regulars. |
 
