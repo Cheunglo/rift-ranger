@@ -150,14 +150,15 @@ export function listen(context, stream) {
   analyser.connect(muted);
   muted.connect(context.destination);
   const samples = new Float32Array(analyser.fftSize);
-  const clapWindow = Math.round(context.sampleRate * .042);
+  const shotWindow = Math.round(context.sampleRate * .042);
   let calibrationUntil;
   let roomLevel = .001;
-  let previous = 0;
+  let previousRms = 0;
+  let burst;
   let soundSince = 0;
   let lastSound = -Infinity;
   let previousSampleHadSound = false;
-  let lastClap = -Infinity;
+  let lastShot = -Infinity;
   let wasHumming = false;
 
   return (now, suppressHum = false) => {
@@ -168,7 +169,7 @@ export function listen(context, stream) {
     let energy = 0;
     let recentEnergy = 0;
     let peak = 0;
-    const startRecent = samples.length - clapWindow;
+    const startRecent = samples.length - shotWindow;
     for (let i = 0; i < samples.length; i++) {
       const sample = samples[i];
       sum += sample;
@@ -180,23 +181,43 @@ export function listen(context, stream) {
     }
     const average = sum / samples.length;
     const rms = Math.sqrt(Math.max(0, energy / samples.length - average ** 2));
-    const recentRms = Math.sqrt(recentEnergy / clapWindow);
-    // A clap is a sudden peak in the most recent audio, not a sustained note.
-    const clap = !calibrating && recentRms > Math.max(.013, roomLevel * 3.5, previous * 2.2) &&
-      peak > Math.max(.09, recentRms * 3.1);
-    previous = recentRms;
-    if (clap) lastClap = now;
-    const afterClap = now - lastClap < 110;
+    const recentRms = Math.sqrt(recentEnergy / shotWindow);
+    let fireLaser = false;
+    if (calibrating || suppressHum || now - lastShot < 220) {
+      burst = undefined;
+    } else if (recentRms > Math.max(.013, roomLevel * 3.5, previousRms * 2.2) &&
+               peak > Math.max(.09, recentRms * 3.1)) {
+      // A clap or snap has a narrow peak and can fire immediately.
+      fireLaser = true;
+    } else if (burst) {
+      if (now - burst.startedAt > 240) {
+        // A loud note that carries on is charge input.
+        burst = undefined;
+      } else if (recentRms < burst.loudest * .35) {
+        // A sharp shout can be less peaky. Wait for it to fall away first.
+        fireLaser = true;
+      } else {
+        burst.loudest = Math.max(recentRms, burst.loudest);
+      }
+    } else if (recentRms > Math.max(.022, roomLevel * 4.5, previousRms * 2.8)) {
+      burst = { startedAt: now, loudest: recentRms };
+    }
+    previousRms = recentRms;
+    if (fireLaser) {
+      lastShot = now;
+      burst = undefined;
+    }
+    const afterShot = now - lastShot < 110;
     const level = Math.max(0, Math.min(100, Math.round((20 * Math.log10(rms) + 65) * 2)));
 
-    // Do not learn the clap or a hum held through the beam as background noise.
-    if (calibrating || suppressHum || afterClap) {
+    // Do not learn the firing cue or sound held through the beam as background noise.
+    if (calibrating || suppressHum || afterShot) {
       if (calibrating) roomLevel += (Math.min(rms, .05) - roomLevel) * .2;
       lastSound = -Infinity;
       previousSampleHadSound = false;
       wasHumming = false;
       const state = calibrating ? 'calibrating' : suppressHum ? 'beam' : 'sound';
-      return { clap, humming: false, level, state };
+      return { fireLaser, humming: false, level, state };
     }
 
     // Charge from sustained sound above the calibrated room level. Once active,
@@ -215,7 +236,8 @@ export function listen(context, stream) {
     }
 
     previousSampleHadSound = sound;
-    const state = wasHumming ? 'humming' : sound ? 'sustaining' : level > 6 ? 'sound' : 'quiet';
-    return { clap, humming: wasHumming, level, state };
+    const humming = wasHumming && !burst;
+    const state = humming ? 'humming' : sound ? 'sustaining' : level > 6 ? 'sound' : 'quiet';
+    return { fireLaser, humming, level, state };
   };
 }

@@ -1,5 +1,5 @@
 // Owns the round and connects input, attack rules, and presentation.
-import { createCameraSession, defaultStatus } from './camera-session.mjs?v=62';
+import { createCameraSession, defaultStatus } from './camera-session.mjs?v=66';
 import {
   arena, burnStatus, byId, hideOverlay, lockMarkers,
   lockStatus, mobileControls, powerStock, renderAura, renderBossLabel,
@@ -11,14 +11,14 @@ import {
   scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
 } from './boss-attacks.mjs?v=64';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
-import { lessons } from './tutorial.mjs?v=61';
+import { lessons } from './tutorial.mjs?v=66';
 import { paintBoss } from './boss-bodies.mjs?v=65';
 import { parseFightId } from './boss-fights.mjs?v=65';
 import { attackDamage } from './boss-profiles.mjs?v=64';
 import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=65';
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { combatArt } from './combat-art.mjs?v=62';
-import { gestures } from './controls.mjs?v=57';
+import { gestures } from './controls.mjs?v=66';
 
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
@@ -486,7 +486,7 @@ function fireBeam(now) {
     return;
   }
 
-  // A clap spends the meter and fires one shot at the highest completed stage.
+  // A firing input spends the meter and fires one shot at the highest completed stage.
   // Higher stages deal more damage and can earn multiple laser lock credits.
   round.auraMs = 0;
   round.humBlockedUntil = now + beamDuration + 200;
@@ -604,7 +604,7 @@ function tick(now) {
     // Use the sampled interval so a slow render frame does not slow the mic down.
     if (audio.humming && round.micHumming) micCharge = Math.min(audio.elapsed, 350) * micAuraChargeRate;
     round.micHumming = audio.humming;
-    if (audio.clap) fireBeam(now);
+    if (audio.fireLaser) fireBeam(now);
   }
   if (round.finished) {
     animation = requestAnimationFrame(tick);

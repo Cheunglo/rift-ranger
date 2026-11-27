@@ -68,10 +68,55 @@ test('clap fires once without charging and a held hum can resume after a beam', 
   const read = microphone(48000);
   for (let i = 0; i < 22; i++) read();
   const clap = (time, index) => index > 3500 && index < 3510 ? .8 : 0;
-  assert.equal(read(clap).clap, true);
-  assert.equal(read(clap).clap, false);
+  assert.equal(read(clap).fireLaser, true);
+  assert.equal(read(clap).fireLaser, false);
   for (let i = 0; i < 31; i++) assert.equal(read(hum(130, .005), true).humming, false);
   let result;
   for (let i = 0; i < 9; i++) result = read(hum(130, .005));
   assert.equal(result.humming, true);
+});
+
+test('a short snap fires directly from its narrow peak', () => {
+  const read = microphone(48000);
+  for (let i = 0; i < 22; i++) read();
+  const snap = (_, index) => index >= 3960 && index < 3970 ? (index % 2 ? .46 : -.46) : 0;
+  assert.equal(read(snap).fireLaser, true);
+  assert.equal(read(snap).fireLaser, false);
+});
+
+test('a sharp vocal burst fires on release without also charging Aura', () => {
+  const read = microphone(48000);
+  for (let i = 0; i < 22; i++) read();
+  const shout = hum(145, .085);
+  for (let i = 0; i < 7; i++) {
+    const result = read(shout);
+    assert.equal(result.fireLaser, false);
+    assert.equal(result.humming, false);
+  }
+  const falling = read();
+  assert.equal(falling.fireLaser, true);
+  assert.equal(falling.humming, false);
+  assert.equal(read().fireLaser, false);
+});
+
+test('loud sustained singing remains charge input and does not fire on release', () => {
+  const read = microphone(48000);
+  for (let i = 0; i < 22; i++) read();
+  let result;
+  for (let i = 0; i < 25; i++) {
+    result = read(hum(260, .085));
+    assert.equal(result.fireLaser, false);
+  }
+  assert.equal(result.humming, true);
+  assert.equal(read().fireLaser, false);
+});
+
+test('firing cues are ignored during the beam', () => {
+  const read = microphone(48000);
+  for (let i = 0; i < 22; i++) read();
+  const peak = (_, index) => index > 3500 && index < 3510 ? .8 : 0;
+  assert.equal(read(peak, true).fireLaser, false);
+  const shout = hum(145, .085);
+  for (let i = 0; i < 7; i++) assert.equal(read(shout, true).fireLaser, false);
+  assert.equal(read().fireLaser, false);
 });

@@ -28,7 +28,7 @@ export const lessons = [
   {
     id: 'beam',
     title: 'Fire a short laser',
-    hint: 'Clap once or press J to fire at the highest completed aura stage.',
+    hint: 'Clap, snap, give a short shout, or press J to fire at the highest completed Aura stage.',
     mobileHint: 'Tap Laser to fire at the highest completed Aura stage.',
   },
   {
