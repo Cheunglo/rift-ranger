@@ -229,13 +229,7 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
   body:not(.mobile-play) .moves { display: none; }
 }
 
-/* Keep charge at the stage edge; the character supplies action feedback. */
-#aura-strip { position: absolute; inset: auto 0 0; z-index: 3; pointer-events: none; }
-#aura-caption { display: block; width: fit-content; margin: 0 10px 5px; padding: 2px 6px; border-radius: 4px; background: #171326dc; color: #e3c5ff; font: 700 .7rem/1.2 ui-monospace, monospace; }
-#aura { width: 100%; height: 5px; margin: 0; border-radius: 0; background: #372448; accent-color: #d8abfa; }
-#aura::-webkit-progress-bar { background: #372448; }
-#aura::-webkit-progress-value { background: #d8abfa; }
-#aura::-moz-progress-bar { background: #d8abfa; }
+/* The character supplies action feedback. */
 #battle-feedback { position: absolute; inset: auto 10px 36px; z-index: 3; text-align: center; pointer-events: none; }
 #move-notice, #tracking { width: fit-content; max-width: 100%; margin: 4px auto 0; padding: 4px 8px; border-radius: 5px; background: #171326ed; color: #ffdca2; font-size: .8125rem; }
 #move-notice { display: block; }
@@ -260,3 +254,15 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 
 .mobile-play #mobile-status #lock-status { grid-template-columns: auto 1fr; gap: 2px 8px; }
 .mobile-play #mobile-status #lock-instruction { grid-column: 1 / -1; }
+
+/* Charge readiness is shown by the character glow and matching Aura button. */
+:where(.arena, #mobile-controls) { --aura-color: #b7adc8; }
+[data-aura-stage="1"] { --aura-color: #68dfff; }
+[data-aura-stage="2"] { --aura-color: #ce8cff; }
+[data-aura-stage="3"] { --aura-color: #ffe477; }
+#aura-status { position: absolute; inset: auto auto 8px 10px; z-index: 3; pointer-events: none; }
+#aura-caption { padding: 2px 6px; border-radius: 4px; background: #171326dc; color: var(--aura-color); font: 700 .7rem/1.2 ui-monospace, monospace; }
+#mobile-controls .touch-aura { border-color: var(--aura-color); color: var(--aura-color); }
+#mobile-controls .touch-aura small { color: inherit; }
+#mobile-controls[data-aura-stage]:not([data-aura-stage="0"]) .touch-aura { box-shadow: 0 0 14px color-mix(in srgb, var(--aura-color) 35%, transparent); }
+#mobile-controls .touch-aura.is-held { background: color-mix(in srgb, var(--aura-color) 22%, #30233f); color: var(--aura-color); }

@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=49">
-  <script type="module" src="./game.mjs?v=48"></script>
+  <link rel="stylesheet" href="./style.css?v=50">
+  <script type="module" src="./game.mjs?v=50"></script>
 </head>
 <body>
   <main>
@@ -73,9 +73,8 @@
           <output id="move-notice" role="status" hidden></output>
           <p id="tracking" hidden></p>
         </div>
-        <div id="aura-strip" hidden>
-          <label id="aura-caption" for="aura">Aura</label>
-          <progress id="aura" aria-label="Aura charge toward next stage" max="100" value="0"></progress>
+        <div id="aura-status" hidden>
+          <output id="aura-caption" aria-live="polite">Aura · charge to 1</output>
         </div>
         <div class="overlay" id="overlay">
           <h2 id="overlay-title">Defend the city.</h2>
@@ -117,7 +116,7 @@
     <section id="mobile-controls" aria-label="Mobile combat controls" hidden>
       <button type="button" data-key="d" class="touch-power">Powerwave / Heal<small>Tap</small></button>
       <button type="button" data-key="s" class="touch-block">Block<small>Hold</small></button>
-      <button type="button" data-key="g" class="touch-aura">Aura<small>Hold to charge</small></button>
+      <button type="button" data-key="g" class="touch-aura">Aura<small id="aura-button-caption">Hold to charge</small></button>
       <button type="button" data-key="f" class="touch-laser">Laser<small>Tap</small></button>
       <button type="button" data-key="a" class="touch-slash">Slash<small>Tap</small></button>
     </section>

@@ -33,7 +33,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       [side * mix(25, 38, lift), mix(-25, -88, lift)]];
   }
 
-  function ranger(scene, aura) {
+  function ranger(scene, aura, auraStage) {
     ctx.save();
     ctx.translate(scene.x, scene.floor);
     ctx.scale(scene.scale, scene.scale);
@@ -42,13 +42,14 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.ellipse(0, -2, 36, 8, 0, 0, Math.PI * 2);
     ctx.fill();
     if (aura > .01) {
+      const color = ['#b7adc8', '#68dfff', '#ce8cff', '#ffe477'][auraStage];
       const glow = ctx.createRadialGradient(0, -48, 17, 0, -48, 43 + aura * 35);
-      glow.addColorStop(0, '#dab5ff80');
-      glow.addColorStop(.55, '#a168ee65');
-      glow.addColorStop(1, '#a168ee00');
+      glow.addColorStop(0, color + '90');
+      glow.addColorStop(.55, color + '70');
+      glow.addColorStop(1, color + '00');
       ctx.fillStyle = glow;
       ctx.fillRect(-82, -130, 164, 155);
-      ctx.strokeStyle = '#e3bbffbc';
+      ctx.strokeStyle = color + 'dd';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.ellipse(0, -6, 31 + aura * 30, 8 + aura * 8, 0, 0, Math.PI * 2);
@@ -309,7 +310,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       previousTime = undefined;
       leftLift = rightLift = 0;
     },
-    render(now, { left, right, guard, aura, flash, beamStrength, flame, burning }) {
+    render(now, { left, right, guard, aura, auraStage = 0, flash, beamStrength, flame, burning }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
@@ -367,7 +368,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       }
       ctx.globalAlpha = 1;
       if (burning) burningRanger(scene, now);
-      ranger(scene, aura);
+      ranger(scene, aura, auraStage);
     },
   };
 }

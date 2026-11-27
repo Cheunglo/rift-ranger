@@ -3,7 +3,7 @@ import { bindCombatInputs } from './mobile-controls.mjs?v=46';
 import { lessons } from './tutorial.mjs?v=45';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
-import { combatArt } from './combat-art.mjs?v=43';
+import { combatArt } from './combat-art.mjs?v=50';
 import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
 
 const byId = id => document.getElementById(id);
@@ -38,7 +38,8 @@ const poseArt = byId('pose-art');
 const poseIcon = poseArt.ownerSVGElement;
 const moveNotice = byId('move-notice');
 const battleFeedback = byId('battle-feedback');
-const auraStrip = byId('aura-strip');
+const auraStatus = byId('aura-status');
+const auraButtonCaption = byId('aura-button-caption');
 const player = byId('player');
 const burnStatus = byId('burn-status');
 const enemy = byId('enemy');
@@ -48,7 +49,6 @@ const lockTitle = byId('lock-title');
 const lockRemaining = byId('lock-remaining');
 const lockInstruction = byId('lock-instruction');
 const tutorialBadge = byId('tutorial-badge');
-const auraMeter = byId('aura');
 const auraCaption = byId('aura-caption');
 const bossPanelHome = bossPanel.parentElement;
 const lockStatusHome = lockStatus.parentElement;
@@ -171,8 +171,9 @@ function resetHud() {
   setHealth(player, player.max);
   setHealth(enemy, enemy.max);
   burnStatus.hidden = true;
-  auraMeter.value = 0;
-  auraCaption.textContent = 'Aura';
+  arena.dataset.auraStage = mobileControls.dataset.auraStage = '0';
+  auraCaption.textContent = 'Aura · charge to 1';
+  auraButtonCaption.textContent = 'Hold to charge';
   for (const marker of lockMarkers.children) marker.dataset.state = 'closed';
 }
 
@@ -428,7 +429,7 @@ function resetRound() {
   burnStatus.hidden = true;
   cameraBonusStatus.hidden = true;
   visuals.clear();
-  cameraPosePreview.hidden = battleFeedback.hidden = auraStrip.hidden = true;
+  cameraPosePreview.hidden = battleFeedback.hidden = auraStatus.hidden = true;
   bossPanel.hidden = true;
   tutorialPanel.hidden = true;
   arena.removeAttribute('data-tutorial');
@@ -469,7 +470,7 @@ function startRound(mode, learning, mobileMode = false) {
   overlay.hidden = true;
   showPose();
   showWarning('No attack incoming');
-  battleFeedback.hidden = auraStrip.hidden = false;
+  battleFeedback.hidden = auraStatus.hidden = false;
   bossPanel.hidden = false;
   tracking.hidden = mode !== 'camera';
   if (mode === 'camera') cameraStatus('Waiting for tracking…', 'waiting');
@@ -776,12 +777,11 @@ function fireBeam(now) {
 function showAura() {
   const ready = readyAuraStage();
   const index = ready?.level ?? 0;
-  const bottom = ready?.chargeMs ?? 0;
-  const next = auraStages[index];
-  const percent = next ? Math.floor((round.auraMs - bottom) / (next.chargeMs - bottom) * 100) : 100;
-  if (auraMeter.value !== percent) auraMeter.value = percent;
+  arena.dataset.auraStage = mobileControls.dataset.auraStage = String(index);
   const caption = ready ? 'Aura ' + index + ' · ' + ready.multiplier + '×' : 'Aura · charge to 1';
+  const buttonCaption = ready ? 'Stage ' + index + ' · ' + ready.multiplier + '×' : 'Hold to charge';
   if (auraCaption.textContent !== caption) auraCaption.textContent = caption;
+  if (auraButtonCaption.textContent !== buttonCaption) auraButtonCaption.textContent = buttonCaption;
 }
 
 function updateAura(now, delta, humming) {
@@ -802,7 +802,7 @@ function drawBattle(now, guard, flash = null, flame = null) {
   visuals.render(now, {
     left: Boolean(tracked?.left || guard || bothArms),
     right: Boolean(tracked?.right || attack === 'basic' || bothArms),
-    guard, aura: round.auraMs / auraCapacity, flash, beamStrength, flame,
+    guard, aura: round.auraMs / auraCapacity, auraStage: readyAuraStage()?.level ?? 0, flash, beamStrength, flame,
     burning: round.burnTickAt !== Infinity,
   });
 }
