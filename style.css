@@ -219,6 +219,8 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play .moves, .mobile-play header, .mobile-play .footer { display: none; }
 .mobile-play main { margin-block: 8px; }
 .mobile-play .toolbar { margin-top: 0; font-size: .8rem; }
+.mobile-play .toolbar .actions { order: -1; }
+.mobile-play #warning-toggle { padding: 5px 8px; font-size: .75rem; }
 @media (max-width: 670px) {
   .mobile-play main { width: calc(100% - 16px); }
   .mobile-play .arena { --arena-height: clamp(300px, calc(100svh - 330px), 550px); }
@@ -245,8 +247,7 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play #boss-panel .audio-tools { grid-column: 1 / -1; }
 
 /* Mobile status lives below the arena, never over the boss. */
-#mobile-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 60px auto; gap: 6px 10px; align-items: center; padding-top: 8px; }
-#mobile-status #warning-toggle { grid-column: 2; grid-row: 1; padding: 7px 9px; min-height: 44px; min-width: 112px; font-size: .75rem; }
+#mobile-status { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 60px auto; gap: 6px; align-items: center; padding-top: 8px; }
 .mobile-play #mobile-status #boss-panel { grid-column: 1; grid-row: 1; max-height: 100%; overflow: auto; padding: 6px 8px; border-color: transparent; background: transparent; grid-template-columns: 1fr; }
 .mobile-play #mobile-status #boss-panel[data-state="danger"] { border-color: #ff849e; background: #501a35; }
 .mobile-play #mobile-status #warning-hint { text-align: left; }

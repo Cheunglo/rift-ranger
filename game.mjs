@@ -62,7 +62,6 @@ function setWarningVisible(visible) {
 function setMobileHud(enabled) {
   mobileStatus.hidden = !enabled;
   setWarningVisible(true);
-  (enabled ? mobileStatus : byId('exit').parentElement).prepend(warningToggle);
   (enabled ? mobileStatus : bossPanelHome).append(bossPanel);
   (enabled ? mobileStatus : lockStatusHome).append(lockStatus);
 }
