@@ -217,7 +217,7 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 #mobile-controls button.is-held { background: var(--acid); color: var(--ink); box-shadow: 0 0 16px #e8ff7540; }
 #mobile-controls button.is-held small { color: var(--ink); }
 .mobile-play .moves, .mobile-play header, .mobile-play .footer { display: none; }
-.mobile-play main { margin-block: 8px; }
+.mobile-play main { margin-block: 8px; overflow-anchor: none; }
 .mobile-play .toolbar { margin-top: 0; font-size: .8rem; }
 .mobile-play .toolbar .actions { order: -1; }
 .mobile-play #warning-toggle { padding: 5px 8px; font-size: .75rem; }
@@ -246,12 +246,13 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play #warning-hint { text-align: right; font-size: .75rem; }
 .mobile-play #boss-panel .audio-tools { grid-column: 1 / -1; }
 
-/* Mobile status lives below the arena, never over the boss. */
-#mobile-status { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 60px auto; gap: 6px; align-items: center; padding-top: 8px; }
-.mobile-play #mobile-status #boss-panel { grid-column: 1; grid-row: 1; max-height: 100%; overflow: auto; padding: 6px 8px; border-color: transparent; background: transparent; grid-template-columns: 1fr; }
+/* Reserve both status rows so new hints or lock instructions cannot move the controls. */
+#mobile-status { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 60px 48px; gap: 6px; align-items: stretch; padding-top: 8px; }
+.mobile-play #mobile-status #boss-panel { grid-column: 1; grid-row: 1; min-height: 0; height: 100%; align-content: start; overflow: auto; padding: 6px 8px; border-color: transparent; background: transparent; grid-template-columns: 1fr; }
 .mobile-play #mobile-status #boss-panel[data-state="danger"] { border-color: #ff849e; background: #501a35; }
 .mobile-play #mobile-status #warning-hint { text-align: left; }
-.mobile-play #mobile-status #lock-status { grid-column: 1 / -1; width: 100%; justify-items: start; margin: 0; }
+.mobile-play #mobile-status #lock-status { grid-column: 1 / -1; grid-row: 2; width: 100%; min-height: 0; align-content: start; justify-items: start; margin: 0; padding: 4px 6px; border: 1px solid transparent; overflow: auto; }
+.mobile-play #mobile-status #lock-status[data-active="true"] { border-color: #fbc56c; }
 .mobile-play #mobile-status #lock-remaining { text-align: left; }
 #boss-panel.warnings-hidden :is(#boss-panel-label, #prompt, #warning-pose, #warning-hint) { display: none; }
 #boss-panel.warnings-hidden:not(:has(.mic-control > :not([hidden]))) { visibility: hidden; }
