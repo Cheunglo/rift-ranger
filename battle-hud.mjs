@@ -51,7 +51,7 @@ warningToggle.addEventListener('click', () => {
 });
 
 const lockInstructions = {
-  basic: 'Right hand up · A',
+  basic: 'Right hand up · J',
   power: 'Block to bank Powerwaves',
   beam: 'Stages 1–3 earn 1, 2, 4',
 };

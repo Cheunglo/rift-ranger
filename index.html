@@ -7,7 +7,7 @@
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
   <link rel="stylesheet" href="./style.css?v=56">
-  <script type="module" src="./game.mjs?v=58"></script>
+  <script type="module" src="./game.mjs?v=59"></script>
 </head>
 <body>
   <main>
@@ -16,10 +16,10 @@
       <p>Webcam arcade</p>
     </header>
     <section class="moves" aria-label="Moves">
-      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#basic"></use></svg><span>Attack <kbd>A</kbd></span><strong>Basic attack</strong><p>Raise your right hand above your shoulder. Lower it to repeat.</p></article>
+      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#basic"></use></svg><span>Attack <kbd>J</kbd></span><strong>Basic attack</strong><p>Raise your right hand above your shoulder. Lower it to repeat.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#guard"></use></svg><span>Defend <kbd>S</kbd></span><strong>Guard</strong><p>Raise your left hand above your shoulder and hold it through the strike.</p></article>
       <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#power"></use></svg><span>Counter <kbd>D</kbd></span><strong>Power pose</strong><p>Both hands up or D: spend a banked Powerwave and heal with charged Aura if needed.</p></article>
-      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Aura <kbd>G</kbd> <kbd>F</kbd></span><strong>Fire or heal</strong><p>Hum to charge and clap to fire, or spend aura on a heal.</p></article>
+      <article><svg class="move-icon" aria-hidden="true" viewBox="0 0 96 88"><use href="./poses.svg?v=7#clap"></use></svg><span>Aura <kbd>Space</kbd> <kbd>K</kbd></span><strong>Fire or heal</strong><p>Hum to charge and clap to fire, or spend aura on a heal.</p></article>
     </section>
     <section class="arena" id="arena" aria-label="Battle arena">
       <!-- The fixed HUD sits over the battle stage. The canvases draw art and effects. -->
@@ -115,11 +115,11 @@
     <section id="mobile-status" aria-label="Battle status" hidden>
     </section>
     <section id="mobile-controls" aria-label="Mobile combat controls" hidden>
-      <button type="button" data-key="d" class="touch-power">Powerwave / Heal<small>Tap</small></button>
-      <button type="button" data-key="s" class="touch-block">Block<small>Hold</small></button>
-      <button type="button" data-key="g" class="touch-aura">Aura<small id="aura-button-caption">Hold to charge</small></button>
-      <button type="button" data-key="f" class="touch-laser">Laser<small>Tap</small></button>
-      <button type="button" data-key="a" class="touch-slash">Slash<small>Tap</small></button>
+      <button type="button" data-action="power" class="touch-power">Powerwave / Heal<small>Tap</small></button>
+      <button type="button" data-action="guard" class="touch-block">Block<small>Hold</small></button>
+      <button type="button" data-action="aura" class="touch-aura">Aura<small id="aura-button-caption">Hold to charge</small></button>
+      <button type="button" data-action="beam" class="touch-laser">Laser<small>Tap</small></button>
+      <button type="button" data-action="basic" class="touch-slash">Slash<small>Tap</small></button>
     </section>
     <div class="toolbar">
       <div id="device" role="status">Camera and mic stay on your device.</div>

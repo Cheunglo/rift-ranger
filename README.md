@@ -22,19 +22,19 @@ Run `python3 -m http.server 8765 --bind 127.0.0.1` in this folder and open [the 
 
 | Input | Move |
 | --- | --- |
-| A | Basic attack |
-| Hold S | Guard |
+| Hold S | Block |
 | D | Spend a banked Powerwave and heal with charged Aura if needed |
-| F | Fire a short laser |
-| Hold G | Build aura |
+| Hold Space | Charge Aura |
+| J | Slash |
+| K | Fire a short laser |
 
 Choose **Play on mobile** for five touch buttons in a 2–1–2 layout: Powerwave / Heal above Block on the left, Aura in the center, and Laser above Slash on the right. Hold Block to guard and hold Aura to charge; tap the other three buttons. Multiple fingers can hold and attack at the same time. The keyboard start option also enables these controls on touch-first devices. Mobile mode works with **Start Tutorial**, with touch-specific instructions. Warnings sit below the arena so they cannot cover the boss. Lock requirements and progress always remain visible below the arena. Use **Hide warning / Show warning** in any mode to toggle the boss warning. Mobile reserves space for it so the controls stay in place. Aura changes colour as it charges: cyan for Stage 1, purple for Stage 2, and gold for Stage 3. The character glow and mobile Aura button share those colours, with a stage number and laser multiplier for clarity. Spending Aura clears the glow. The character shows successful moves; brief notices explain unavailable moves. Camera mode retains the recognized pose silhouette.
 
 Raise both hands to spend one banked Powerwave. The same action also spends charged Aura if you are injured or burning, even when a Powerwave fires. Aura heals 5, 10, or 20 HP at stages 1, 2, or 3 and clears burning. You can heal with an empty Powerwave stock. Healing never erases damage already taken from the Power Level calculation.
 
-Camera mode requests the camera and microphone together and can run without the mic if access fails. In keyboard mode, hold G to charge aura and press F to fire. Stay quiet briefly while the mic calibrates. The character glow and small stage label show Aura charge; the left panel shows mic input level and whether your sound is charging Aura. Pitch does not affect charging. A sustained new room sound above the calibrated level can also charge it. Mic charging pauses during a beam and briefly afterward. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
+Camera mode requests the camera and microphone together and can run without the mic if access fails. In keyboard mode, hold Space to charge Aura and press K to fire. Stay quiet briefly while the mic calibrates. The character glow and small stage label show Aura charge; the left panel shows mic input level and whether your sound is charging Aura. Pitch does not affect charging. A sustained new room sound above the calibrated level can also charge it. Mic charging pauses during a beam and briefly afterward. A browser connection is needed to download the pinned MediaPipe runtime and pose model. Camera frames and microphone samples are processed in the browser. The game stops device access when the round or session ends.
 
-Choose **Start Tutorial**, then start with camera or keyboard. Complete each prompted move to advance, from slashing and blocking to charging and firing a laser. The final lessons teach all three lock types without health loss or a Power Level penalty. Sustain a sound and clap with the mic, or use G and F.
+Choose **Start Tutorial**, then start with camera or keyboard. Complete each prompted move to advance, from slashing and blocking to charging and firing a laser. The final lessons teach all three lock types without health loss or a Power Level penalty. Sustain a sound and clap with the mic, or use Space and K.
 
 ## Reading the code
 

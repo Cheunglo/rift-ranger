@@ -40,7 +40,7 @@ export function createCameraSession({ onReady, onLost, onMicStopped }) {
   let requestId = 0;
   const videoInputOptions = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } };
   const audioInputOptions = { autoGainControl: false, noiseSuppression: false, echoCancellation: true };
-  const micUnavailable = 'Microphone unavailable. Check browser permission, or use F and G.';
+  const micUnavailable = 'Microphone unavailable. Check browser permission, or use K and Space.';
   function cameraStatus(message, state = '') {
     const text = 'Camera: ' + message;
     if (tracking.textContent !== text) tracking.textContent = text;
@@ -124,7 +124,7 @@ export function createCameraSession({ onReady, onLost, onMicStopped }) {
     stream.getAudioTracks()[0].addEventListener('ended', () => {
       if (micStream !== stream) return;
       stopMic();
-      setMicMessage('Mic disconnected. F and G still work.');
+      setMicMessage('Mic disconnected. K and Space still work.');
       device.textContent = defaultStatus;
     });
     setMicMessage('Mic on. Sustain a sound to charge, then clap once to fire.');

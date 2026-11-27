@@ -4,55 +4,73 @@ import { bindCombatInputs } from '../mobile-controls.mjs';
 function setup() {
   const target = new EventTarget();
   const doc = new EventTarget();
-  const buttons = Object.fromEntries(['a', 's', 'd', 'f', 'g'].map(key => {
+  const buttons = Object.fromEntries(['basic', 'guard', 'power', 'beam', 'aura'].map(action => {
     const button = new EventTarget();
-    button.dataset = { key };
+    button.dataset = { action };
     button.classList = { toggle() {} };
     button.setPointerCapture = () => {};
-    return [key, button];
+    return [action, button];
   }));
   const log = [];
   const panel = { querySelectorAll: () => Object.values(buttons) };
   const inputs = bindCombatInputs(panel, {
     active: () => true,
-    press: key => log.push('+' + key),
-    release: key => log.push('-' + key),
+    press: action => log.push('+' + action),
+    release: action => log.push('-' + action),
   }, target, doc);
   const send = (element, type, props = {}) => {
     const event = new Event(type, { cancelable: true });
     Object.assign(event, props);
     element.dispatchEvent(event);
+    return event;
   };
-  const down = (key, pointerId) => send(buttons[key], 'pointerdown', { button: 0, pointerId });
-  const up = (key, pointerId, type = 'pointerup') => send(buttons[key], type, { pointerId });
+  const down = (action, pointerId) => send(buttons[action], 'pointerdown', { button: 0, pointerId });
+  const up = (action, pointerId, type = 'pointerup') => send(buttons[action], type, { pointerId });
   return { target, doc, log, inputs, send, down, up };
 }
 test('hold block and aura while tapping attacks; release independently', () => {
   const { down, up, log } = setup();
-  down('s', 1); down('g', 2); down('a', 3); up('a', 3); up('g', 2); up('s', 1);
-  assert.deepEqual(log, ['+s', '+g', '+a', '-a', '-g', '-s']);
+  down('guard', 1); down('aura', 2); down('basic', 3); up('basic', 3); up('aura', 2); up('guard', 1);
+  assert.deepEqual(log, ['+guard', '+aura', '+basic', '-basic', '-aura', '-guard']);
 });
 test('keyboard and two fingers share a hold until all sources release', () => {
   const { down, up, send, target, log } = setup();
-  send(target, 'keydown', { key: 's' }); down('s', 1); down('s', 2);
-  send(target, 'keyup', { key: 's' }); up('s', 1);
-  assert.deepEqual(log, ['+s']);
-  up('s', 2); down('s', 3);
-  assert.deepEqual(log, ['+s', '-s', '+s']);
+  send(target, 'keydown', { key: 's' }); down('guard', 1); down('guard', 2);
+  send(target, 'keyup', { key: 's' }); up('guard', 1);
+  assert.deepEqual(log, ['+guard']);
+  up('guard', 2); down('guard', 3);
+  assert.deepEqual(log, ['+guard', '-guard', '+guard']);
 });
 test('cancellation, lost capture, focus loss, and hidden page release holds', () => {
   const { down, up, send, target, doc, log, inputs } = setup();
-  down('s', 1); up('s', 1, 'pointercancel'); up('s', 1, 'lostpointercapture');
-  down('g', 2); send(target, 'blur');
-  down('s', 3); doc.hidden = true; send(doc, 'visibilitychange');
-  down('g', 4); inputs.reset();
-  assert.deepEqual(log, ['+s', '-s', '+g', '-g', '+s', '-s', '+g', '-g']);
+  down('guard', 1); up('guard', 1, 'pointercancel'); up('guard', 1, 'lostpointercapture');
+  down('aura', 2); send(target, 'blur');
+  down('guard', 3); doc.hidden = true; send(doc, 'visibilitychange');
+  down('aura', 4); inputs.reset();
+  assert.deepEqual(log, ['+guard', '-guard', '+aura', '-aura', '+guard', '-guard', '+aura', '-aura']);
 });
 test('power and laser fire once per press, with repeat keydown ignored', () => {
   const { down, up, send, target, log } = setup();
-  down('d', 1); up('d', 1); down('f', 2); up('f', 2);
-  send(target, 'keydown', { key: 'a' });
-  send(target, 'keydown', { key: 'a', repeat: true });
-  send(target, 'keyup', { key: 'a' });
-  assert.deepEqual(log, ['+d', '-d', '+f', '-f', '+a', '-a']);
+  down('power', 1); up('power', 1); down('beam', 2); up('beam', 2);
+  send(target, 'keydown', { key: 'j' });
+  send(target, 'keydown', { key: 'j', repeat: true });
+  send(target, 'keyup', { key: 'j' });
+  assert.deepEqual(log, ['+power', '-power', '+beam', '-beam', '+basic', '-basic']);
+});
+
+test('space holds Aura and suppresses native actions even on key repeat', () => {
+  const { send, target, log } = setup();
+  assert.equal(send(target, 'keydown', { key: ' ' }).defaultPrevented, true);
+  assert.equal(send(target, 'keydown', { key: ' ', repeat: true }).defaultPrevented, true);
+  assert.equal(send(target, 'keyup', { key: ' ' }).defaultPrevented, true);
+  assert.deepEqual(log, ['+aura', '-aura']);
+});
+
+test('right-hand keys fire Slash and Laser, with the old bindings inactive', () => {
+  const { send, target, log } = setup();
+  for (const key of ['a', 'f', 'g', 'j', 'k']) {
+    send(target, 'keydown', { key });
+    send(target, 'keyup', { key });
+  }
+  assert.deepEqual(log, ['+basic', '-basic', '+beam', '-beam']);
 });
