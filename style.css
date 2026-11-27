@@ -221,7 +221,7 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play .toolbar { margin-top: 0; font-size: .8rem; }
 @media (max-width: 670px) {
   .mobile-play main { width: calc(100% - 16px); }
-  .mobile-play .arena { --arena-height: clamp(390px, calc(100svh - 330px), 550px); }
+  .mobile-play .arena { --arena-height: clamp(300px, calc(100svh - 330px), 550px); }
   #mobile-controls { gap: 8px; }
   #mobile-controls button { font-size: .875rem; }
 }
@@ -240,14 +240,16 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 .mobile-play #boss-panel .audio-tools { grid-column: 1 / -1; }
 
 /* Mobile status lives below the arena, never over the boss. */
-#mobile-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding-top: 8px; }
-#mobile-details { grid-column: 2; grid-row: 1; padding: 7px 9px; min-height: 36px; font-size: .75rem; }
-.mobile-play #mobile-status #boss-panel { grid-column: 1; grid-row: 1; padding: 6px 8px; border-color: transparent; background: transparent; grid-template-columns: 1fr; }
+#mobile-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 60px auto; gap: 6px 10px; align-items: center; padding-top: 8px; }
+#mobile-status #warning-toggle { grid-column: 2; grid-row: 1; padding: 7px 9px; min-height: 44px; min-width: 112px; font-size: .75rem; }
+.mobile-play #mobile-status #boss-panel { grid-column: 1; grid-row: 1; max-height: 100%; overflow: auto; padding: 6px 8px; border-color: transparent; background: transparent; grid-template-columns: 1fr; }
 .mobile-play #mobile-status #boss-panel[data-state="danger"] { border-color: #ff849e; background: #501a35; }
 .mobile-play #mobile-status #warning-hint { text-align: left; }
 .mobile-play #mobile-status #lock-status { grid-column: 1 / -1; width: 100%; justify-items: start; margin: 0; }
 .mobile-play #mobile-status #lock-remaining { text-align: left; }
-.mobile-play:not(.mobile-details) :is(#warning-hint, #mobile-status .audio-tools, #tracking) { display: none; }
+#boss-panel.warnings-hidden :is(#boss-panel-label, #prompt, #warning-pose, #warning-hint) { display: none; }
+#boss-panel.warnings-hidden:not(:has(.mic-control > :not([hidden]))) { visibility: hidden; }
+#boss-panel.warnings-hidden[data-state="danger"] { color: #f6f3ff; border-color: #785d87; background: #171326ed; }
 
 #camera-pose { position: absolute; right: 5%; top: 150px; z-index: 3; color: var(--acid); pointer-events: none; }
 #camera-pose .combat-icon { display: block; width: clamp(44px, 7vw, 70px); }

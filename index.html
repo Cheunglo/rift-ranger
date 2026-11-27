@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=50">
-  <script type="module" src="./game.mjs?v=50"></script>
+  <link rel="stylesheet" href="./style.css?v=51">
+  <script type="module" src="./game.mjs?v=51"></script>
 </head>
 <body>
   <main>
@@ -111,7 +111,6 @@
       </section>
     </section>
     <section id="mobile-status" aria-label="Battle status" hidden>
-      <button id="mobile-details" class="secondary" type="button" aria-expanded="false" aria-controls="boss-panel">Show details</button>
     </section>
     <section id="mobile-controls" aria-label="Mobile combat controls" hidden>
       <button type="button" data-key="d" class="touch-power">Powerwave / Heal<small>Tap</small></button>
@@ -123,6 +122,7 @@
     <div class="toolbar">
       <div id="device" role="status">Camera and mic stay on your device.</div>
       <div class="actions">
+        <button id="warning-toggle" class="secondary" type="button" aria-expanded="true" aria-controls="boss-panel" hidden>Hide warning</button>
         <button id="exit" class="secondary" type="button" hidden>End session</button>
       </div>
     </div>

@@ -21,7 +21,7 @@ const keyboard = byId('keyboard');
 const mobile = byId('mobile');
 const mobileControls = byId('mobile-controls');
 const mobileStatus = byId('mobile-status');
-const mobileDetails = byId('mobile-details');
+const warningToggle = byId('warning-toggle');
 const tutorialButton = byId('tutorial');
 const tutorialPanel = byId('tutorial-panel');
 const micStatus = byId('mic-status');
@@ -53,18 +53,21 @@ const auraCaption = byId('aura-caption');
 const bossPanelHome = bossPanel.parentElement;
 const lockStatusHome = lockStatus.parentElement;
 
+function setWarningVisible(visible) {
+  bossPanel.classList.toggle('warnings-hidden', !visible);
+  warningToggle.setAttribute('aria-expanded', String(visible));
+  warningToggle.textContent = visible ? 'Hide warning' : 'Show warning';
+}
+
 function setMobileHud(enabled) {
   mobileStatus.hidden = !enabled;
-  document.body.classList.remove('mobile-details');
-  mobileDetails.setAttribute('aria-expanded', 'false');
-  mobileDetails.textContent = 'Show details';
+  setWarningVisible(true);
+  (enabled ? mobileStatus : byId('exit').parentElement).prepend(warningToggle);
   (enabled ? mobileStatus : bossPanelHome).append(bossPanel);
   (enabled ? mobileStatus : lockStatusHome).append(lockStatus);
 }
-mobileDetails.addEventListener('click', () => {
-  const expanded = document.body.classList.toggle('mobile-details');
-  mobileDetails.setAttribute('aria-expanded', String(expanded));
-  mobileDetails.textContent = expanded ? 'Hide details' : 'Show details';
+warningToggle.addEventListener('click', () => {
+  setWarningVisible(warningToggle.getAttribute('aria-expanded') === 'false');
 });
 // All timing values are milliseconds. The animation loop uses one clock.
 const battleTiming = {
@@ -430,7 +433,7 @@ function resetRound() {
   cameraBonusStatus.hidden = true;
   visuals.clear();
   cameraPosePreview.hidden = battleFeedback.hidden = auraStatus.hidden = true;
-  bossPanel.hidden = true;
+  bossPanel.hidden = warningToggle.hidden = true;
   tutorialPanel.hidden = true;
   arena.removeAttribute('data-tutorial');
   tutorialBadge.hidden = true;
@@ -471,7 +474,7 @@ function startRound(mode, learning, mobileMode = false) {
   showPose();
   showWarning('No attack incoming');
   battleFeedback.hidden = auraStatus.hidden = false;
-  bossPanel.hidden = false;
+  bossPanel.hidden = warningToggle.hidden = false;
   tracking.hidden = mode !== 'camera';
   if (mode === 'camera') cameraStatus('Waiting for tracking…', 'waiting');
   exit.hidden = false;
