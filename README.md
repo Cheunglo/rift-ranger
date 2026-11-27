@@ -38,15 +38,38 @@ Choose **Start Tutorial**, then start with camera or keyboard. Complete each pro
 
 ## Boss options and fight IDs
 
-Open **Boss options** to pick the Riftbeast, Barkjaw (tree), Iron Beetle, or a random body. The two new bodies are the first Random Fight prototypes. They use the Riftbeast's Eye Lasers, Flame Breath, and Shout, with the effects attached to their own eyes and mouths.
+Open **Boss options** to pick a body or roll one at random. The roster includes the Riftbeast, Barkjaw, Iron Beetle, The Duelist, Rift Hound, Coilfang, Rift Slime, Tidewhale, and Moon Owl. All nine use the same prototype moves, while their body stats change the fight. The effects attach to each body's own eyes and mouth.
 
-Copy the **Fight ID** below the battle and send it to a friend. They can paste it under **Boss options** or open a URL such as `?boss=RR1-T-LFS-SPL`. The ID preserves the body, move set, and lock order. Attack rolls still vary within that fight.
+Copy the **Fight ID** below the battle and send it to a friend. They can paste it under **Boss options** or open a URL such as `?boss=RR1-T-LFS-SPL`. Attack rolls still vary within the same configuration.
+
+| Piece | Meaning |
+| --- | --- |
+| `RR1` | Rift Ranger fight ID format, version 1. |
+| `T` | The body. The letters are `R` Riftbeast, `T` tree, `B` beetle, `H` human, `D` hound, `S` serpent, `G` slime, `W` whale, and `O` owl. |
+| `LFS` | Eye Lasers, Flame Breath, and Shout in the Regular, Special, and Status slots. |
+| `SPL` | Slash, Powerwave, and Laser locks in order from highest HP to lowest. Iron Beetle adds its 65 HP lock at the front. |
+
+The parser checks the body, move set, and lock count. Iron Beetle requires four letters, such as `RR1-B-LFS-PSPL`. Other bodies require three. The last three letters must contain one of each lock type.
+
+| Body | Starting balance |
+| --- | --- |
+| The Riftbeast | Baseline. |
+| Barkjaw | 30% shorter healing intervals and 25% weaker hits. |
+| Iron Beetle | An extra lock at 65 HP, with 650 ms longer gaps before attacks. |
+| The Duelist | 350 ms shorter gaps before Regulars and 450 ms longer gaps before Specials. |
+| Rift Hound | 85 HP and gaps up to 450 ms shorter. |
+| Coilfang | 25% harder hits and 35% longer healing intervals. |
+| Rift Slime | 120 HP and 15% weaker hits. |
+| Tidewhale | Specials hit 35% harder, followed by 650 ms extra recovery. |
+| Moon Owl | Up to 550 ms shorter recovery after Specials and 450 ms longer after Regulars. |
+
+Gap modifiers never shorten a move's warning. Damage modifiers apply to direct hits. Burn uses the same tick damage.
 
 ## Reading the code
 
 - `index.html` defines the HUD, controls, and canvases. `style.css` lays them out and keeps the arena fixed during play.
 - `game.mjs` owns the round and resolves combat. Start with `startRound()` and `tick()`.
-- `boss-fights.mjs` encodes a fight configuration. `boss-bodies.mjs` defines the sprites and effect attachment points.
+- `boss-fights.mjs` encodes a fight configuration. `boss-bodies.mjs` defines the roster and effect attachment points. `boss-profiles.mjs` defines the stat tradeoffs. `boss-body-art.mjs` paints the modular sprites.
 - `boss-attacks.mjs` owns the Riftbeast’s move slots, attack timing, and flame charge rules. `boss-locks.mjs` owns the shuffled health gates.
 - `battle-hud.mjs` renders warnings, health, Aura, locks, and the score.
 - `camera-session.mjs` handles permissions, starts and stops streams, and samples the camera and mic.

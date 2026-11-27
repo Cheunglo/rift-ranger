@@ -5,17 +5,18 @@ import {
   lockStatus, mobileControls, powerStock, renderAura, renderBossLabel,
   renderBossLocks, renderBossName, renderPose, renderPowerStock, renderHealth, resetHud, setBattleHudVisible,
   setMobileHud, shakenStatus, showBattleResult, showBattleWarning, showOverlay,
-} from './battle-hud.mjs?v=62';
+} from './battle-hud.mjs?v=63';
 import {
-  attackTell, coolFlame, openingStrike, randomWarningStart, scheduleNextStrike,
+  attackTell, coolFlame, moveSlot, openingStrike, randomWarningStart, scheduleNextStrike,
   scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
-} from './boss-attacks.mjs?v=62';
+} from './boss-attacks.mjs?v=63';
 import { bindCombatInputs } from './mobile-controls.mjs?v=60';
 import { lessons } from './tutorial.mjs?v=61';
-import { paintBoss } from './boss-bodies.mjs?v=62';
-import { parseFightId } from './boss-fights.mjs?v=62';
-import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=62';
-import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=62';
+import { paintBoss } from './boss-bodies.mjs?v=63';
+import { parseFightId } from './boss-fights.mjs?v=63';
+import { attackDamage } from './boss-profiles.mjs?v=63';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=63';
+import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=63';
 import { combatArt } from './combat-art.mjs?v=62';
 import { gestures } from './controls.mjs?v=57';
 
@@ -104,7 +105,8 @@ function healInterval() {
   // Each tick restores one HP. The interval grows with health, so the rate
   // falls as the boss heals. The minimum keeps low-HP recovery bounded.
   const { healMinInterval, healFullInterval } = battleTiming;
-  return healMinInterval + (healFullInterval - healMinInterval) * round.hp.enemy / round.maxHp.enemy;
+  const base = healMinInterval + (healFullInterval - healMinInterval) * round.hp.enemy / round.maxHp.enemy;
+  return base * (round.profile.healInterval ?? 1);
 }
 
 function healBoss(now) {
@@ -198,23 +200,24 @@ function startRound(mode, learning, mobileMode = false, fight = defaultFight) {
   setMobileHud(mobileMode);
   document.body.classList.toggle('mobile-play', mobileMode);
   const now = performance.now();
+  const maxHp = { ...startingHP, enemy: fight.profile.maxHp ?? startingHP.enemy };
   round = {
-    ...openingStrike(mode, learning, now, fight.moves),
+    ...openingStrike(mode, learning, now, fight.moves, fight.profile),
     fight,
     mode, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
-    hp: { ...startingHP },
-    maxHp: { ...startingHP },
+    hp: { ...maxHp },
+    maxHp,
     cameraBonusEligible: mode === 'camera' && !learning,
     powerCharges: 0, blockBonusUntil: 0, nextPower: now,
     keyboardGuard: false, shaken: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
-    locks: learning ? [] : bossLocksForOrder(fight.lockOrder), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
+    locks: learning ? [] : bossLocksForOrder(fight.lockOrder, fight.profile.extraLock), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(), burnTickAt: Infinity,
   };
   paintBoss(bossCanvas, fight.body);
   renderBossName(fight.body.name);
   showFightId(learning ? '' : fight.id);
-  resetHud(round.maxHp);
+  resetHud(round.maxHp, learning ? undefined : round.locks.map(lock => lock.hp));
   updatePowerStock();
   powerStock.hidden = false;
   cameraBonusStatus.hidden = !round.cameraBonusEligible;
@@ -367,7 +370,7 @@ function resolveComboLaser(now, guarded, cameraLeftHeld) {
     return;
   }
   if (!isTutorial()) {
-    const damage = hurtPlayer(19, now);
+    const damage = hurtPlayer(attackDamage(round.profile, 19, 'regular'), now);
     round.strikeNotice = 'Eye laser hit · −' + damage + ' HP';
     round.strikeNoticeUntil = now + 1000;
   }
@@ -544,7 +547,7 @@ function resolveGuardableStrike(outcome, now, guard, cameraGuard) {
   } else if (isTutorial()) {
     round.strikeNotice = kind === 'flame' ? 'Flame hit · interrupt the next charge' : 'Missed block · try the next shot';
   } else {
-    const damage = hurtPlayer(outcome.damage, now);
+    const damage = hurtPlayer(attackDamage(round.profile, outcome.damage, moveSlot(round.bossMoves, kind)), now);
     round.strikeNotice = outcome.name + ' hit · −' + damage + ' HP';
     if (outcome.burns && !round.finished && round.burnTickAt === Infinity) {
       round.burnTickAt = now + burnInterval;

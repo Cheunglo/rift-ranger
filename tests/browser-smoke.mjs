@@ -90,16 +90,42 @@ test('boss selection and a shared fight ID restore the body and first lock', { t
   await page.locator('#boss-choice').selectOption('B');
   await page.locator('#mobile').click();
   assert.equal(await page.locator('#boss-name').textContent(), 'Iron Beetle');
-  assert.match(await page.locator('#current-fight-id').inputValue(), /^RR1-B-LFS-/);
+  assert.match(await page.locator('#current-fight-id').inputValue(), /^RR1-B-LFS-[SPL]{4}$/);
+  assert.equal(await page.locator('#lock-markers .lock-marker').count(), 4);
+  assert.match(await page.locator('#lock-title').textContent(), /65 HP/);
 });
 
 test('a link can prefill a fight ID', { timeout: 15000 }, async t => {
   const page = await openGame(t, { viewport: { width: 1280, height: 720 } });
   const link = new URL(url);
-  link.searchParams.set('boss', 'RR1-B-LFS-LPS');
+  link.searchParams.set('boss', 'RR1-B-LFS-LLPS');
   await page.goto(link.href);
-  assert.equal(await page.locator('#fight-id-input').inputValue(), 'RR1-B-LFS-LPS');
+  assert.equal(await page.locator('#fight-id-input').inputValue(), 'RR1-B-LFS-LLPS');
   await page.locator('#keyboard').click();
   assert.equal(await page.locator('#boss-name').textContent(), 'Iron Beetle');
   assert.equal(await page.locator('#lock-remaining').textContent(), '2 laser credits left');
+});
+
+test('each new body is selectable and paints a distinct sprite', { timeout: 35000 }, async t => {
+  const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
+  await page.locator('#fight-options summary').click();
+  const bodies = { H: 'The Duelist', D: 'Rift Hound', S: 'Coilfang', G: 'Rift Slime', W: 'Tidewhale', O: 'Moon Owl' };
+  const sprites = new Set();
+  for (const [code, name] of Object.entries(bodies)) {
+    await page.locator('#boss-choice').selectOption(code);
+    await page.locator('#mobile').click();
+    assert.equal(await page.locator('#boss-name').textContent(), name);
+    const maxHp = code === 'D' ? '85' : code === 'G' ? '120' : '100';
+    assert.equal(await page.locator('#enemy').getAttribute('max'), maxHp);
+    assert.equal(await page.locator('#enemy').getAttribute('value'), maxHp);
+    assert.match(await page.locator('#current-fight-id').inputValue(), new RegExp('^RR1-' + code + '-LFS-'));
+    const sprite = await page.locator('#beast').evaluate(canvas => {
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      return pixels.some((value, i) => i % 4 === 3 && value > 0) ? canvas.toDataURL() : '';
+    });
+    assert(sprite);
+    sprites.add(sprite);
+    await page.locator('#exit').click();
+  }
+  assert.equal(sprites.size, Object.keys(bodies).length);
 });

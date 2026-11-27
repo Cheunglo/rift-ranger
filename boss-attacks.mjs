@@ -1,3 +1,5 @@
+import { attackGapOffset, bossProfiles } from './boss-profiles.mjs?v=63';
+
 // Owns boss attack timing, tells, and charge changes. The round applies hits and effects.
 const warningStep = 1000;
 const warningColors = ['green', 'yellow', 'red'];
@@ -53,6 +55,10 @@ const attacks = {
 };
 
 const currentAttack = round => attacks[round.strikeKind];
+export function moveSlot(moves, kind) {
+  if (kind === moves.special) return 'special';
+  return kind === moves.status ? 'status' : 'regular';
+}
 function flameDelay(pace) {
   return flameChargeTime + pace.flamePause;
 }
@@ -60,14 +66,18 @@ function flameDelay(pace) {
 export const warningDuration = round => currentAttack(round).warningDuration(round);
 export const strikeOutcome = round => currentAttack(round).hit;
 
-export function openingStrike(mode, learning, now, bossMoves = riftbeastMoves) {
+export function openingStrike(mode, learning, now, bossMoves = riftbeastMoves, profile = bossProfiles.R) {
   const pace = bossPace[mode];
   const openingSpecial = !learning && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
   const strikeKind = openingSpecial ? bossMoves.special : bossMoves.regular;
   const move = attacks[strikeKind];
+  const delay = move.firstDelay(pace) + attackGapOffset(profile, null, moveSlot(bossMoves, strikeKind));
+  // The first eye warning has up to three steps. Recovery modifiers never cut a tell.
+  const minimumTell = openingSpecial ? move.warningDuration() : warningColors.length * warningStep;
   return {
     pace,
-    strike: learning ? Infinity : now + move.firstDelay(pace),
+    strike: learning ? Infinity : now + Math.max(minimumTell, delay),
+    profile,
     bossMoves,
     strikeKind,
     comboLaserAt: move.rollCombo ? undefined : Infinity,
@@ -82,6 +92,7 @@ function flamePhase(round, now) {
 }
 
 export function scheduleNextStrike(round, now, hp, maxHp) {
+  const previousSlot = moveSlot(round.bossMoves, round.strikeKind);
   round.comboLaserAt = Infinity;
   if (round.lessonIndex !== null) {
     round.strike = Infinity;
@@ -104,7 +115,9 @@ export function scheduleNextStrike(round, now, hp, maxHp) {
   }
   const move = currentAttack(round);
   if (move.randomizeWarning !== false) round.warningStart = randomWarningStart();
-  round.strike = now + move.delay(round.pace, hp / maxHp);
+  const delay = move.delay(round.pace, hp / maxHp);
+  const gap = attackGapOffset(round.profile, previousSlot, moveSlot(round.bossMoves, round.strikeKind));
+  round.strike = now + Math.max(move.warningDuration(round), delay + gap);
   if (move.rollCombo) round.comboLaserAt = undefined;
 }
 

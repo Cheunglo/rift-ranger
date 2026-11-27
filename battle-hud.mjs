@@ -1,5 +1,5 @@
 // Paints DOM battle state. The game decides when that state changes.
-import { lockRequirement, nextBossLock } from './boss-locks.mjs?v=62';
+import { baseLockThresholds, lockRequirement, nextBossLock } from './boss-locks.mjs?v=63';
 
 export const byId = id => document.getElementById(id);
 export const arena = byId('arena');
@@ -78,14 +78,21 @@ export function renderHealth(fighter, hp, maxHp) {
   byId(bar.id + '-hp').textContent = hp + ' / ' + maxHp + ' HP';
 }
 
-export function resetHud(maxHp) {
+export function resetHud(maxHp, gateHP = baseLockThresholds) {
   renderHealth('player', maxHp.player, maxHp.player);
   renderHealth('enemy', maxHp.enemy, maxHp.enemy);
   burnStatus.hidden = shakenStatus.hidden = true;
   arena.dataset.auraStage = mobileControls.dataset.auraStage = '0';
   auraCaption.textContent = 'Aura · charge to 1';
   auraButtonCaption.textContent = 'Hold to charge';
-  for (const marker of lockMarkers.children) marker.dataset.state = 'closed';
+  lockMarkers.replaceChildren(...gateHP.map(hp => {
+    const marker = document.createElement('span');
+    marker.className = 'lock-marker';
+    marker.id = 'lock-' + hp;
+    marker.dataset.state = 'closed';
+    marker.style.setProperty('--threshold', hp / maxHp.enemy * 100 + '%');
+    return marker;
+  }));
 }
 
 // The HUD previews the next gate and keeps an engaged lock highlighted if the boss heals.

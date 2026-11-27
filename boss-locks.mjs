@@ -1,6 +1,6 @@
 // Health gates are checked from highest HP to lowest. Each gate stores its own
 // lifetime progress, independent of the boss's current health.
-const thresholds = [40, 20, 10];
+export const baseLockThresholds = [40, 20, 10];
 const laserCredits = [0, 1, 2, 4];
 export const lockMoves = {
   basic: ['slash', 'slashes'],
@@ -21,10 +21,13 @@ export function createBossLocks(random = Math.random) {
   return bossLocksForOrder(shuffle(Object.keys(lockMoves), random));
 }
 
-export function bossLocksForOrder(moves) {
-  return thresholds.map((hp, i) => ({
-    hp, move: moves[i], total: (i + 1) * 2, done: 0, engaged: false,
+export function bossLocksForOrder(moves, extraLock) {
+  const offset = extraLock ? 1 : 0;
+  const locks = baseLockThresholds.map((hp, i) => ({
+    hp, move: moves[i + offset], total: (i + 1) * 2, done: 0, engaged: false,
   }));
+  if (extraLock) locks.unshift({ ...extraLock, move: moves[0], done: 0, engaged: false });
+  return locks;
 }
 
 export function nextBossLock(locks) {

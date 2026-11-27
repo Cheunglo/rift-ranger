@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=62">
-  <script type="module" src="./game.mjs?v=62"></script>
+  <link rel="stylesheet" href="./style.css?v=63">
+  <script type="module" src="./game.mjs?v=63"></script>
 </head>
 <body>
   <main>
@@ -37,9 +37,6 @@
           <div class="enemy-meter">
             <progress id="enemy" aria-label="Riftbeast health" max="100" value="100"></progress>
             <div id="lock-markers" aria-hidden="true" hidden>
-              <span class="lock-marker" id="lock-40" style="--threshold: 40%"></span>
-              <span class="lock-marker" id="lock-20" style="--threshold: 20%"></span>
-              <span class="lock-marker" id="lock-10" style="--threshold: 10%"></span>
             </div>
           </div>
           <p id="lock-status" role="status" hidden>
@@ -103,9 +100,6 @@
             <div class="fight-options-fields">
               <label>Boss
                 <select id="boss-choice">
-                  <option value="R">The Riftbeast</option>
-                  <option value="T">Barkjaw (tree)</option>
-                  <option value="B">Iron Beetle</option>
                   <option value="random">Random body</option>
                 </select>
               </label>
@@ -113,6 +107,7 @@
                 <input id="fight-id-input" maxlength="24" placeholder="RR1-T-LFS-SPL" spellcheck="false" autocomplete="off" aria-describedby="fight-id-error">
               </label>
             </div>
+            <p id="boss-profile"></p>
             <p id="fight-id-error" role="status"></p>
           </details>
           <div class="actions">
