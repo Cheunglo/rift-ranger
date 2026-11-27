@@ -222,6 +222,11 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 @media (max-width: 670px) {
   .mobile-play main { width: calc(100% - 16px); }
   .mobile-play .arena { --arena-height: clamp(300px, calc(100svh - 330px), 550px); }
+  /* Warnings and locks are below the mobile arena, so only reserve room for health. */
+  .mobile-play #beast {
+    --stage-height: calc(var(--arena-height) - var(--lesson-height, 0px));
+    width: min(70%, 340px, calc((var(--stage-height) * .76 - 84px) * 40 / 36));
+  }
   #mobile-controls { gap: 8px; }
   #mobile-controls button { font-size: .875rem; }
 }
