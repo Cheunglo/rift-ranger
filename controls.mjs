@@ -142,51 +142,23 @@ export function listen(context, stream) {
   const analyser = context.createAnalyser();
   analyser.fftSize = 2 ** Math.ceil(Math.log2(context.sampleRate * .064));
   const source = context.createMediaStreamSource(stream);
+  // Keep the analyser in the audio graph even in browsers that skip unused nodes.
+  // A zero-gain output prevents microphone playback.
+  const muted = context.createGain();
+  muted.gain.value = 0;
   source.connect(analyser);
+  analyser.connect(muted);
+  muted.connect(context.destination);
   const samples = new Float32Array(analyser.fftSize);
-  const stride = Math.max(1, Math.floor(context.sampleRate / 8000));
-  const pitchRate = context.sampleRate / stride;
-  const signal = new Float32Array(Math.floor(samples.length / stride));
-  const shortestPeriod = Math.floor(pitchRate / 850);
-  const longestPeriod = Math.ceil(pitchRate / 65);
-  const comparisonLength = signal.length - longestPeriod - 1;
   const clapWindow = Math.round(context.sampleRate * .042);
   let calibrationUntil;
   let roomLevel = .001;
   let previous = 0;
-  let pitch = 0;
-  let humSince = 0;
-  let lastNote = -Infinity;
+  let soundSince = 0;
+  let lastSound = -Infinity;
+  let previousSampleHadSound = false;
   let lastClap = -Infinity;
   let wasHumming = false;
-
-  // Look for a repeating waveform by comparing it with time-shifted copies.
-  // Averaging small blocks first keeps the comparison cheap at high sample rates.
-  function detectPitch(average) {
-    for (let i = 0; i < signal.length; i++) {
-      let sum = 0;
-      for (let j = 0; j < stride; j++) sum += samples[i * stride + j];
-      signal[i] = sum / stride - average;
-    }
-
-    let referenceEnergy = 0;
-    for (let i = 0; i < comparisonLength; i++) referenceEnergy += signal[i] ** 2;
-    let previousCorrelation = 0;
-    for (let lag = Math.max(1, shortestPeriod - 1); lag <= longestPeriod + 1; lag++) {
-      let cross = 0;
-      let shiftedEnergy = 0;
-      for (let i = 0; i < comparisonLength; i++) {
-        cross += signal[i] * signal[i + lag];
-        shiftedEnergy += signal[i + lag] ** 2;
-      }
-      const correlation = cross / Math.sqrt(referenceEnergy * shiftedEnergy);
-      if (lag > shortestPeriod && previousCorrelation >= .76 && correlation < previousCorrelation) {
-        return pitchRate / (lag - 1);
-      }
-      previousCorrelation = correlation;
-    }
-    return 0;
-  }
 
   return (now, suppressHum = false) => {
     calibrationUntil ??= now + 400;
@@ -217,34 +189,33 @@ export function listen(context, stream) {
     const afterClap = now - lastClap < 110;
     const level = Math.max(0, Math.min(100, Math.round((20 * Math.log10(rms) + 65) * 2)));
 
-    // Learn steady room noise before playing and between claps during a beam.
-    // Do not treat the clap itself as the new noise floor, or charge from it.
+    // Do not learn the clap or a hum held through the beam as background noise.
     if (calibrating || suppressHum || afterClap) {
-      if (!afterClap) roomLevel += (Math.min(rms, .05) - roomLevel) * .2;
-      pitch = 0;
-      lastNote = -Infinity;
+      if (calibrating) roomLevel += (Math.min(rms, .05) - roomLevel) * .2;
+      lastSound = -Infinity;
+      previousSampleHadSound = false;
       wasHumming = false;
       const state = calibrating ? 'calibrating' : suppressHum ? 'beam' : 'sound';
       return { clap, humming: false, level, state };
     }
 
-    // A new hum must stand out above the room. A lower threshold then lets a
-    // recognized note fade or wobble briefly without resetting the input.
-    const continuing = now - lastNote <= 145;
-    const threshold = Math.max(.0021, roomLevel * (continuing ? 1.25 : 1.75));
-    const tone = rms >= threshold ? detectPitch(average) : 0;
-    if (tone) {
-      const similar = pitch && Math.abs(Math.log2(tone / pitch)) <= .3;
-      if (!similar || now - lastNote > 145) humSince = now;
-      pitch = similar ? pitch * .75 + tone * .25 : tone;
-      lastNote = now;
-      wasHumming = now - humSince >= 280;
+    // Charge from sustained sound above the calibrated room level. Once active,
+    // tolerate a short pause or a dip in volume.
+    const continuing = now - lastSound <= 160;
+    const sustained = continuing || previousSampleHadSound;
+    const threshold = Math.max(.00085, roomLevel * (sustained ? 1.12 : 1.35));
+    const sound = rms >= threshold;
+    if (sound) {
+      if (!sustained) soundSince = now;
+      lastSound = now;
+      wasHumming = now - soundSince >= 140;
     } else if (!continuing) {
       wasHumming = false;
       roomLevel += (Math.min(rms, .05) - roomLevel) * .04;
     }
 
-    const state = wasHumming ? 'humming' : tone ? 'note' : level > 6 ? 'sound' : 'quiet';
+    previousSampleHadSound = sound;
+    const state = wasHumming ? 'humming' : sound ? 'sustaining' : level > 6 ? 'sound' : 'quiet';
     return { clap, humming: wasHumming, level, state };
   };
 }

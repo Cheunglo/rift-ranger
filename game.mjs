@@ -1,10 +1,10 @@
 import { bindCombatInputs } from './mobile-controls.mjs?v=46';
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=55';
+import { lessons } from './tutorial.mjs?v=57';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
 import { combatArt } from './combat-art.mjs?v=56';
-import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=37';
+import { gestures, listen, loadTracker, posePoint, stopTracks, wristPoint } from './controls.mjs?v=57';
 
 const byId = id => document.getElementById(id);
 const arena = byId('arena');
@@ -122,6 +122,7 @@ const auraStages = [
   { level: 3, chargeMs: 5600, multiplier: 4 },
 ];
 const auraCapacity = auraStages.at(-1).chargeMs;
+const micAuraChargeRate = 1.4;
 const beamDuration = 420;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const visuals = combatArt(byId('combat-fx'), byId('beast'), reducedMotion);
@@ -139,11 +140,11 @@ const trackingHints = {
 };
 const audioHints = {
   calibrating: 'Calibrating mic · stay quiet briefly.',
-  beam: 'Beam input · hum again after firing.',
-  quiet: 'Mic on · hum close to the mic.',
-  sound: 'Sound heard · try a steady note.',
-  note: 'Note heard · keep humming.',
-  humming: 'Hum detected · charging aura.',
+  beam: 'Beam input · charging resumes after firing.',
+  quiet: 'Mic on · hum, whistle, or sing.',
+  sound: 'Sound heard · keep it going to charge.',
+  sustaining: 'Sound heard · keep it going.',
+  humming: 'Charging Aura from mic.',
 };
 
 let round;
@@ -397,7 +398,7 @@ function activateMic(stream, audioContext) {
     setMicMessage('Mic disconnected. F and G still work.');
     device.textContent = defaultStatus;
   });
-  setMicMessage('Mic on. Hum to charge, then clap once to fire.');
+  setMicMessage('Mic on. Sustain a sound to charge, then clap once to fire.');
   micLevel.hidden = false;
 }
 
@@ -465,7 +466,7 @@ function startRound(mode, learning, mobileMode = false) {
     mode, pace, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
     strike: learning ? Infinity : now + firstStrike,
     cameraBonusEligible: mode === 'camera' && !learning,
-    powerCharges: 0, blockBonusUntil: 0, nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
+    powerCharges: 0, blockBonusUntil: 0, nextPower: now, lastAudioPoll: -Infinity, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false, shaken: false, attacksSinceShout: 0,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
@@ -516,7 +517,7 @@ function showLesson(now) {
     .replace('Raise your right hand above your shoulder, or press A', 'Tap Slash')
     .replace('hold your left hand up or hold S', 'hold Block')
     .replaceAll('raise both hands or press D', 'tap Powerwave / Heal')
-    .replace('Hum a steady note or hold G', 'Hold Aura')
+    .replace('Hum, whistle, sing, or hold G', 'Hold Aura')
     .replace('Clap once or press F', 'Tap Laser')
     .replace('Lower and raise your left hand, or release and re-press S,', 'Release and re-press Block') : current.hint;
   round.strike = Infinity;
@@ -857,11 +858,11 @@ function showAura() {
   if (auraButtonCaption.textContent !== buttonCaption) auraButtonCaption.textContent = buttonCaption;
 }
 
-function updateAura(now, delta, humming) {
+function updateAura(now, chargeMs) {
   const current = isTutorial() ? lesson().id : null;
-  if (humming && (!current || current === 'hum' || current === 'heal' || current === 'beam' ||
+  if (chargeMs > 0 && (!current || current === 'hum' || current === 'heal' || current === 'beam' ||
       current === 'beam-lock' || current === 'flame')) {
-    round.auraMs = Math.min(auraCapacity, round.auraMs + delta);
+    round.auraMs = Math.min(auraCapacity, round.auraMs + chargeMs);
     if (current === 'hum' && readyAuraStage()) advanceLesson(now);
   }
   showAura();
@@ -953,11 +954,15 @@ function tick(now) {
     if (!round) return;
   }
 
-  if (audioInput && now >= round.nextAudioPoll) {
-    round.nextAudioPoll = now + 20;
+  let micCharge = 0;
+  if (audioInput && now - round.lastAudioPoll >= 20) {
+    const audioElapsed = now - round.lastAudioPoll;
+    round.lastAudioPoll = now;
     const suppressHum = now < (round.humBlockedUntil ?? 0);
     const { clap, humming, level, state } = audioInput(now, suppressHum);
     showMicInput(state, level);
+    // Charge for the sampled interval so slower animation frames do not slow the mic down.
+    if (humming && round.micHumming) micCharge = Math.min(audioElapsed, 350) * micAuraChargeRate;
     round.micHumming = humming;
     if (clap) fireBeam(now);
   }
@@ -965,8 +970,7 @@ function tick(now) {
     animation = requestAnimationFrame(tick);
     return;
   }
-  const humming = round.keyboardHum || (now >= (round.humBlockedUntil ?? 0) && round.micHumming);
-  updateAura(now, delta, humming);
+  updateAura(now, round.keyboardHum ? delta : micCharge);
   healBoss(now);
 
   if (now >= round.burnTickAt) {
