@@ -1,6 +1,6 @@
 import { bindCombatInputs } from './mobile-controls.mjs?v=46';
 // Owns the match state, connects input to moves, and updates the HUD and arena.
-import { lessons } from './tutorial.mjs?v=45';
+import { lessons } from './tutorial.mjs?v=55';
 import { paintBeast } from './beast.mjs';
 import { bossHit, createBossLocks, lockMoves, nextBossLock } from './boss-locks.mjs?v=42';
 import { combatArt } from './combat-art.mjs?v=50';
@@ -42,6 +42,7 @@ const auraStatus = byId('aura-status');
 const auraButtonCaption = byId('aura-button-caption');
 const player = byId('player');
 const burnStatus = byId('burn-status');
+const powerStock = byId('power-stock');
 const enemy = byId('enemy');
 const lockMarkers = byId('lock-markers');
 const lockStatus = byId('lock-status');
@@ -70,11 +71,8 @@ warningToggle.addEventListener('click', () => {
 });
 // All timing values are milliseconds. The animation loop uses one clock.
 const battleTiming = {
-  firstStrike: 7000,
-  slowestStrikeInterval: 6600,
-  fastestStrikeInterval: 3650,
   warningStep: 1000,
-  counterWindow: 2400,
+  blockBonusWindow: 2400,
   healQuietTime: 1800,
   healMinInterval: 700,
   healFullInterval: 5200,
@@ -97,12 +95,15 @@ const flamePhases = [
 ];
 const flameChargeTime = flamePhases.at(-1).until;
 const comboLaserLeadTime = 2300;
-const comboChanceByLocksOpened = [.15, .40, .75, 1];
+const bossPace = {
+  camera: { firstLaser: 7000, slowLaser: 6600, fastLaser: 3650, flamePause: 1000, openingFlame: 0, comboOdds: [.15, .40, .75, 1] },
+  keyboard: { firstLaser: 5000, slowLaser: 4900, fastLaser: 3200, flamePause: 300, openingFlame: .35, comboOdds: [.45, .65, .90, 1] },
+};
 const burnInterval = 1000;
 const warningDuration = () => round.strikeKind === 'flame' ? flameChargeTime : eyeWarningDuration();
 const lockInstructions = {
   basic: 'Right hand up · A',
-  power: 'Block, then both up · D',
+  power: 'Block to bank Powerwaves',
   beam: 'Stages 1–3 earn 1, 2, 4',
 };
 // Each additional stage takes twice as long to fill as the last one.
@@ -281,8 +282,8 @@ function updateCameraStatus(now) {
   if (!move || now - round.lastPose > 400) return cameraStatus('Waiting for tracking…', 'waiting');
   if (round.cameraGuardBroken) return cameraStatus('Guard broken. Lower your left hand, then raise it.', 'waiting');
   if (move.state === 'power') {
-    const hint = canPowerCounter(now) ? 'Both arms detected. Power counter ready.' :
-      healBlockReason(now) || 'Both arms detected. Heal ready.';
+    const hint = canPowerCounter() ? 'Both arms detected. Power counter ready.' :
+      healBlockReason() || 'Both arms detected. Heal ready.';
     return cameraStatus(hint, 'waiting');
   }
   const notice = round.cameraNotice;
@@ -428,7 +429,7 @@ function resetRound() {
   setMobileHud(false);
   document.body.classList.remove('mobile-play');
   round = null;
-  burnStatus.hidden = true;
+  burnStatus.hidden = powerStock.hidden = true;
   cameraBonusStatus.hidden = true;
   visuals.clear();
   cameraPosePreview.hidden = battleFeedback.hidden = auraStatus.hidden = true;
@@ -448,16 +449,23 @@ function startRound(mode, learning, mobileMode = false) {
   setMobileHud(mobileMode);
   document.body.classList.toggle('mobile-play', mobileMode);
   const now = performance.now();
+  const pace = bossPace[mode];
+  const openingFlame = !learning && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
+  const firstStrike = openingFlame ? flameChargeTime + pace.flamePause : pace.firstLaser;
   round = {
-    mode, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now, strike: learning ? Infinity : now + battleTiming.firstStrike,
+    mode, pace, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
+    strike: learning ? Infinity : now + firstStrike,
     cameraBonusEligible: mode === 'camera' && !learning,
-    nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
+    powerCharges: 0, blockBonusUntil: 0, nextPower: now, nextAudioPoll: now, nextPosePoll: now, videoTime: -1,
     keyboardGuard: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
     locks: learning ? [] : createBossLocks(), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
-    warningStart: randomWarningStart(), strikeKind: 'laser', comboLaserAt: Infinity, burnTickAt: Infinity,
+    warningStart: randomWarningStart(), strikeKind: openingFlame ? 'flame' : 'laser',
+    comboLaserAt: openingFlame ? undefined : Infinity, burnTickAt: Infinity,
   };
   resetHud();
+  updatePowerStock();
+  powerStock.hidden = false;
   cameraBonusStatus.hidden = !round.cameraBonusEligible;
   cameraBonusStatus.dataset.earned = 'true';
   cameraBonusStatus.textContent = '+' + cameraBonusPercent + '% camera bonus active';
@@ -506,8 +514,8 @@ function showLesson(now) {
   round.comboLaserAt = Infinity;
   round.strikeKind = current.id === 'flame' || current.id === 'guard-break' ? 'flame' : 'laser';
   if (current.id !== 'counter') {
-    round.counterUntil = 0;
-    round.powerCounterAvailable = false;
+    round.blockBonusUntil = 0;
+    updatePowerStock(0);
   }
   if (current.id === 'block' || current.id === 'power-lock') {
     round.warningStart = 0;
@@ -584,8 +592,18 @@ function endRound(won) {
   webcam.focus({ preventScroll: true });
 }
 
-function canPowerCounter(now) {
-  return round.powerCounterAvailable && now < round.counterUntil;
+function canPowerCounter() {
+  return round.powerCharges > 0;
+}
+
+function updatePowerStock(charges = round.powerCharges) {
+  round.powerCharges = charges;
+  powerStock.textContent = 'Powerwaves: ' + charges;
+}
+
+function bankPowerCounter(now, kind) {
+  updatePowerStock(round.powerCharges + 1);
+  round.blockBonusUntil = isTutorial() && kind === 'laser' ? Infinity : now + battleTiming.blockBonusWindow;
 }
 
 function playerDamageScale(move) {
@@ -607,10 +625,9 @@ function scheduleNextStrike(now) {
   }
   round.strikeKind = round.strikeKind === 'laser' ? 'flame' : 'laser';
   round.warningStart = randomWarningStart();
-  const interval = battleTiming.fastestStrikeInterval +
-    (battleTiming.slowestStrikeInterval - battleTiming.fastestStrikeInterval) * enemy.value / enemy.max;
-  // A faster boss still gives players the full flamethrower warning.
-  round.strike = now + Math.max(Math.round(interval), round.strikeKind === 'flame' ? flameChargeTime + 1000 : 0);
+  const { fastLaser, slowLaser, flamePause } = round.pace;
+  const laserInterval = fastLaser + (slowLaser - fastLaser) * enemy.value / enemy.max;
+  round.strike = now + (round.strikeKind === 'flame' ? flameChargeTime + flamePause : Math.round(laserInterval));
   if (round.strikeKind === 'flame') round.comboLaserAt = undefined;
 }
 
@@ -625,7 +642,7 @@ function updateFlameCombo(now) {
   // Roll once as the charge begins, using the locks the player has already opened.
   if (round.comboLaserAt !== undefined || now < round.strike - flameChargeTime) return;
   const opened = round.locks.filter(lock => lock.done === lock.total).length;
-  round.comboLaserAt = Math.random() < comboChanceByLocksOpened[opened]
+  round.comboLaserAt = Math.random() < round.pace.comboOdds[opened]
     ? round.strike - comboLaserLeadTime : Infinity;
 }
 
@@ -638,6 +655,7 @@ function resolveComboLaser(now, guarded, cameraLeftHeld) {
     round.cameraGuardBroken = cameraLeftHeld;
     round.guardBreakNoticeUntil = now + 900;
     round.comboGuardBlocked = true;
+    if (!isTutorial()) bankPowerCounter(now, 'laser');
     return;
   }
   if (!isTutorial()) {
@@ -677,26 +695,28 @@ function hurtPlayer(amount, now) {
 
 function attack(move, now, fromCamera = false) {
   if (!round || round.finished) return;
-  if (move === 'power' && !canPowerCounter(now)) return healPlayer(now, fromCamera);
+  if (move === 'power' && !canPowerCounter()) return healPlayer(now, fromCamera);
   const current = isTutorial() ? lesson() : null;
   if (current && !current.lock && !(((current.id === 'slash' || current.id === 'flame') && move === 'basic') ||
       (current.id === 'counter' && move === 'power'))) return;
   const [damage, label] = attacks[move];
   if (move === 'power' && now < round.nextPower) return;
-  const bonus = now < (round.counterUntil ?? 0);
+  const bonus = now < round.blockBonusUntil;
   const counterDamage = move === 'basic' ? 2 : 5;
   const scaledDamage = Math.max(1, Math.round((damage + (bonus ? counterDamage : 0)) * playerDamageScale(move)));
   const hit = damageBoss(scaledDamage, move, now);
   if (move === 'power') {
     round.nextPower = now + 580;
-    round.powerCounterAvailable = false;
+    updatePowerStock(round.powerCharges - 1);
   }
   round.attackPose = { move, until: now + 360 };
   visuals.play(move, now);
   const flameOutcome = hitFlameCharge(move, now);
   if (hit.dealt || hit.credited) round.hitUntil = now + 170;
   const damageText = isTutorial() ? hit.dealt + ' damage' : '−' + hit.dealt + ' HP';
-  const outcome = flameOutcome || lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
+  const waveOutcome = flameOutcome || lockImpact(hit) || label + (bonus ? ' counter' : '') + ' · ' + damageText;
+  const healOutcome = move === 'power' && !current && !healBlockReason() ? applyAuraHeal(now) : '';
+  const outcome = healOutcome ? waveOutcome + ' · ' + healOutcome : waveOutcome;
   confirmPose(move, outcome, now);
   if (fromCamera) cameraNotice(outcome, !flameOutcome && hit.lock && !hit.credited && !hit.dealt ? 'waiting' : 'accepted', now);
   if (current && (current.id === 'slash' || current.id === 'counter' ||
@@ -709,9 +729,8 @@ function readyAuraStage() {
   return auraStages.findLast(stage => round.auraMs >= stage.chargeMs);
 }
 
-function healBlockReason(now) {
+function healBlockReason() {
   if (isTutorial() && lesson().id !== 'heal') return 'Follow the current lesson.';
-  if (canPowerCounter(now)) return 'Heal after the power counter window.';
   if (player.value >= player.max && round.burnTickAt === Infinity) {
     return 'Health is full. Block a strike to unlock a power counter.';
   }
@@ -721,21 +740,13 @@ function healBlockReason(now) {
 
 function healPlayer(now, fromCamera = false) {
   if (!round || round.finished) return false;
-  const blocked = healBlockReason(now);
+  const blocked = healBlockReason();
   if (blocked) {
     if (!fromCamera) round.poseFeedback = { move: 'heal', label: blocked, state: 'locked', until: now + 1000 };
     return false;
   }
-  const restored = Math.min(player.max - player.value, readyAuraStage().multiplier * 5);
-  const burned = round.burnTickAt !== Infinity;
-  round.burnTickAt = Infinity;
-  burnStatus.hidden = true;
-  round.auraMs = 0;
-  showAura();
-  setHealth(player, player.value + restored);
+  const outcome = applyAuraHeal(now);
   round.attackPose = { move: 'heal', until: now + 750 };
-  visuals.play('heal', now);
-  const outcome = 'Healed +' + restored + ' HP' + (burned ? ' · Burn cleared' : '');
   confirmPose('heal', outcome, now);
   if (fromCamera) cameraNotice(outcome, 'accepted', now);
   if (isTutorial()) {
@@ -743,6 +754,18 @@ function healPlayer(now, fromCamera = false) {
     advanceLesson(now);
   }
   return true;
+}
+
+function applyAuraHeal(now) {
+  const restored = Math.min(player.max - player.value, readyAuraStage().multiplier * 5);
+  const burned = round.burnTickAt !== Infinity;
+  round.burnTickAt = Infinity;
+  burnStatus.hidden = true;
+  round.auraMs = 0;
+  showAura();
+  setHealth(player, player.value + restored);
+  visuals.play('heal', now);
+  return 'Healed +' + restored + ' HP' + (burned ? ' · Burn cleared' : '');
 }
 
 function fireBeam(now) {
@@ -761,7 +784,7 @@ function fireBeam(now) {
   round.humBlockedUntil = now + beamDuration + 200;
   round.beamFlash = { until: now + beamDuration, strength: stage.multiplier / 4 };
   showAura();
-  const baseDamage = now < (round.counterUntil ?? 0) ? 8 : 6;
+  const baseDamage = now < round.blockBonusUntil ? 8 : 6;
   const damage = Math.max(1, Math.round(baseDamage * playerDamageScale())) * stage.multiplier;
   const hit = damageBoss(damage, 'beam', now, stage.level);
   const flameOutcome = hitFlameCharge('beam', now, stage.level);
@@ -838,7 +861,7 @@ function tick(now) {
     round.lastPose = now;
     round.cameraMove = move;
     if (!move.left && move.state !== 'framing') round.cameraGuardBroken = false;
-    const healing = move.attack === 'power' && !canPowerCounter(now);
+    const healing = move.attack === 'power' && !canPowerCounter();
     if (move.attack && attack(move.attack, now, true)) move.consume?.(healing ? 'heal-held' : undefined);
     if (!round) return;
   }
@@ -889,9 +912,9 @@ function tick(now) {
     scheduleNextStrike(now);
     round.strikeNotice = 'Strike finished';
     if (guard) {
-      round.counterUntil = isTutorial() && kind === 'laser' ? Infinity : now + battleTiming.counterWindow;
-      round.powerCounterAvailable = true;
-      confirmPose('guard', 'Blocked! Power counter ready.', now);
+      bankPowerCounter(now, kind);
+      round.strikeNotice = 'Blocked · Powerwave banked';
+      confirmPose('guard', round.strikeNotice, now);
       if (cameraGuard) cameraNotice('Guard blocked the strike.', 'accepted', now);
       if (isTutorial() && lesson().id === 'block') advanceLesson(now);
       if (isTutorial() && kind === 'flame') round.strikeNotice = 'Blocked · interrupt the next charge';
@@ -937,8 +960,8 @@ function tick(now) {
   if (guardBroken) showPose('guard', 'Guard broken · release to reset', 'locked');
   else if (now < round.guardBreakNoticeUntil && !guard) showPose('guard', 'Raise guard again', 'locked');
   else if (cameraPose === 'power') {
-    const counter = canPowerCounter(now);
-    showPose('heal', healBlockReason(now), counter || !healBlockReason(now) ? '' : 'locked');
+    const counter = canPowerCounter();
+    showPose('heal', healBlockReason(), counter || !healBlockReason() ? '' : 'locked');
   }
   else if (recentAction && used.move === 'guard') showPose(used.move, used.label, 'active');
   else if (guard) showPose('guard', 'Guard detected', 'active');
