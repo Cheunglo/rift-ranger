@@ -281,6 +281,12 @@ kbd { border: 1px solid #625572; padding: 0 .25em; border-radius: 3px; }
 /* Keep selection in the start overlay and sharing below the combat controls. */
 #fight-options { width: min(100%, 360px); margin-bottom: 10px; text-align: left; }
 #fight-options summary { width: max-content; margin-inline: auto; color: var(--acid); cursor: pointer; }
+#training-options { width: min(100%, 240px); text-align: left; }
+#training-controls { width: min(100%, 390px); }
+#training-controls .fight-options-fields { align-items: end; }
+#training-queue { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+#training-queue button { padding: 4px 8px; font-size: .875rem; }
+.training-queue-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .fight-options-fields { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 8px; }
 .fight-options-fields label { flex: 1 1 120px; }
 .fight-options-fields :is(input, select), #current-fight-id {

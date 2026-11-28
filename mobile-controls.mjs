@@ -61,7 +61,8 @@ export function bindCombatInputs(panel, { active, press, release }, target = win
   }
   target.addEventListener('keydown', event => {
     const key = event.key.toLowerCase();
-    if (!active() || !Object.hasOwn(rangerKeys, key) || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (!active() || event.target?.tagName === 'SELECT' || !Object.hasOwn(rangerKeys, key) ||
+        event.ctrlKey || event.metaKey || event.altKey) return;
     event.preventDefault();
     if (!event.repeat) down('key-' + key, rangerKeys[key]);
   });

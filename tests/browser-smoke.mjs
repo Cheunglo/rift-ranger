@@ -68,6 +68,64 @@ test('mobile tutorial shows touch instructions and advances on Slash', { timeout
   assert.match(await page.locator('#tutorial-instruction').textContent(), /hold Block/);
 });
 
+test('training queues three real attacks and lets the chosen boss reach zero HP', { timeout: 30000 }, async t => {
+  const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
+  await page.clock.install();
+  await page.locator('#training').click();
+  await page.locator('#training-boss').selectOption('B');
+  await page.locator('#mobile').click();
+  assert.equal(await page.locator('#boss-name').textContent(), 'Iron Beetle');
+  assert(await page.locator('#lock-status').isHidden());
+  assert.equal(await page.locator('#lock-markers .lock-marker').count(), 0);
+  await page.locator('[data-action="basic"]').tap();
+  const enemy = page.locator('#enemy');
+  const damagedHp = Number(await enemy.getAttribute('value'));
+  assert(damagedHp < 100);
+  await page.clock.runFor(8000);
+  assert.equal(Number(await enemy.getAttribute('value')), damagedHp);
+  assert.equal(await page.locator('#player').getAttribute('value'), '100');
+
+  const select = page.locator('#training-move');
+  const add = page.locator('#training-add-move');
+  const run = page.locator('#training-run-queue');
+  for (const move of ['laser', 'flame', 'shout']) {
+    await select.selectOption(move);
+    await add.click();
+  }
+  assert.equal(await page.locator('#training-queue li').count(), 3);
+  assert(await add.isDisabled());
+  await run.click();
+  assert(await run.isDisabled());
+  await page.keyboard.down('s');
+  await page.clock.runFor(3100);
+  await page.keyboard.up('s');
+  assert.match(await page.locator('#power-stock').textContent(), /Powerwaves: 1/);
+  await page.clock.runFor(950);
+  assert.equal(await page.locator('#boss-panel-label').textContent(), 'Flamethrower');
+  await page.keyboard.press('k');
+  await page.clock.runFor(1900);
+  assert(await page.locator('#shaken-status').isVisible());
+  assert(await run.isEnabled());
+  assert.equal(await page.locator('#player').getAttribute('value'), '100');
+
+  await page.keyboard.down('Space');
+  await page.clock.runFor(850);
+  await page.keyboard.up('Space');
+  await page.keyboard.press('d');
+  assert(await page.locator('#shaken-status').isHidden());
+  assert.equal(await page.locator('#training-queue li').count(), 3);
+  await page.locator('#training-queue button').last().click();
+  assert(await add.isEnabled());
+  for (let i = 0; i < 40 && Number(await enemy.getAttribute('value')) > 0; i++) {
+    await page.keyboard.press('k');
+  }
+  assert.equal(await enemy.getAttribute('value'), '0');
+  await page.clock.runFor(600);
+  assert.equal(await page.locator('#overlay-title').textContent(), 'Training complete');
+  assert(await page.locator('#training-controls').isHidden());
+  assert(await page.locator('#battle-result').isHidden());
+});
+
 test('boss selection and a shared fight ID restore the body and first lock', { timeout: 25000 }, async t => {
   const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
   await page.locator('#fight-options summary').click();

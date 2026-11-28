@@ -8,17 +8,18 @@ import {
 } from './battle-hud.mjs?v=64';
 import {
   attackTell, coolFlame, moveSlot, openingStrike, randomWarningStart, scheduleNextStrike,
-  scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
-} from './boss-attacks.mjs?v=64';
-import { bindCombatInputs } from './mobile-controls.mjs?v=60';
+  scheduleTrainingStrike, scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
+} from './boss-attacks.mjs?v=71';
+import { bindCombatInputs } from './mobile-controls.mjs?v=71';
 import { lessons } from './tutorial.mjs?v=68';
-import { paintBoss } from './boss-bodies.mjs?v=70';
-import { parseFightId } from './boss-fights.mjs?v=70';
-import { attackDamage } from './boss-profiles.mjs?v=64';
-import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=70';
+import { bossBodies, paintBoss } from './boss-bodies.mjs?v=70';
+import { parseFightId } from './boss-fights.mjs?v=71';
+import { attackDamage, bossProfiles } from './boss-profiles.mjs?v=64';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=71';
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { combatArt } from './combat-art.mjs?v=70';
 import { gestures } from './controls.mjs?v=68';
+import { createTrainingControls } from './training-controls.mjs?v=71';
 
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
@@ -26,6 +27,9 @@ const keyboard = byId('keyboard');
 const mobile = byId('mobile');
 const tutorialButton = byId('tutorial');
 const tutorialPanel = byId('tutorial-panel');
+const trainingButton = byId('training');
+const trainingOptions = byId('training-options');
+const trainingBoss = byId('training-boss');
 const exit = byId('exit');
 const device = byId('device');
 const tutorialBadge = byId('tutorial-badge');
@@ -53,6 +57,7 @@ const auraStages = [
 const auraCapacity = auraStages.at(-1).chargeMs;
 const micAuraChargeRate = 1.4;
 const beamDuration = 420;
+const trainingMoveGap = 900;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const bossCanvas = byId('beast');
 const visuals = combatArt(byId('combat-fx'), bossCanvas, reducedMotion);
@@ -69,8 +74,17 @@ const trackingHints = {
   reset: 'Lower your right hand to attack again.',
 };
 let round;
-let tutorialSelected = false;
+let session = 'battle';
 let animation;
+for (const [code, body] of Object.entries(bossBodies)) {
+  trainingBoss.add(new Option(body.label ?? body.name, code));
+}
+const trainingControls = createTrainingControls(moves => {
+  if (!round?.training || round.finished || round.strike !== Infinity) return;
+  round.training.pending = moves;
+  advanceTrainingQueue(performance.now());
+});
+
 paintBoss(bossCanvas, defaultFight.body);
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
@@ -110,7 +124,7 @@ function healInterval() {
 }
 
 function healBoss(now) {
-  if (isTutorial() || now < round.nextHeal || round.hp.enemy <= 0 || round.hp.enemy >= round.maxHp.enemy) return;
+  if (isTutorial() || round.training || now < round.nextHeal || round.hp.enemy <= 0 || round.hp.enemy >= round.maxHp.enemy) return;
   setHealth('enemy', round.hp.enemy + 1);
   round.nextHeal = now + healInterval();
   renderBossLocks(round.locks);
@@ -148,28 +162,48 @@ function confirmPose(move, label, now) {
 }
 
 function updateStartButtons() {
-  webcam.disabled = tutorialButton.disabled = false;
-  showFightOptions(!tutorialSelected);
-  webcam.textContent = tutorialSelected ? 'Tutorial with camera + mic' : 'Enable camera + mic';
-  keyboard.textContent = tutorialSelected ? 'Tutorial with keyboard' : 'Play with keyboard';
-  mobile.textContent = tutorialSelected ? 'Tutorial on mobile' : 'Play on mobile';
-  tutorialButton.textContent = tutorialSelected ? 'Back to battle' : 'Start Tutorial';
+  webcam.disabled = tutorialButton.disabled = trainingButton.disabled = false;
+  showFightOptions(session === 'battle');
+  trainingOptions.hidden = session !== 'training';
+  tutorialButton.hidden = session === 'training';
+  trainingButton.hidden = session === 'tutorial';
+  const action = session === 'training' ? 'Train' : session === 'tutorial' ? 'Tutorial' : 'Play';
+  webcam.textContent = session === 'battle' ? 'Enable camera + mic' : action + ' with camera + mic';
+  keyboard.textContent = action + ' with keyboard';
+  mobile.textContent = action + ' on mobile';
+  tutorialButton.textContent = session === 'tutorial' ? 'Back to battle' : 'Start Tutorial';
+  trainingButton.textContent = session === 'training' ? 'Back to battle' : 'Training Mode';
 }
 
 function showStartMenu() {
   updateStartButtons();
-  if (tutorialSelected) {
+  if (session === 'tutorial') {
     showOverlay('Guided tutorial', 'Choose camera, keyboard, or mobile to learn the moves and open the boss locks.');
+  } else if (session === 'training') {
+    showOverlay('Training Mode', 'Choose a boss, then queue up to three moves to practice against.');
   } else {
     showOverlay('Defend the city.', 'Keep your shoulders and any raised hand in view. You can play sitting or standing.');
   }
 }
 
 tutorialButton.addEventListener('click', () => {
-  tutorialSelected = !tutorialSelected;
+  session = session === 'tutorial' ? 'battle' : 'tutorial';
   showStartMenu();
-  (tutorialSelected ? webcam : tutorialButton).focus({ preventScroll: true });
+  (session === 'tutorial' ? webcam : tutorialButton).focus({ preventScroll: true });
 });
+
+trainingButton.addEventListener('click', () => {
+  session = session === 'training' ? 'battle' : 'training';
+  showStartMenu();
+  (session === 'training' ? trainingBoss : trainingButton).focus({ preventScroll: true });
+});
+
+function advanceTrainingQueue(startAt) {
+  if (round.strike === Infinity && round.training.pending.length && !round.finished) {
+    scheduleTrainingStrike(round, round.training.pending.shift(), startAt);
+  }
+  trainingControls.setRunning(round.strike !== Infinity || Boolean(round.finished));
+}
 
 function resetRound() {
   // Cancel the frame loop and release both devices before showing the menu.
@@ -186,6 +220,7 @@ function resetRound() {
   visuals.clear();
   setBattleHudVisible(false);
   tutorialPanel.hidden = true;
+  trainingControls.show(false);
   arena.removeAttribute('data-tutorial');
   tutorialBadge.hidden = true;
   lockMarkers.hidden = lockStatus.hidden = true;
@@ -194,7 +229,9 @@ function resetRound() {
   device.textContent = defaultStatus;
 }
 
-function startRound(mode, learning, mobileMode = false, fight = defaultFight) {
+function startRound(mode, startingSession, mobileMode, fight) {
+  const learning = startingSession === 'tutorial';
+  const training = startingSession === 'training';
   combatInputs.reset();
   mobileControls.hidden = !mobileMode;
   setMobileHud(mobileMode);
@@ -202,21 +239,22 @@ function startRound(mode, learning, mobileMode = false, fight = defaultFight) {
   const now = performance.now();
   const maxHp = { ...startingHP, enemy: fight.profile.maxHp ?? startingHP.enemy };
   round = {
-    ...openingStrike(mode, learning, now, fight.moves, fight.profile),
-    fight,
+    ...openingStrike(mode, learning || training, now, fight.moves, fight.profile),
+    fight, training: training ? { pending: [] } : null,
     mode, mobile: mobileMode, lessonIndex: learning ? 0 : null, startedAt: now,
     hp: { ...maxHp },
     maxHp,
-    cameraBonusEligible: mode === 'camera' && !learning,
+    cameraBonusEligible: mode === 'camera' && !learning && !training,
     powerCharges: 0, blockBonusUntil: 0, nextPower: now,
     keyboardGuard: false, shaken: false,
     readGesture: gestures(), hitUntil: 0, auraMs: 0, damageTaken: 0, lastTick: now,
-    locks: learning ? [] : bossLocksForOrder(fight.lockOrder, fight.profile), nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
+    locks: learning || training ? [] : bossLocksForOrder(fight.lockOrder, fight.profile),
+    nextHeal: now + battleTiming.healQuietTime + battleTiming.healFullInterval,
     warningStart: randomWarningStart(), burnTickAt: Infinity,
   };
   paintBoss(bossCanvas, fight.body);
   renderBossName(fight.body.name);
-  showFightId(learning ? '' : fight.id);
+  showFightId(learning || training ? '' : fight.id);
   resetHud(round.maxHp, learning ? undefined : round.locks.map(lock => lock.hp));
   updatePowerStock();
   powerStock.hidden = false;
@@ -225,11 +263,12 @@ function startRound(mode, learning, mobileMode = false, fight = defaultFight) {
   cameraBonusStatus.textContent = '+' + cameraBonusPercent + '% camera bonus active';
   arena.toggleAttribute('data-tutorial', learning);
   if (learning) showLesson(now);
-  else {
+  else if (!training) {
     lockMarkers.hidden = lockStatus.hidden = false;
     renderBossLocks(round.locks);
   }
   tutorialBadge.hidden = !learning;
+  trainingControls.show(training);
   arena.dataset.state = 'ready';
   hideOverlay();
   showPose();
@@ -287,7 +326,7 @@ function advanceLesson(now) {
 }
 
 function completeTutorial() {
-  tutorialSelected = false;
+  session = 'battle';
   resetRound();
   arena.dataset.state = 'ready';
   showOverlay('Tutorial complete', 'You learned every move and opened all three locks. In battle, lock moves are shuffled and the boss can heal.');
@@ -308,10 +347,17 @@ function endRound(won) {
   const damage = round.damageTaken;
   const maxHealth = round.maxHp.player;
   const { id: fightId, body } = round.fight;
+  const training = round.training;
   const cameraBonusEligible = round.cameraBonusEligible;
   resetRound();
   showFightId(fightId);
   arena.dataset.state = won ? 'win' : 'ready';
+  if (training) {
+    showOverlay(won ? 'Training complete' : 'Ranger down',
+      won ? body.name + ' has fallen. Start another session to keep practicing.' : 'Start another session to try a different counter.');
+    webcam.focus({ preventScroll: true });
+    return;
+  }
   showOverlay(won ? 'City saved!' : 'Ranger down',
     won ? body.name + ' has fallen.' : 'Raise your right arm to attack and your left arm to guard.');
   if (won) {
@@ -579,6 +625,7 @@ function tick(now) {
   // then render. Keyboard input uses the same move and damage functions.
   if (!round) return;
   if (round.finished) {
+    if (round.training) trainingControls.setRunning(true);
     if (now >= round.finished.until) return round.finished.tutorial ? completeTutorial() : endRound(round.finished.won);
     drawBattle(now, false);
     animation = requestAnimationFrame(tick);
@@ -669,6 +716,7 @@ function tick(now) {
   else if (now < round.strikeNoticeUntil) showWarning(round.strikeNotice);
   else showWarning('No attack incoming');
   drawBattle(now, guard, flash, flame, inhale);
+  if (round.training) advanceTrainingQueue(now + trainingMoveGap);
   animation = requestAnimationFrame(tick);
 }
 
@@ -683,19 +731,32 @@ const cameraSession = createCameraSession({
   },
 });
 
-webcam.addEventListener('click', () => {
-  const learning = tutorialSelected;
-  const fight = learning ? defaultFight : chooseFight();
-  if (fight) void cameraSession.start(() => startRound('camera', learning, false, fight));
+function fightForSession() {
+  if (session === 'tutorial') return defaultFight;
+  if (session !== 'training') return chooseFight();
+  const code = trainingBoss.value;
+  return { body: bossBodies[code], profile: bossProfiles[code], moves: defaultFight.moves };
+}
+
+webcam.addEventListener('click', async () => {
+  const startingSession = session;
+  const fight = fightForSession();
+  if (!fight) return;
+  trainingButton.disabled = true;
+  try {
+    await cameraSession.start(() => startRound('camera', startingSession, false, fight));
+  } finally {
+    trainingButton.disabled = false;
+  }
 });
 
 function startManual(mobileMode) {
-  const fight = tutorialSelected ? defaultFight : chooseFight();
+  const fight = fightForSession();
   if (!fight) return;
   cameraSession.stop();
   updateStartButtons();
   device.textContent = mobileMode ? 'Hold Block to guard and Aura to charge. Tap the other moves.' : defaultStatus;
-  startRound('keyboard', tutorialSelected, mobileMode, fight);
+  startRound('keyboard', session, mobileMode, fight);
 }
 // Some phones/tablets report a fine primary pointer when a mouse is connected.
 keyboard.addEventListener('click', () => startManual(

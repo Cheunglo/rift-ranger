@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101018">
   <meta name="description" content="A webcam-powered arcade boss fight.">
   <title>Rift Ranger</title>
-  <link rel="stylesheet" href="./style.css?v=70">
-  <script type="module" src="./game.mjs?v=70"></script>
+  <link rel="stylesheet" href="./style.css?v=71">
+  <script type="module" src="./game.mjs?v=71"></script>
 </head>
 <body>
   <main>
@@ -110,11 +110,17 @@
             <p id="boss-profile"></p>
             <p id="fight-id-error" role="status"></p>
           </details>
+          <div id="training-options" class="fight-options-fields" hidden>
+            <label>Training boss
+              <select id="training-boss"></select>
+            </label>
+          </div>
           <div class="actions">
             <button id="webcam" type="button">Enable camera + mic</button>
             <button id="keyboard" class="secondary" type="button">Play with keyboard</button>
             <button id="mobile" class="secondary" type="button">Play on mobile</button>
             <button id="tutorial" class="secondary" type="button">Start Tutorial</button>
+            <button id="training" class="secondary" type="button">Training Mode</button>
           </div>
         </div>
       </div>
@@ -132,6 +138,19 @@
       <button type="button" data-action="aura" class="touch-aura">Aura<small id="aura-button-caption">Hold to charge</small></button>
       <button type="button" data-action="beam" class="touch-laser">Laser<small>Tap</small></button>
       <button type="button" data-action="basic" class="touch-slash">Slash<small>Tap</small></button>
+    </section>
+    <section id="training-controls" aria-label="Boss training controls" hidden>
+      <div class="fight-options-fields">
+        <label>Boss move
+          <select id="training-move"></select>
+        </label>
+        <button id="training-add-move" class="secondary" type="button">Add move</button>
+      </div>
+      <ol id="training-queue" aria-label="Move queue"></ol>
+      <div class="training-queue-actions">
+        <output id="training-queue-status" aria-live="polite">0 / 3 moves</output>
+        <button id="training-run-queue" class="secondary" type="button">Run queue</button>
+      </div>
     </section>
     <div class="toolbar">
       <div id="device" role="status">Camera and mic stay on your device.</div>

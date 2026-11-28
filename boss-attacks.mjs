@@ -30,6 +30,7 @@ const shoutGap = 450;
 // rotation chooses a slot without knowing how the move in it works.
 const attacks = {
   laser: {
+    name: 'Eye Lasers',
     firstDelay: pace => pace.firstLaser,
     delay: ({ fastLaser, slowLaser }, hpRatio) => Math.round(fastLaser + (slowLaser - fastLaser) * hpRatio),
     warningDuration: eyeWarningDuration,
@@ -37,6 +38,7 @@ const attacks = {
     hit: { type: 'guardable', effect: 'laser', damage: 19, name: 'Laser' },
   },
   flame: {
+    name: 'Flame Breath',
     firstDelay: flameDelay,
     delay: flameDelay,
     warningDuration: () => flameChargeTime,
@@ -45,6 +47,7 @@ const attacks = {
     hit: { type: 'guardable', effect: 'flame', damage: 10, name: 'Flame', burns: true },
   },
   shout: {
+    name: 'Shout',
     delay: () => shoutGap + shoutTell,
     warningDuration: () => shoutTell,
     tell: readShoutTell,
@@ -53,6 +56,8 @@ const attacks = {
     hit: { type: 'shout', effect: 'shout' },
   },
 };
+
+export const trainingMoves = Object.entries(attacks).map(([id, { name }]) => ({ id, name }));
 
 const currentAttack = round => attacks[round.strikeKind];
 export function moveSlot(moves, kind) {
@@ -66,9 +71,9 @@ function flameDelay(pace) {
 export const warningDuration = round => currentAttack(round).warningDuration(round);
 export const strikeOutcome = round => currentAttack(round).hit;
 
-export function openingStrike(mode, learning, now, bossMoves = riftbeastMoves, profile = bossProfiles.R) {
+export function openingStrike(mode, waitForInput, now, bossMoves = riftbeastMoves, profile = bossProfiles.R) {
   const pace = bossPace[mode];
-  const openingSpecial = !learning && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
+  const openingSpecial = !waitForInput && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
   const strikeKind = openingSpecial ? bossMoves.special : bossMoves.regular;
   const move = attacks[strikeKind];
   const delay = move.firstDelay(pace) + attackGapOffset(profile, null, moveSlot(bossMoves, strikeKind));
@@ -76,7 +81,7 @@ export function openingStrike(mode, learning, now, bossMoves = riftbeastMoves, p
   const minimumTell = openingSpecial ? move.warningDuration() : warningColors.length * warningStep;
   return {
     pace,
-    strike: learning ? Infinity : now + Math.max(minimumTell, delay),
+    strike: waitForInput ? Infinity : now + Math.max(minimumTell, delay),
     profile,
     bossMoves,
     strikeKind,
@@ -94,7 +99,7 @@ function flamePhase(round, now) {
 export function scheduleNextStrike(round, now, hp, maxHp) {
   const previousSlot = moveSlot(round.bossMoves, round.strikeKind);
   round.comboLaserAt = Infinity;
-  if (round.lessonIndex !== null) {
+  if (round.lessonIndex !== null || round.training) {
     round.strike = Infinity;
     return;
   }
@@ -119,6 +124,15 @@ export function scheduleNextStrike(round, now, hp, maxHp) {
   const gap = attackGapOffset(round.profile, previousSlot, moveSlot(round.bossMoves, round.strikeKind));
   round.strike = now + Math.max(move.warningDuration(round), delay + gap);
   if (move.rollCombo) round.comboLaserAt = undefined;
+}
+
+export function scheduleTrainingStrike(round, kind, now) {
+  if (!round.training || round.strike !== Infinity || !Object.hasOwn(attacks, kind)) return;
+  round.strikeKind = kind;
+  // Show the entire tell and leave the flame's optional eye shot out of the drill.
+  round.warningStart = 0;
+  round.comboLaserAt = Infinity;
+  round.strike = now + warningDuration(round);
 }
 
 export function scheduleTutorialFlame(round, now, pause, guardBreak) {
