@@ -69,6 +69,45 @@ test('mobile tutorial shows touch instructions and advances on Slash', { timeout
   assert.match(await page.locator('#tutorial-instruction').textContent(), /hold Block/);
 });
 
+test('camera setup returns control to the selected menu on cancel or failure', { timeout: 20000 }, async t => {
+  const page = await openGame(t, { viewport: { width: 1280, height: 720 } });
+  await page.evaluate(() => {
+    // Exercise camera permissions without opening the browser's real audio graph.
+    Object.defineProperty(window, 'AudioContext', { value: undefined });
+    Object.defineProperty(window, 'webkitAudioContext', { value: undefined });
+    let pending = true;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        /** Hold the first request until cancellation, then simulate refused permissions. */
+        async getUserMedia() {
+          if (pending) {
+            pending = false;
+            await new Promise(resolve => { window.finishCameraRequest = resolve; });
+          }
+          throw new DOMException('Camera denied for test', 'NotAllowedError');
+        },
+      },
+    });
+  });
+  await page.locator('#training').click();
+  await page.locator('#webcam').click();
+  assert(await page.locator('#training').isDisabled());
+  assert(await page.locator('#exit').isVisible());
+  await page.locator('#exit').click();
+  await page.evaluate(() => window.finishCameraRequest());
+  assert.equal(await page.locator('#overlay-title').textContent(), 'Training Mode');
+  assert(await page.locator('#training').isEnabled());
+  assert(await page.locator('#exit').isHidden());
+
+  await page.locator('#webcam').click();
+  await page.waitForFunction(() => document.querySelector('#webcam').textContent === 'Retry camera + mic');
+  assert(await page.locator('#training').isEnabled());
+  assert(await page.locator('#exit').isHidden());
+  await page.locator('#keyboard').click();
+  assert(await page.locator('#training-controls').isVisible());
+  assert(await page.locator('#overlay').isHidden());
+});
+
 test('the Ranger colour persists and paints the suit on mobile', { timeout: 20000 }, async t => {
   const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
   const color = page.getByLabel('Ranger colour');

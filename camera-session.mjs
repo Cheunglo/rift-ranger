@@ -14,7 +14,7 @@ const audioHints = {
 };
 
 /** Own permission requests, local media streams, and the sampled input lifecycle. */
-export function createCameraSession({ onLost, onMicStopped }) {
+export function createCameraSession({ onConnecting, onConnectFailed, onLost, onMicStopped }) {
   /** Find a camera or microphone element in the game markup. */
   const byId = id => document.getElementById(id);
   const camera = byId('camera');
@@ -24,9 +24,6 @@ export function createCameraSession({ onLost, onMicStopped }) {
   const poseContext = trackingPoints.getContext('2d');
   const micStatus = byId('mic-status');
   const micLevel = byId('mic-level');
-  const webcam = byId('webcam');
-  const tutorialButton = byId('tutorial');
-  const exit = byId('exit');
   const device = byId('device');
   let lastVideoTime = -Infinity;
   let lastPosePoll = -Infinity;
@@ -171,9 +168,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
   /** Request camera access, prepare tracking, and start the round once ready. */
   async function start(onReady) {
     const request = ++requestId;
-    webcam.disabled = tutorialButton.disabled = true;
-    webcam.textContent = 'Starting camera…';
-    exit.hidden = false;
+    onConnecting();
     const automaticMic = beginCameraMic();
     let micFallback = !automaticMic;
     device.textContent = automaticMic ? 'Allow camera and microphone access when your browser asks.' :
@@ -233,9 +228,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     } catch (error) {
       if (request !== requestId) return;
       stop();
-      webcam.disabled = tutorialButton.disabled = false;
-      webcam.textContent = 'Retry camera + mic';
-      exit.hidden = true;
+      onConnectFailed();
       const cameraError = error.name === 'NotAllowedError' || error.name === 'NotFoundError' ||
         error.name === 'NotReadableError' || !navigator.mediaDevices;
       device.textContent = cameraError

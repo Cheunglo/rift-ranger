@@ -74,10 +74,11 @@ Gap modifiers never shorten a move's warning. Damage modifiers apply to direct h
 The [architecture guide](ARCHITECTURE.md) maps the modules and explains the round lifecycle.
 
 - `index.html` defines the HUD, controls, and canvases. `style.css` lays them out and keeps the arena fixed during play.
-- `game.mjs` owns the round and resolves combat. Start with `startRound()` and `tick()`.
+- `game.mjs` connects events to the game modules and runs `tick()`. `game-menu.mjs` handles menus and `game-sessions.mjs` starts, finishes, and tears down rounds.
+- `combat-round.mjs` owns combat state and outcomes. `round-drills.mjs` runs the scripted tutorial and training sequences.
 - `boss-fights.mjs` encodes a fight configuration. `boss-bodies.mjs` defines the roster and effect attachment points. `boss-profiles.mjs` defines the stat tradeoffs. `boss-body-art.mjs` paints the modular sprites.
 - `boss-attacks.mjs` owns the Riftbeast’s move slots, attack timing, and flame charge rules. `boss-locks.mjs` owns the shuffled health gates.
-- `battle-hud.mjs` renders warnings, health, Aura, locks, and the score.
+- `battle-view.mjs` presents combat state through the canvas and `battle-hud.mjs`.
 - `camera-session.mjs` handles permissions, starts and stops streams, and samples the camera and mic.
 - `mobile-controls.mjs` handles simultaneous touch and keyboard inputs, including cancellation and focus loss. Run its checks with `node --test tests/mobile-controls.test.mjs`.
 - `controls.mjs` turns camera landmarks and microphone samples into pose, sustained sound, and Laser input.
@@ -85,7 +86,7 @@ The [architecture guide](ARCHITECTURE.md) maps the modules and explains the roun
 
 ## Working on the game
 
-Start at `startRound()` and `tick()` in `game.mjs`. Touch and key input arrives as named actions. The camera session emits pose and audio samples. The round resolves those inputs with boss scheduling, locks, and status rules. It owns HP and other combat state. The HUD renders that state, and the canvas draws the active effects from the boss's attachment points.
+Start at `tick()` in `game.mjs` for the frame flow, or at `start()` in `game-sessions.mjs` for setup. Touch and key input arrives as named actions. The camera session emits pose and audio samples. `combat-round.mjs` resolves those inputs with boss scheduling, locks, and status rules. The battle view presents that state through the HUD and the canvas.
 
 To add a boss attack, add its timing, tell, and outcome to the move definitions in `boss-attacks.mjs`, then put its ID in a boss's Regular, Special, or Status slot. Reuse the guardable outcome for ordinary damage and choose a distinct resolver only for a new game rule. Put new canvas effects in `boss-effects.mjs`. Both tell and hit graphics should use the boss's anchors. Tutorial lessons can provide a separate `mobileHint` when a touch instruction differs.
 
