@@ -1,4 +1,4 @@
-import { bossEffectDurations, createBossEffects } from './boss-effects.mjs?v=58';
+import { bossEffectDurations, createBossEffects } from './boss-effects.mjs?v=76';
 
 // Canvas coordinates are CSS pixels. The boss anchors follow its existing sprite.
 /** Create the arena renderer and its per-round animation state. */
@@ -108,8 +108,8 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.restore();
   }
 
-  /** Outline the guard at the position where incoming effects stop. */
-  function shield(box) {
+  /** Outline the guard and show spreading cracks as its hold runs out. */
+  function shield(box, remaining = 1) {
     const x = box.x - 6;
     const y = box.y - 4;
     const width = box.width + 12;
@@ -123,6 +123,17 @@ export function combatArt(canvas, beast, reducedMotion) {
       const inward = corner === x ? 1 : -1;
       line([[corner, y + 18], [corner, y], [corner + inward * 18, y]], '#dcfcff', 3);
       line([[corner, y + height - 18], [corner, y + height], [corner + inward * 18, y + height]], '#dcfcff', 3);
+    }
+    /** Convert proportional positions to coordinates on this shield. */
+    const point = ([across, down]) => [x + across * width, y + down * height];
+    if (remaining <= .45) {
+      line([[.60, .99], [.54, .83], [.62, .76], [.51, .64], [.55, .54]].map(point), '#d8fbff', 3);
+      line([[.54, .83], [.45, .85], [.41, .77]].map(point), '#a5ebff', 2);
+    }
+    if (remaining <= .2) {
+      line([[.51, .64], [.43, .54], [.48, .45], [.39, .35]].map(point), '#d8fbff', 3);
+      line([[.62, .76], [.74, .69], [.78, .56], [.89, .51]].map(point), '#d8fbff', 2);
+      line([[.45, .85], [.34, .91], [.26, .82], [.12, .79]].map(point), '#d8fbff', 2);
     }
   }
 
@@ -276,7 +287,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       leftLift = rightLift = kneel = 0;
     },
     /** Composite the arena effects and Ranger for one animation frame. */
-    render(now, { left, right, guard, aura, auraStage = 0, suit, flash, beamStrength, beamStage, beamWindUp, flame, inhale, shaken, burning, anchors }) {
+    render(now, { left, right, guard, guardRemaining, aura, auraStage = 0, suit, flash, beamStrength, beamStage, beamWindUp, flame, inhale, shaken, burning, anchors }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
@@ -322,11 +333,14 @@ export function combatArt(canvas, beast, reducedMotion) {
       // Shield, beam and projectiles sit behind the foreground ranger.
       const active = effects.filter(effect => now - effect.now < duration[effect.kind]);
       effects.splice(0, effects.length, ...active);
-      if (guard || active.some(effect => (effect.kind === 'laser' || effect.kind === 'flame') && effect.strength)) shield(boss);
+      if (guard) shield(boss, guardRemaining);
+      else if (!active.some(effect => effect.kind === 'guard-fatigue') &&
+          active.some(effect => (effect.kind === 'laser' || effect.kind === 'flame') && effect.strength)) shield(boss);
       if (flame) bossEffects.fireball(scene, flame);
       if (inhale !== null) bossEffects.inhaleAir(scene, inhale);
       if (beamStrength > 0) beam(scene, beamStrength, beamStage);
       for (const effect of active) {
+        if (guard && effect.kind === 'guard-fatigue') continue;
         const elapsed = now - effect.now;
         ctx.globalAlpha = Math.min(1, (duration[effect.kind] - elapsed) / 130);
         if (effect.kind === 'basic') slash(scene, elapsed);

@@ -6,9 +6,9 @@ import {
 } from './battle-hud.mjs?v=64';
 import { attackTell } from './boss-attacks.mjs?v=74';
 import { paintBoss } from './boss-bodies.mjs?v=70';
-import { combatArt } from './combat-art.mjs?v=75';
+import { combatArt } from './combat-art.mjs?v=76';
 import { createRangerColorPicker } from './ranger-colors.mjs?v=72';
-import { lessons } from './tutorial.mjs?v=75';
+import { lessons } from './tutorial.mjs?v=76';
 
 const trackingHints = {
   framing: 'Move back so the camera can see your shoulders.',
@@ -152,7 +152,7 @@ export function createBattleView(cameraSession, cameraBonusPercent) {
   }
 
   /** Build renderer inputs from the current poses, charge, boss cues, and effects. */
-  function drawBattle(now, combat, guard, flash = null, flame = null, inhale = null) {
+  function drawBattle(now, combat, { guard = false, guardRemaining = 1, flash = null, flame = null, inhale = null } = {}) {
     const round = combat.state;
     const tracked = combat.cameraPoseAt(now);
     const attack = now < round.attackPose?.until ? round.attackPose.move : null;
@@ -162,13 +162,13 @@ export function createBattleView(cameraSession, cameraBonusPercent) {
     visuals.render(now, {
       left: Boolean(tracked?.left || guard || bothArms || windUp.left),
       right: !round.shaken && Boolean(tracked?.right || attack === 'basic' || bothArms || windUp.right),
-      guard, ...combat.auraForDraw(), flash, beamStrength, beamStage: round.beamFlash?.stage, flame, inhale, shaken: round.shaken,
+      guard, guardRemaining, ...combat.auraForDraw(), flash, beamStrength, beamStage: round.beamFlash?.stage, flame, inhale, shaken: round.shaken,
       suit: rangerSuit(), beamWindUp: windUp.beam, burning: round.burnTickAt !== Infinity, anchors: round.fight.body.anchors,
     });
   }
 
   /** Render the current combat cues, pose feedback, and frame of animation. */
-  function render(now, combat, { guard, cameraMove }) {
+  function render(now, combat, { guard, guardRemaining, guardFatigued, cameraMove }) {
     const round = combat.state;
     if (round.mode === 'camera') updateCameraStatus(now, combat);
     const cameraPose = cameraMove?.state;
@@ -176,6 +176,7 @@ export function createBattleView(cameraSession, cameraBonusPercent) {
     const used = round.poseFeedback;
     const recentAction = used && now < used.until;
     if (guardBroken) showPose(round.mode, 'guard', 'Guard broken · release to reset', 'locked');
+    else if (guardFatigued) showPose(round.mode, 'guard', 'Guard worn out · release to reset', 'locked');
     else if (now < round.guardBreakNoticeUntil && !guard) showPose(round.mode, 'guard', 'Raise guard again', 'locked');
     else if (cameraPose === 'power') {
       const counter = !round.shaken && round.powerCharges > 0;
@@ -198,7 +199,7 @@ export function createBattleView(cameraSession, cameraBonusPercent) {
     if (warning) showWarning(round, warning.message, true, warning.hint, warning.showGuardPose);
     else if (now < round.strikeNoticeUntil) showWarning(round, round.strikeNotice);
     else showWarning(round, 'No attack incoming');
-    drawBattle(now, combat, guard, flash, flame, inhale);
+    drawBattle(now, combat, { guard, guardRemaining, flash, flame, inhale });
   }
 
   return { feedback, start, reset, showIdle, showResult, showCameraBonusLost, render, drawBattle };

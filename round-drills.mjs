@@ -2,7 +2,7 @@
 import {
   clearScheduledStrike, hasScheduledStrike, scheduleTrainingStrike, scheduleTutorialFlame, warningDuration,
 } from './boss-attacks.mjs?v=74';
-import { lessons } from './tutorial.mjs?v=75';
+import { lessons } from './tutorial.mjs?v=76';
 
 const trainingMoveGap = 900;
 

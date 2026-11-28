@@ -1,10 +1,10 @@
 // Connects the game modules and advances the active session once per frame.
 import { mobileControls } from './battle-hud.mjs?v=64';
-import { createBattleView } from './battle-view.mjs?v=75';
+import { createBattleView } from './battle-view.mjs?v=76';
 import { parseFightId } from './boss-fights.mjs?v=74';
 import { createCameraSession } from './camera-session.mjs?v=73';
 import { createGameMenu } from './game-menu.mjs?v=75';
-import { createGameSessions } from './game-sessions.mjs?v=75';
+import { createGameSessions } from './game-sessions.mjs?v=76';
 import { bindCombatInputs } from './mobile-controls.mjs?v=75';
 
 const defaultFight = parseFightId('RR1-R-LFS-SPL');
@@ -83,7 +83,7 @@ function tick(now) {
   if (finished) {
     menu.updateTraining(round.trainingBusy);
     if (now >= finished.until) return sessions.finish();
-    view.drawBattle(now, round, false);
+    view.drawBattle(now, round);
   } else {
     const frame = round.step(now, camera);
     if (frame) {

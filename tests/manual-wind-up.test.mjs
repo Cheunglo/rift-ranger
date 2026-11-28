@@ -44,11 +44,16 @@ test('completed holds can commit on release and focus resets discard pending act
 /** Ignore presentation events while checking the combat state directly. */
 function ignore() {}
 
-test('a Block feint only shows the wind-up and a held Block protects after 200 ms', () => {
+/** Start a training round with optional effect logging and no browser presentation. */
+function trainingRound(mode, effect = ignore) {
   const fight = { moves: riftbeastMoves, profile: bossProfiles.R };
-  const round = createCombatRound({ mode: 'keyboard', session: 'training', fight, now: 0 }, {
-    aura: ignore, health: ignore, stock: ignore, pose: ignore, effect: ignore,
+  return createCombatRound({ mode, session: 'training', fight, now: 0 }, {
+    aura: ignore, health: ignore, stock: ignore, pose: ignore, effect,
   });
+}
+
+test('a Block feint only shows the wind-up and a held Block protects after 200 ms', () => {
+  const round = trainingRound('keyboard');
   const media = { readPose: ignore, readAudio: ignore };
   round.enqueue(['laser'], 0);
   round.press('guard', 2600);
@@ -71,4 +76,46 @@ test('a Block feint only shows the wind-up and a held Block protects after 200 m
   assert.equal(round.state.powerCharges, 1);
   round.release('guard', 6120);
   assert(!round.state.keyboardGuard);
+});
+
+test('manual guard cracks, shatters once on expiry, and resets on release', () => {
+  const effects = [];
+  const round = trainingRound('keyboard', kind => effects.push(kind));
+  const media = { readPose: ignore, readAudio: ignore };
+  round.enqueue(['laser'], 200);
+  round.press('guard', 0);
+  assert(round.step(200, media).guard);
+  assert(round.step(2000, media).guardRemaining < .45);
+  assert(round.step(3199, media).guard);
+  const expired = round.step(3200, media);
+  assert(!expired.guard);
+  assert(expired.guardFatigued);
+  assert.equal(round.state.hp.player, 81);
+  assert(!round.step(3600, media).guard);
+  assert.equal(effects.filter(kind => kind === 'guard-fatigue').length, 1);
+
+  round.release('guard', 3650);
+  round.press('guard', 3650);
+  assert(!round.step(3849, media).guard);
+  const fresh = round.step(3850, media);
+  assert(fresh.guard);
+  assert(!fresh.guardFatigued);
+  assert.equal(fresh.guardRemaining, 1);
+});
+
+test('camera gesture guard keeps its shield during a long hold', () => {
+  const round = trainingRound('camera');
+  /** Keep the camera recognizer in its committed guard pose. */
+  round.state.readGesture = () => ({ left: true, guard: true });
+  const media = {
+    /** Supply a fresh frame on each update while the guard gesture is held. */
+    readPose: () => ({ points: [] }),
+    readAudio: ignore,
+  };
+  round.enqueue(['laser'], 3500);
+  assert(round.step(0, media).guard);
+  const frame = round.step(6500, media);
+  assert(frame.guard);
+  assert.equal(frame.guardRemaining, 1);
+  assert.equal(round.state.powerCharges, 1);
 });

@@ -7,7 +7,7 @@ import {
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { attackDamage } from './boss-profiles.mjs?v=64';
 import { gestures } from './controls.mjs?v=68';
-import { createTrainingDrill, createTutorialDrill } from './round-drills.mjs?v=75';
+import { createTrainingDrill, createTutorialDrill } from './round-drills.mjs?v=76';
 import { createManualWindUp } from './manual-wind-up.mjs?v=75';
 
 // All timing values are milliseconds. The animation loop uses one clock.
@@ -32,6 +32,7 @@ const auraStages = [
 const auraCapacity = auraStages.at(-1).chargeMs;
 const micAuraChargeRate = 1.4;
 const beamDuration = 420;
+const guardDuration = 3000;
 
 /** Create the session state and the actions that can update it. */
 export function createCombatRound({ mode, session, mobile: mobileMode, fight, now }, feedback) {
@@ -58,6 +59,8 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
   );
   const { busy, enqueue, continueTraining } = createTrainingDrill(round);
   const manualWindUp = createManualWindUp(commitManualAction);
+  let guardStartedAt = null;
+  let guardFatigued = false;
 
   // Health, resources, and strike resolution
 
@@ -164,6 +167,7 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
     feedback.effect(guarded ? 'guard-break' : 'laser', now);
     if (guarded) {
       // The laser spends the shield. Each held input must be released to rearm.
+      guardStartedAt = null;
       round.keyboardGuardBroken = round.keyboardGuard;
       round.cameraGuardBroken = cameraLeftHeld;
       round.guardBreakNoticeUntil = now + 900;
@@ -384,6 +388,18 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
     return round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
   }
 
+  /** Time a manual shield from formation and shatter it once when exhausted. */
+  function updateGuard(now, ready) {
+    if (!ready) return 1;
+    guardStartedAt ??= now;
+    const remaining = Math.max(0, 1 - (now - guardStartedAt) / guardDuration);
+    if (remaining === 0 && !guardFatigued) {
+      guardFatigued = true;
+      feedback.effect('guard-fatigue', now);
+    }
+    return remaining;
+  }
+
   /** Resolve newly detected poses and latch the actions the round accepts. */
   function applyPose(poseFrame, now) {
     if (!poseFrame) return;
@@ -429,8 +445,10 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
     if (round.finished) return null;
 
     const cameraMove = cameraPoseAt(now);
-    const cameraGuard = cameraMove?.guard && !round.cameraGuardBroken;
-    let guard = (round.keyboardGuard && !round.keyboardGuardBroken) || cameraGuard;
+    const cameraGuard = Boolean(cameraMove?.guard && !round.cameraGuardBroken);
+    const manualGuard = round.keyboardGuard && !round.keyboardGuardBroken;
+    const manualGuardRemaining = updateGuard(now, manualGuard);
+    let guard = cameraGuard || (manualGuard && !guardFatigued);
     updateFlameCombo(round, now);
     if (takeDueComboLaser(round, now)) {
       resolveComboLaser(now, guard, Boolean(cameraMove?.left));
@@ -441,7 +459,10 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
       const outcome = strikeOutcome(round);
       strikeResolvers[outcome.type](outcome, now, guard, cameraGuard);
     }
-    return { guard, cameraMove };
+    return {
+      guard, guardRemaining: cameraGuard ? 1 : manualGuardRemaining,
+      guardFatigued: guardFatigued && !guard, cameraMove,
+    };
   }
 
   /** Format the current charge for the renderer without exposing Aura thresholds. */
@@ -467,7 +488,11 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
   function release(action, now, cancelled) {
     // A shield is active only while held, even if release falls between frames.
     manualWindUp.release(action, now, cancelled || action === 'guard');
-    if (action === 'guard') round.keyboardGuard = round.keyboardGuardBroken = false;
+    if (action === 'guard') {
+      round.keyboardGuard = round.keyboardGuardBroken = false;
+      guardStartedAt = null;
+      guardFatigued = false;
+    }
     if (action === 'aura') round.keyboardHum = false;
   }
 

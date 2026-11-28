@@ -1,5 +1,8 @@
 // Draws boss attack effects around the body's eye and mouth anchors.
-export const bossEffectDurations = { laser: 360, flame: 650, shout: 540, 'guard-break': 460 };
+const shieldShatterDuration = 460;
+export const bossEffectDurations = {
+  laser: 360, flame: 650, shout: 540, 'guard-break': shieldShatterDuration, 'guard-fatigue': shieldShatterDuration,
+};
 
 /** Bind the canvas primitives used by the boss tells and impact effects. */
 export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
@@ -73,9 +76,9 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
     ctx.fill();
   }
 
-  /** Scatter fragments from the shield edge struck by a guard-breaking shot. */
+  /** Scatter fragments from the lower edge of the shield. */
   function shatteredShield(scene, elapsed) {
-    const progress = reducedMotion.matches ? .35 : elapsed / bossEffectDurations['guard-break'];
+    const progress = reducedMotion.matches ? .35 : elapsed / shieldShatterDuration;
     const { x, y, width, height } = scene.boss;
     const center = x + width / 2;
     const impactY = y + height * .82;
@@ -128,8 +131,8 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
   function drawEffect(scene, elapsed, { kind, strength }) {
     if (kind === 'shout') shoutWave(scene, elapsed, strength);
     else if (kind === 'flame') flamethrower(scene, elapsed, strength);
-    else if (kind === 'guard-break') {
-      if (elapsed < bossEffectDurations.laser) lasers(scene, true);
+    else if (kind === 'guard-break' || kind === 'guard-fatigue') {
+      if (kind === 'guard-break' && elapsed < bossEffectDurations.laser) lasers(scene, true);
       shatteredShield(scene, elapsed);
     } else if (kind === 'laser') lasers(scene, strength);
   }

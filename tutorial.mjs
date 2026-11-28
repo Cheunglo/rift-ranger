@@ -10,8 +10,8 @@ export const lessons = [
   {
     id: 'block',
     title: 'Block the laser',
-    hint: 'When the eyes flash, hold your left hand up or hold S through the shot.',
-    mobileHint: 'Hold Block before the shot so your shield has time to form.',
+    hint: 'When the eyes flash, raise your left hand or hold S through the shot. Keyboard guard lasts up to 3 seconds.',
+    mobileHint: 'Hold Block near the shot. Your shield cracks and breaks after 3 seconds. Release to reset it.',
   },
   {
     id: 'counter',
