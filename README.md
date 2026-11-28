@@ -42,6 +42,8 @@ Open **Boss options** to pick a body or roll one at random. The roster includes 
 
 Open **Training Mode** to choose a boss and train with camera, keyboard, or touch. In the session, choose a **Boss move** and use **Add move** to queue up to three moves. **Run queue** plays them in order. Tap a queued move to remove it, or run the same queue again to practice another response. The boss waits when the queue is inactive, keeps the damage it takes, and has no locks or passive healing. The session ends when either fighter reaches zero HP. Eye Lasers, Flame Breath, and Shout are available. Flame Breath plays on its own for counter practice.
 
+Set **Ranger colour** on the start screen. Your browser remembers the armour colour for the next session. Aura colours still show your current charge stage.
+
 Copy the **Fight ID** below the battle and send it to a friend. They can paste it under **Boss options** or open a URL such as `?boss=RR1-T-LFS-SPL`. Attack rolls still vary within the same configuration.
 
 | Piece | Meaning |

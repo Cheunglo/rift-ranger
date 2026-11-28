@@ -39,7 +39,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       [side * mix(25, 38, lift), mix(-25, -88, lift)]];
   }
 
-  function ranger(scene, aura, auraStage) {
+  function ranger(scene, aura, auraStage, { plate, helmet, arm: armColor, leg, light, shade }) {
     ctx.save();
     ctx.translate(scene.x, scene.floor);
     ctx.scale(scene.scale, scene.scale);
@@ -67,33 +67,33 @@ export function combatArt(canvas, beast, reducedMotion) {
       const rightLeg = [[10, -32 + 22 * kneel], [mix(18, 13, kneel), mix(-18, -4, kneel)], [29, -3]];
       for (const joints of [leftLeg, rightLeg]) {
         line(joints, '#171326', 14);
-        line(joints, '#8183bd', 8);
-        line(joints.slice(1), '#5c578f', 7);
+        line(joints, leg, 8);
+        line(joints.slice(1), shade, 7);
       }
       line([[-31, -3], [-23, -3]], '#171326', 8);
       line([[26, -3], [34, -3]], '#171326', 7);
     } else {
       polygon('#171326', [[-17,-34],[17,-34],[20,-8],[28,-3],[27,1],[8,1],[4,-22],[-4,-22],[-8,1],[-27,1],[-28,-3],[-20,-8]]);
-      polygon('#8183bd', [[-17,-32],[-5,-27],[-9,-8],[-19,-5]]);
-      polygon('#a6a7df', [[17,-32],[5,-27],[9,-8],[19,-5]]);
+      polygon(leg, [[-17,-32],[-5,-27],[-9,-8],[-19,-5]]);
+      polygon(light, [[17,-32],[5,-27],[9,-8],[19,-5]]);
     }
     ctx.translate(0, 22 * kneel);
     for (const [side, lift] of [[-1, leftLift], [1, rightLift]]) {
       const joints = arm(side, lift);
       line(joints, '#171326', 17);
-      line(joints, '#a3a4db', 11);
-      line(joints.slice(1), '#5c578f', 7);
+      line(joints, armColor, 11);
+      line(joints.slice(1), shade, 7);
       const [handX, handY] = joints[2];
       ctx.fillStyle = '#e8ff75';
       ctx.fillRect(handX - 4, handY - 4, 8, 8);
     }
     polygon('#171326', [[-21,-70],[21,-70],[25,-60],[19,-33],[13,-27],[-13,-27],[-19,-33],[-25,-60]]);
-    polygon('#d1cdf8', [[-19,-67],[19,-67],[22,-60],[15,-37],[-15,-37],[-22,-60]]);
-    polygon('#5c578f', [[-15,-37],[15,-37],[12,-31],[-12,-31]]);
+    polygon(plate, [[-19,-67],[19,-67],[22,-60],[15,-37],[-15,-37],[-22,-60]]);
+    polygon(shade, [[-15,-37],[15,-37],[12,-31],[-12,-31]]);
     polygon('#4b416f', [[0,-61],[9,-54],[0,-44],[-9,-54]]);
     polygon('#e8ff75', [[0,-58],[5,-54],[0,-48],[-5,-54]]);
     polygon('#171326', [[-17,-86],[-11,-94],[11,-94],[17,-86],[16,-74],[10,-68],[-10,-68],[-16,-74]]);
-    polygon('#adabe4', [[-13,-85],[-9,-90],[9,-90],[13,-85],[12,-76],[8,-72],[-8,-72],[-12,-76]]);
+    polygon(helmet, [[-13,-85],[-9,-90],[9,-90],[13,-85],[12,-76],[8,-72],[-8,-72],[-12,-76]]);
     polygon('#e8ff75', [[-2,-89],[2,-89],[2,-75],[-2,-75]]);
     ctx.restore();
   }
@@ -257,7 +257,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       previousTime = undefined;
       leftLift = rightLift = kneel = 0;
     },
-    render(now, { left, right, guard, aura, auraStage = 0, flash, beamStrength, beamStage, flame, inhale, shaken, burning, anchors }) {
+    render(now, { left, right, guard, aura, auraStage = 0, suit, flash, beamStrength, beamStage, flame, inhale, shaken, burning, anchors }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
@@ -316,7 +316,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       }
       ctx.globalAlpha = 1;
       if (burning) burningRanger(scene, now);
-      ranger(scene, aura, auraStage);
+      ranger(scene, aura, auraStage, suit);
     },
   };
 }

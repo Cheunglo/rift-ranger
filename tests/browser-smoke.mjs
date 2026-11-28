@@ -68,6 +68,22 @@ test('mobile tutorial shows touch instructions and advances on Slash', { timeout
   assert.match(await page.locator('#tutorial-instruction').textContent(), /hold Block/);
 });
 
+test('the Ranger colour persists and paints the suit on mobile', { timeout: 20000 }, async t => {
+  const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
+  const color = page.getByLabel('Ranger colour');
+  assert.equal(await color.inputValue(), 'Gray');
+  await color.selectOption('Red');
+  await page.reload();
+  assert.equal(await color.inputValue(), 'Red');
+  await page.locator('#mobile').click();
+  await page.waitForFunction(() => {
+    const canvas = document.getElementById('combat-fx');
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    return pixels.some((channel, index) => index % 4 === 0 && channel === 239 &&
+      pixels[index + 1] === 83 && pixels[index + 2] === 98 && pixels[index + 3] === 255);
+  });
+});
+
 test('training queues three real attacks and lets the chosen boss reach zero HP', { timeout: 30000 }, async t => {
   const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
   await page.clock.install();

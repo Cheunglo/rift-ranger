@@ -17,9 +17,10 @@ import { parseFightId } from './boss-fights.mjs?v=71';
 import { attackDamage, bossProfiles } from './boss-profiles.mjs?v=64';
 import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=71';
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
-import { combatArt } from './combat-art.mjs?v=70';
+import { combatArt } from './combat-art.mjs?v=72';
 import { gestures } from './controls.mjs?v=68';
 import { createTrainingControls } from './training-controls.mjs?v=71';
+import { createRangerColorPicker } from './ranger-colors.mjs?v=72';
 
 const cameraBonusStatus = byId('camera-bonus-status');
 const webcam = byId('webcam');
@@ -61,6 +62,7 @@ const trainingMoveGap = 900;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const bossCanvas = byId('beast');
 const visuals = combatArt(byId('combat-fx'), bossCanvas, reducedMotion);
+const rangerSuit = createRangerColorPicker(byId('ranger-color'), byId('ranger-color-swatch'));
 const defaultFight = parseFightId('RR1-R-LFS-SPL');
 const trackingHints = {
   framing: 'Move back so the camera can see your shoulders.',
@@ -572,7 +574,7 @@ function drawBattle(now, guard, flash = null, flame = null, inhale = null) {
     left: Boolean(tracked?.left || guard || bothArms),
     right: !round.shaken && Boolean(tracked?.right || attack === 'basic' || bothArms),
     guard, aura: round.auraMs / auraCapacity, auraStage: readyAuraStage()?.level ?? 0, flash, beamStrength, beamStage: round.beamFlash?.stage, flame, inhale, shaken: round.shaken,
-    burning: round.burnTickAt !== Infinity, anchors: round.fight.body.anchors,
+    suit: rangerSuit(), burning: round.burnTickAt !== Infinity, anchors: round.fight.body.anchors,
   });
 }
 
