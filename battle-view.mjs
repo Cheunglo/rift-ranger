@@ -6,9 +6,11 @@ import {
 } from './battle-hud.mjs?v=64';
 import { attackTell } from './boss-attacks.mjs?v=74';
 import { paintBoss } from './boss-bodies.mjs?v=70';
-import { combatArt } from './combat-art.mjs?v=76';
-import { createRangerColorPicker } from './ranger-colors.mjs?v=72';
+import { combatArt } from './combat-art.mjs?v=77';
+import { createRangerColorPicker } from './ranger-colors.mjs?v=77';
 import { lessons } from './tutorial.mjs?v=76';
+
+const damagePulseDuration = 180;
 
 const trackingHints = {
   framing: 'Move back so the camera can see your shoulders.',
@@ -159,11 +161,14 @@ export function createBattleView(cameraSession, cameraBonusPercent) {
     const bothArms = attack === 'power' || attack === 'heal';
     const beamStrength = now < round.beamFlash?.until ? round.beamFlash.strength : 0;
     const windUp = combat.windUpForDraw();
+    const damagePulse = round.damagePulseAt === undefined ? 0 :
+      Math.max(0, 1 - (now - round.damagePulseAt) / damagePulseDuration);
     visuals.render(now, {
       left: Boolean(tracked?.left || guard || bothArms || windUp.left),
       right: !round.shaken && Boolean(tracked?.right || attack === 'basic' || bothArms || windUp.right),
       guard, guardRemaining, ...combat.auraForDraw(), flash, beamStrength, beamStage: round.beamFlash?.stage, flame, inhale, shaken: round.shaken,
-      suit: rangerSuit(), beamWindUp: windUp.beam, burning: round.burnTickAt !== Infinity, anchors: round.fight.body.anchors,
+      suit: rangerSuit(), damagePulse, beamWindUp: windUp.beam,
+      burning: round.burnTickAt !== Infinity, anchors: round.fight.body.anchors,
     });
   }
 

@@ -1,5 +1,5 @@
 // Owns the active session and coordinates its start, results, and teardown.
-import { createCombatRound, startingHP } from './combat-round.mjs?v=76';
+import { createCombatRound, startingHP } from './combat-round.mjs?v=77';
 
 /** Connect a session's combat state to the menu, arena, devices, and frame loop. */
 export function createGameSessions({ defaultFight, view, menu, camera, controls, startFrames, stopFrames }) {

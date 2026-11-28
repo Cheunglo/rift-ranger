@@ -198,6 +198,7 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
   function hurtPlayer(amount, now) {
     const damage = Math.min(round.hp.player, amount);
     round.damageTaken += damage;
+    if (damage > 0) round.damagePulseAt = now;
     setHealth('player', round.hp.player - damage);
     if (round.hp.player === 0) round.finished = { won: false, until: now + 400 };
     return damage;

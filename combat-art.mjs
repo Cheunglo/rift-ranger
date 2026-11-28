@@ -44,8 +44,25 @@ export function combatArt(canvas, beast, reducedMotion) {
       [side * mix(25, 38, lift), mix(-25, -88, lift)]];
   }
 
+  /** Tint one armour layer toward its impact colour while retaining its shading. */
+  function pulseTint(color, tint, amount) {
+    if (!amount) return color;
+    const base = Number.parseInt(color.slice(1), 16);
+    const target = Number.parseInt(tint.slice(1), 16);
+    const channels = [16, 8, 0].map(shift => Math.round(mix((base >> shift) & 255, (target >> shift) & 255, amount)));
+    return 'rgb(' + channels.join(',') + ')';
+  }
+
   /** Draw the selected armour, Aura, and pose including a right-knee kneel. */
-  function ranger(scene, aura, auraStage, { plate, helmet, arm: armColor, leg, light, shade }, beamWindUp) {
+  function ranger(scene, aura, auraStage, suit, damagePulse, beamWindUp) {
+    // Leave the Aura, trim, and outline at their own colours.
+    const tint = damagePulse * .78;
+    const plate = pulseTint(suit.plate, suit.pulse, tint);
+    const helmet = pulseTint(suit.helmet, suit.pulse, tint);
+    const armColor = pulseTint(suit.arm, suit.pulse, tint);
+    const leg = pulseTint(suit.leg, suit.pulse, tint);
+    const light = pulseTint(suit.light, suit.pulse, tint);
+    const shade = pulseTint(suit.shade, suit.pulse, tint);
     ctx.save();
     ctx.translate(scene.x, scene.floor);
     ctx.scale(scene.scale, scene.scale);
@@ -287,7 +304,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       leftLift = rightLift = kneel = 0;
     },
     /** Composite the arena effects and Ranger for one animation frame. */
-    render(now, { left, right, guard, guardRemaining, aura, auraStage = 0, suit, flash, beamStrength, beamStage, beamWindUp, flame, inhale, shaken, burning, anchors }) {
+    render(now, { left, right, guard, guardRemaining, aura, auraStage = 0, suit, damagePulse = 0, flash, beamStrength, beamStage, beamWindUp, flame, inhale, shaken, burning, anchors }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
@@ -350,7 +367,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       }
       ctx.globalAlpha = 1;
       if (burning) burningRanger(scene, now);
-      ranger(scene, aura, auraStage, suit, beamWindUp);
+      ranger(scene, aura, auraStage, suit, damagePulse, beamWindUp);
     },
   };
 }

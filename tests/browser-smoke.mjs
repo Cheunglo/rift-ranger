@@ -50,6 +50,17 @@ async function holdButton(page, button, ms = 240) {
   await page.mouse.up();
 }
 
+/** Sample the Ranger's armour beside the central emblem on the effects canvas. */
+async function rangerArmourPixel(page) {
+  return page.locator('#combat-fx').evaluate(canvas => {
+    const { width, height } = canvas.getBoundingClientRect();
+    const scale = Math.min(1.3, width / 500, height / 420);
+    const x = Math.round((width * .5 - 13 * scale) * canvas.width / width);
+    const y = Math.round((height * .95 - 54 * scale) * canvas.height / height);
+    return Array.from(canvas.getContext('2d').getImageData(x, y, 1, 1).data);
+  });
+}
+
 test('desktop controls use Space and display combat HP from round state', { timeout: 20000 }, async t => {
   const page = await openGame(t, { viewport: { width: 1280, height: 620 } });
   await page.clock.install();
@@ -144,6 +155,33 @@ test('the Ranger colour persists and paints the suit on mobile', { timeout: 2000
     return pixels.some((channel, index) => index % 4 === 0 && channel === 239 &&
       pixels[index + 1] === 83 && pixels[index + 2] === 98 && pixels[index + 3] === 255);
   });
+});
+
+test('Flame Breath pulses the armour on contact and on each Burn tick', { timeout: 25000 }, async t => {
+  const page = await openGame(t, { viewport: { width: 390, height: 740 }, hasTouch: true });
+  await page.clock.install();
+  await page.getByLabel('Ranger colour').selectOption('Red');
+  await page.locator('#training').click();
+  await page.locator('#mobile').click();
+  await page.locator('#training-move').selectOption('flame');
+  await page.locator('#training-add-move').click();
+  const now = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(now + 100);
+  const base = await rangerArmourPixel(page);
+  assert.deepEqual(base, [239, 83, 98, 255]);
+  await page.locator('#training-run-queue').click();
+  const health = page.locator('#player');
+
+  await page.clock.runFor(7160);
+  assert.equal(await health.getAttribute('value'), '90');
+  assert((await rangerArmourPixel(page))[1] > base[1] + 40);
+  for (const hp of ['89', '88']) {
+    await page.clock.runFor(500);
+    assert.deepEqual(await rangerArmourPixel(page), base);
+    await page.clock.runFor(500);
+    assert.equal(await health.getAttribute('value'), hp);
+    assert((await rangerArmourPixel(page))[1] > base[1] + 40);
+  }
 });
 
 test('training queues three real attacks and lets the chosen boss reach zero HP', { timeout: 30000 }, async t => {
