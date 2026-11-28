@@ -45,7 +45,7 @@ export function combatArt(canvas, beast, reducedMotion) {
   }
 
   /** Draw the selected armour, Aura, and pose including a right-knee kneel. */
-  function ranger(scene, aura, auraStage, { plate, helmet, arm: armColor, leg, light, shade }) {
+  function ranger(scene, aura, auraStage, { plate, helmet, arm: armColor, leg, light, shade }, beamWindUp) {
     ctx.save();
     ctx.translate(scene.x, scene.floor);
     ctx.scale(scene.scale, scene.scale);
@@ -101,6 +101,10 @@ export function combatArt(canvas, beast, reducedMotion) {
     polygon('#171326', [[-17,-86],[-11,-94],[11,-94],[17,-86],[16,-74],[10,-68],[-10,-68],[-16,-74]]);
     polygon(helmet, [[-13,-85],[-9,-90],[9,-90],[13,-85],[12,-76],[8,-72],[-8,-72],[-12,-76]]);
     polygon('#e8ff75', [[-2,-89],[2,-89],[2,-75],[-2,-75]]);
+    if (beamWindUp) {
+      line([[-10, -55], [10, -55]], '#fff5dd', 2);
+      line([[0, -64], [0, -46]], '#fff5dd', 2);
+    }
     ctx.restore();
   }
 
@@ -272,7 +276,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       leftLift = rightLift = kneel = 0;
     },
     /** Composite the arena effects and Ranger for one animation frame. */
-    render(now, { left, right, guard, aura, auraStage = 0, suit, flash, beamStrength, beamStage, flame, inhale, shaken, burning, anchors }) {
+    render(now, { left, right, guard, aura, auraStage = 0, suit, flash, beamStrength, beamStage, beamWindUp, flame, inhale, shaken, burning, anchors }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
       const rect = canvas.getBoundingClientRect();
@@ -332,7 +336,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       }
       ctx.globalAlpha = 1;
       if (burning) burningRanger(scene, now);
-      ranger(scene, aura, auraStage, suit);
+      ranger(scene, aura, auraStage, suit, beamWindUp);
     },
   };
 }

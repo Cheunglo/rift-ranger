@@ -7,7 +7,7 @@ const rangerKeys = {
 };
 
 /** Map physical keys and pointer sources onto the same combat actions. */
-export function bindCombatInputs(panel, { active, press, release }, target = window, doc = document) {
+export function bindCombatInputs(panel, { active, press, release, cancel }, target = window, doc = document) {
   const held = new Map();
   const buttons = [...panel.querySelectorAll('[data-action]')];
   /** Check whether any tracked input still holds the given action. */
@@ -22,19 +22,20 @@ export function bindCombatInputs(panel, { active, press, release }, target = win
     const alreadyHeld = holding(action);
     held.set(source, action);
     paint();
-    if (!alreadyHeld || (action !== 'guard' && action !== 'aura')) press(action, fromButton);
+    if (!alreadyHeld) press(action, fromButton, true);
   }
   /** Release a source and end the action only when no other source holds it. */
-  function up(source) {
+  function up(source, cancelled = false) {
     const action = held.get(source);
     if (!action) return;
     held.delete(source);
-    if (!holding(action)) release(action);
+    if (!holding(action)) release(action, cancelled);
     paint();
   }
   /** Release tracked input when the session or its focus is lost. */
   function reset() {
-    for (const source of [...held.keys()]) up(source);
+    for (const source of [...held.keys()]) up(source, true);
+    cancel?.();
   }
   for (const button of buttons) {
     button.addEventListener('pointerdown', event => {
@@ -44,7 +45,7 @@ export function bindCombatInputs(panel, { active, press, release }, target = win
       down(event.pointerId, button.dataset.action, true);
     });
     for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-      button.addEventListener(type, event => up(event.pointerId));
+      button.addEventListener(type, event => up(event.pointerId, type !== 'pointerup'));
     }
     button.addEventListener('contextmenu', event => event.preventDefault());
     // Keyboard and assistive-technology activation of the visible buttons.
@@ -56,12 +57,13 @@ export function bindCombatInputs(panel, { active, press, release }, target = win
     });
     button.addEventListener('keyup', event => up('button-' + event.key));
     button.addEventListener('blur', () => {
-      up('button-Enter');
+      up('button-Enter', true);
     });
     button.addEventListener('click', event => {
       if (event.detail !== 0 || !active() || holding(button.dataset.action)) return;
-      down('activate', button.dataset.action, true);
-      up('activate');
+      // Assistive activation has no physical hold to measure.
+      press(button.dataset.action, true, false);
+      release(button.dataset.action, false);
     });
   }
   target.addEventListener('keydown', event => {

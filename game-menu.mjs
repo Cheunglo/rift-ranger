@@ -65,7 +65,7 @@ export function createGameMenu({ defaultFight, cameraBonusPercent, startCamera, 
     if (!fight) return;
     stopCamera();
     updateStartButtons();
-    setDeviceStatus(mobileMode ? 'Hold Block to guard and Aura to charge. Tap the other moves.' : defaultStatus);
+    setDeviceStatus('Hold Block and attacks briefly to commit. Release early to feint.');
     startRound({ mode: 'keyboard', session, mobile: mobileMode, fight });
   }
 

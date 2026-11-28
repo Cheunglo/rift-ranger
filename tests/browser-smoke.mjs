@@ -35,23 +35,40 @@ async function openGame(t, options) {
   return page;
 }
 
+/** Hold a keyboard combat action through the manual wind-up. */
+async function holdKey(page, key, ms = 240) {
+  await page.keyboard.down(key);
+  await page.clock.runFor(ms);
+  await page.keyboard.up(key);
+}
+
+/** Hold a mobile control through its pointer-driven wind-up. */
+async function holdButton(page, button, ms = 240) {
+  await button.hover();
+  await page.mouse.down();
+  await page.clock.runFor(ms);
+  await page.mouse.up();
+}
+
 test('desktop controls use Space and display combat HP from round state', { timeout: 20000 }, async t => {
   const page = await openGame(t, { viewport: { width: 1280, height: 620 } });
+  await page.clock.install();
   await page.locator('#keyboard').click();
   assert(await page.locator('#mobile-controls').isHidden());
   await page.locator('#warning-toggle').focus();
   const scrollY = await page.evaluate(() => window.scrollY);
   await page.keyboard.down('Space');
+  await page.clock.runFor(840);
   await page.waitForFunction(() => document.querySelector('#arena').dataset.auraStage === '1');
   await page.keyboard.up('Space');
   assert.equal(await page.evaluate(() => window.scrollY), scrollY);
   assert.equal(await page.locator('#warning-toggle').getAttribute('aria-expanded'), 'true');
   // Changing the bar does not change the opponent's combat HP.
   await page.locator('#enemy').evaluate(bar => { bar.value = 10; });
-  await page.keyboard.press('j');
+  await holdKey(page, 'j');
   assert(Number(await page.locator('#enemy').getAttribute('value')) > 80);
   assert.equal(await page.locator('#arena').getAttribute('data-aura-stage'), '0');
-  await page.keyboard.press('k');
+  await holdKey(page, 'k');
   assert(Number(await page.locator('#enemy').getAttribute('value')) < 94);
   await page.locator('#exit').click();
   assert(await page.locator('#overlay').isVisible());
@@ -60,13 +77,18 @@ test('desktop controls use Space and display combat HP from round state', { time
 
 test('mobile tutorial shows touch instructions and advances on Slash', { timeout: 20000 }, async t => {
   const page = await openGame(t, { viewport: { width: 360, height: 640 }, hasTouch: true });
+  await page.clock.install();
   await page.locator('#tutorial').click();
   await page.locator('#mobile').click();
-  assert.match(await page.locator('#tutorial-instruction').textContent(), /Tap Slash/);
+  assert.match(await page.locator('#tutorial-instruction').textContent(), /Hold Slash/);
   assert.equal(await page.locator('#mobile-controls button').count(), 5);
-  await page.locator('[data-action="basic"]').tap();
+  const slash = page.locator('[data-action="basic"]');
+  await slash.tap();
+  await page.clock.runFor(240);
+  assert.equal(await page.locator('#tutorial-title').textContent(), 'Basic slash');
+  await holdButton(page, slash);
   await page.waitForFunction(() => document.querySelector('#tutorial-title').textContent === 'Block the laser');
-  assert.match(await page.locator('#tutorial-instruction').textContent(), /hold Block/);
+  assert.match(await page.locator('#tutorial-instruction').textContent(), /hold Block/i);
 });
 
 test('camera setup returns control to the selected menu on cancel or failure', { timeout: 20000 }, async t => {
@@ -133,7 +155,7 @@ test('training queues three real attacks and lets the chosen boss reach zero HP'
   assert.equal(await page.locator('#boss-name').textContent(), 'Iron Beetle');
   assert(await page.locator('#lock-status').isHidden());
   assert.equal(await page.locator('#lock-markers .lock-marker').count(), 0);
-  await page.locator('[data-action="basic"]').tap();
+  await holdButton(page, page.locator('[data-action="basic"]'));
   const enemy = page.locator('#enemy');
   const damagedHp = Number(await enemy.getAttribute('value'));
   assert(damagedHp < 100);
@@ -159,7 +181,7 @@ test('training queues three real attacks and lets the chosen boss reach zero HP'
   assert(await run.isDisabled());
   await page.clock.runFor(950);
   assert.equal(await page.locator('#boss-panel-label').textContent(), 'Flamethrower');
-  await page.keyboard.press('k');
+  await holdKey(page, 'k');
   await page.clock.runFor(1900);
   assert(await page.locator('#shaken-status').isVisible());
   assert(await run.isEnabled());
@@ -168,13 +190,13 @@ test('training queues three real attacks and lets the chosen boss reach zero HP'
   await page.keyboard.down('Space');
   await page.clock.runFor(850);
   await page.keyboard.up('Space');
-  await page.keyboard.press('d');
+  await holdKey(page, 'd');
   assert(await page.locator('#shaken-status').isHidden());
   assert.equal(await page.locator('#training-queue li').count(), 3);
   await page.locator('#training-queue button').last().click();
   assert(await add.isEnabled());
   for (let i = 0; i < 40 && Number(await enemy.getAttribute('value')) > 0; i++) {
-    await page.keyboard.press('k');
+    await holdKey(page, 'k');
   }
   assert.equal(await enemy.getAttribute('value'), '0');
   await page.clock.runFor(600);

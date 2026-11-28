@@ -1,11 +1,11 @@
 // Connects the game modules and advances the active session once per frame.
 import { mobileControls } from './battle-hud.mjs?v=64';
-import { createBattleView } from './battle-view.mjs?v=74';
+import { createBattleView } from './battle-view.mjs?v=75';
 import { parseFightId } from './boss-fights.mjs?v=74';
 import { createCameraSession } from './camera-session.mjs?v=73';
-import { createGameMenu } from './game-menu.mjs?v=74';
-import { createGameSessions } from './game-sessions.mjs?v=74';
-import { bindCombatInputs } from './mobile-controls.mjs?v=71';
+import { createGameMenu } from './game-menu.mjs?v=75';
+import { createGameSessions } from './game-sessions.mjs?v=75';
+import { bindCombatInputs } from './mobile-controls.mjs?v=75';
 
 const defaultFight = parseFightId('RR1-R-LFS-SPL');
 const cameraBonusPercent = 20;
@@ -52,12 +52,14 @@ const controls = bindCombatInputs(mobileControls, {
     return Boolean(round && !round.state.finished);
   },
   /** Route a manual press through the active round. */
-  press(action, touch) {
+  press(action, touch, requiresHold) {
     sessions.forfeitCameraBonus(touch ? 'Touch controls used' : 'Keyboard used');
-    sessions.active().press(action, performance.now());
+    sessions.active().press(action, performance.now(), requiresHold);
   },
   /** Release the input if its round still exists. */
-  release(action) { sessions.active()?.release(action); },
+  release(action, cancelled) { sessions.active()?.release(action, performance.now(), cancelled); },
+  /** Cancel uncommitted feints when controls lose focus or are reset. */
+  cancel() { sessions.active()?.cancelManualWindUp(); },
 });
 const sessions = createGameSessions({
   defaultFight, view, menu, camera, controls, startFrames: requestNextFrame,

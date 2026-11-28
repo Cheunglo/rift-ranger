@@ -7,7 +7,8 @@ import {
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { attackDamage } from './boss-profiles.mjs?v=64';
 import { gestures } from './controls.mjs?v=68';
-import { createTrainingDrill, createTutorialDrill } from './round-drills.mjs?v=74';
+import { createTrainingDrill, createTutorialDrill } from './round-drills.mjs?v=75';
+import { createManualWindUp } from './manual-wind-up.mjs?v=75';
 
 // All timing values are milliseconds. The animation loop uses one clock.
 const battleTiming = {
@@ -56,6 +57,7 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
     round, feedback, { setHealth, updatePowerStock },
   );
   const { busy, enqueue, continueTraining } = createTrainingDrill(round);
+  const manualWindUp = createManualWindUp(commitManualAction);
 
   // Health, resources, and strike resolution
 
@@ -420,6 +422,8 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
     const micCharge = readMicCharge(media, now);
     if (round.finished) return null;
     updateAura(now, round.keyboardHum ? delta : micCharge);
+    manualWindUp.advance(now);
+    if (round.finished) return null;
     healBoss(now);
     applyBurn(now);
     if (round.finished) return null;
@@ -445,18 +449,37 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
     return { aura: round.auraMs / auraCapacity, auraStage: readyAuraStage()?.level ?? 0 };
   }
 
-  /** Record manual input or immediately resolve a newly pressed action. */
-  function press(action, now) {
+  /** Resolve a manual move after its wind-up has committed. */
+  function commitManualAction(action, now) {
+    if (round.finished) return;
     if (action === 'guard') round.keyboardGuard = true;
-    else if (action === 'aura') round.keyboardHum = true;
     else if (action === 'beam') fireBeam(now);
     else attack(action, now);
   }
 
-  /** Clear held guard or Aura when its last input is released. */
-  function release(action) {
+  /** Charge Aura immediately or show a wind-up for the pressed action. */
+  function press(action, now, requiresHold = true) {
+    if (action === 'aura') round.keyboardHum = true;
+    else if (action !== 'guard' || requiresHold) manualWindUp.start(action, now, requiresHold);
+  }
+
+  /** End held guard or Aura and cancel a wind-up released too early. */
+  function release(action, now, cancelled) {
+    // A shield is active only while held, even if release falls between frames.
+    manualWindUp.release(action, now, cancelled || action === 'guard');
     if (action === 'guard') round.keyboardGuard = round.keyboardGuardBroken = false;
     if (action === 'aura') round.keyboardHum = false;
+  }
+
+  /** Expose the preparing poses so opponents can see an attack or guard feint. */
+  function windUpForDraw() {
+    if (round.finished) return {};
+    const power = manualWindUp.isPending('power');
+    return {
+      left: power || manualWindUp.isPending('guard'),
+      right: power || manualWindUp.isPending('basic'),
+      beam: manualWindUp.isPending('beam'),
+    };
   }
 
   /** Continue the active round with manual inputs after camera disconnection. */
@@ -479,8 +502,8 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
   return {
     /** Report whether the training queue is busy and should stay locked. */
     get trainingBusy() { return busy(); },
-    state: round, initialize, step, press, release, useKeyboard, stopMic,
+    state: round, initialize, step, press, release, cancelManualWindUp: manualWindUp.cancel, useKeyboard, stopMic,
     enqueue, continueTraining, forfeitCameraBonus,
-    cameraPoseAt, auraForDraw, healBlockReason,
+    cameraPoseAt, auraForDraw, healBlockReason, windUpForDraw,
   };
 }

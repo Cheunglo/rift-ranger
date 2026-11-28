@@ -14,7 +14,7 @@ flowchart TD
   Menus["game-menu.mjs · fight-picker.mjs · training-controls.mjs<br/>Session selection, sharing, and practice queue"]
   Input["mobile-controls.mjs · camera-session.mjs<br/>Keyboard, touch, and media lifecycle"]
   Detection["controls.mjs<br/>Pose and sound recognition"]
-  Combat["combat-round.mjs<br/>Round state and combat resolution"]
+  Combat["combat-round.mjs · manual-wind-up.mjs<br/>Round state, input wind-ups, and combat resolution"]
   Drills["round-drills.mjs · tutorial.mjs<br/>Scripted tutorial and training progression"]
   Fights["boss-fights.mjs · boss-bodies.mjs · boss-profiles.mjs<br/>Fight IDs, bodies, anchors, and stats"]
   Rules["boss-attacks.mjs · boss-locks.mjs<br/>Attack timing and health gates"]
@@ -50,7 +50,7 @@ The two arrows between fight data and rules summarize different file dependencie
 
 ## A combat frame
 
-1. Keyboard and touch handlers translate physical input into named actions such as Slash and held Block. The frame loop samples the camera and microphone, which report gestures, sustained sound, and brief firing cues.
+1. Keyboard and touch handlers translate physical input into named actions such as Slash and held Block. The round tracks their wind-up deadlines and cancels early releases. The frame loop also samples the camera and microphone, which report gestures, sustained sound, and brief firing cues.
 2. `game.mjs` calls the active round's `step()`. The round owns HP, Aura, banked Powerwaves, and status state. It resolves actions using the boss scheduler and lock helpers.
 3. `game.mjs` passes the result to the battle view, advances any pending training drill, and requests the next frame. The view updates the HUD and renders the Ranger pose, the boss's attachment points, and current effects. Combat reports immediate HUD or effect changes through feedback callbacks. A displayed HP bar is a view of round state, so editing the DOM does not alter combat.
 
