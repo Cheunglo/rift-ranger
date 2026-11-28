@@ -3,8 +3,8 @@ import { byId, showBattleResult, showOverlay } from './battle-hud.mjs?v=64';
 import { bossBodies } from './boss-bodies.mjs?v=70';
 import { bossProfiles } from './boss-profiles.mjs?v=64';
 import { defaultStatus } from './camera-session.mjs?v=73';
-import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=71';
-import { createTrainingControls } from './training-controls.mjs?v=71';
+import { chooseFight, showFightId, showFightOptions } from './fight-picker.mjs?v=74';
+import { createTrainingControls } from './training-controls.mjs?v=74';
 
 /** Bind the menu to the session actions it can request. */
 export function createGameMenu({ defaultFight, cameraBonusPercent, startCamera, startRound, stopCamera, onExit, onTrainingQueue }) {
@@ -96,8 +96,8 @@ export function createGameMenu({ defaultFight, cameraBonusPercent, startCamera, 
   }
 
   /** Indicate whether the current practice sequence can be edited or replayed. */
-  function updateTraining(round) {
-    if (round.training) trainingControls.setRunning(round.strike !== Infinity || Boolean(round.finished));
+  function updateTraining(trainingBusy) {
+    trainingControls.setRunning(trainingBusy);
   }
 
   /** Restore idle controls and clear any round-specific share or device message. */

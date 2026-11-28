@@ -156,6 +156,7 @@ test('training queues three real attacks and lets the chosen boss reach zero HP'
   await page.clock.runFor(3100);
   await page.keyboard.up('s');
   assert.match(await page.locator('#power-stock').textContent(), /Powerwaves: 1/);
+  assert(await run.isDisabled());
   await page.clock.runFor(950);
   assert.equal(await page.locator('#boss-panel-label').textContent(), 'Flamethrower');
   await page.keyboard.press('k');

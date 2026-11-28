@@ -2,12 +2,12 @@
 // synchronously so input and timer-driven actions update the same HUD.
 import {
   coolFlame, moveSlot, openingStrike, randomWarningStart, scheduleNextStrike,
-  scheduleTutorialFlame, strikeOutcome, updateFlameCombo, warningDuration,
-} from './boss-attacks.mjs?v=71';
+  scheduleTutorialFlame, strikeOutcome, takeDueComboLaser, updateFlameCombo, warningDuration,
+} from './boss-attacks.mjs?v=74';
 import { bossHit, bossLocksForOrder, lockRequirement } from './boss-locks.mjs?v=64';
 import { attackDamage } from './boss-profiles.mjs?v=64';
 import { gestures } from './controls.mjs?v=68';
-import { createTrainingDrill, createTutorialDrill } from './round-drills.mjs?v=73';
+import { createTrainingDrill, createTutorialDrill } from './round-drills.mjs?v=74';
 
 // All timing values are milliseconds. The animation loop uses one clock.
 const battleTiming = {
@@ -55,7 +55,7 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
   const { isTutorial, lesson, showLesson, advanceLesson } = createTutorialDrill(
     round, feedback, { setHealth, updatePowerStock },
   );
-  const { enqueue, continueTraining } = createTrainingDrill(round);
+  const { busy, enqueue, continueTraining } = createTrainingDrill(round);
 
   // Health, resources, and strike resolution
 
@@ -159,7 +159,6 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
 
   /** Resolve the optional eye shot and require a fresh guard if it shatters the shield. */
   function resolveComboLaser(now, guarded, cameraLeftHeld) {
-    round.comboLaserAt = Infinity;
     feedback.effect(guarded ? 'guard-break' : 'laser', now);
     if (guarded) {
       // The laser spends the shield. Each held input must be released to rearm.
@@ -429,7 +428,7 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
     const cameraGuard = cameraMove?.guard && !round.cameraGuardBroken;
     let guard = (round.keyboardGuard && !round.keyboardGuardBroken) || cameraGuard;
     updateFlameCombo(round, now);
-    if (now >= round.comboLaserAt) {
+    if (takeDueComboLaser(round, now)) {
       resolveComboLaser(now, guard, Boolean(cameraMove?.left));
       guard = false;
       if (round.finished) return null;
@@ -478,6 +477,8 @@ export function createCombatRound({ mode, session, mobile: mobileMode, fight, no
   }
 
   return {
+    /** Report whether the training queue is busy and should stay locked. */
+    get trainingBusy() { return busy(); },
     state: round, initialize, step, press, release, useKeyboard, stopMic,
     enqueue, continueTraining, forfeitCameraBonus,
     cameraPoseAt, auraForDraw, healBlockReason,

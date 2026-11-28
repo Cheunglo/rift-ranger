@@ -4,7 +4,7 @@ import {
   renderAura, renderBossLabel, renderBossLocks, renderBossName, renderHealth, renderPose,
   renderPowerStock, resetHud, setBattleHudVisible, setMobileHud, shakenStatus, showBattleWarning,
 } from './battle-hud.mjs?v=64';
-import { attackTell } from './boss-attacks.mjs?v=71';
+import { attackTell } from './boss-attacks.mjs?v=74';
 import { paintBoss } from './boss-bodies.mjs?v=70';
 import { combatArt } from './combat-art.mjs?v=72';
 import { createRangerColorPicker } from './ranger-colors.mjs?v=72';

@@ -1,4 +1,4 @@
-import { trainingMoves } from './boss-attacks.mjs?v=71';
+import { trainingMoves } from './boss-attacks.mjs?v=74';
 
 const queueLimit = 3;
 

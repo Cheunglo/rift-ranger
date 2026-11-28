@@ -1,5 +1,5 @@
 import { bossBodies } from './boss-bodies.mjs?v=70';
-import { riftbeastMoves } from './boss-attacks.mjs?v=71';
+import { riftbeastMoves } from './boss-attacks.mjs?v=74';
 import { baseLockThresholds, createBossLocks } from './boss-locks.mjs?v=64';
 import { bossProfiles } from './boss-profiles.mjs?v=64';
 

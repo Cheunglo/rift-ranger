@@ -1,5 +1,7 @@
 // Owns the scripted progression of tutorial and training rounds.
-import { scheduleTrainingStrike, scheduleTutorialFlame, warningDuration } from './boss-attacks.mjs?v=71';
+import {
+  clearScheduledStrike, hasScheduledStrike, scheduleTrainingStrike, scheduleTutorialFlame, warningDuration,
+} from './boss-attacks.mjs?v=74';
 import { lessons } from './tutorial.mjs?v=68';
 
 const trainingMoveGap = 900;
@@ -21,8 +23,7 @@ export function createTutorialDrill(round, feedback, { setHealth, updatePowerSto
     const current = lesson();
     if (current.id === 'heal') setHealth('player', 80);
     feedback.lesson(current, round.lessonIndex + 1, lessons.length, round.mobile);
-    round.strike = Infinity;
-    round.comboLaserAt = Infinity;
+    clearScheduledStrike(round);
     round.strikeKind = current.id === 'flame' || current.id === 'guard-break' ? 'flame' : 'laser';
     if (current.id !== 'counter') {
       round.blockBonusUntil = 0;
@@ -59,16 +60,21 @@ export function createTutorialDrill(round, feedback, { setHealth, updatePowerSto
 export function createTrainingDrill(round) {
   let pending = [];
 
+  /** Report whether training controls should be locked during playback or round end. */
+  function busy() {
+    return round.training && (Boolean(round.finished) || hasScheduledStrike(round) || pending.length > 0);
+  }
+
   /** Schedule the next requested move once the current one clears. */
   function advanceTrainingQueue(startAt) {
-    if (round.strike === Infinity && pending.length && !round.finished) {
+    if (!hasScheduledStrike(round) && pending.length && !round.finished) {
       scheduleTrainingStrike(round, pending.shift(), startAt);
     }
   }
 
   /** Start a new practice queue if the current round is idle. */
   function enqueue(moves, now) {
-    if (!round.training || round.finished || round.strike !== Infinity) return;
+    if (!round.training || busy()) return;
     pending = moves;
     advanceTrainingQueue(now);
   }
@@ -78,5 +84,5 @@ export function createTrainingDrill(round) {
     if (round.training) advanceTrainingQueue(now + trainingMoveGap);
   }
 
-  return { enqueue, continueTraining };
+  return { busy, enqueue, continueTraining };
 }

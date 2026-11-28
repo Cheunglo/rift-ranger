@@ -1,6 +1,6 @@
 import { bossBodies } from './boss-bodies.mjs?v=70';
 import { bossProfiles } from './boss-profiles.mjs?v=64';
-import { parseFightId, rollFight } from './boss-fights.mjs?v=71';
+import { parseFightId, rollFight } from './boss-fights.mjs?v=74';
 
 const options = document.getElementById('fight-options');
 const bodyChoice = document.getElementById('boss-choice');

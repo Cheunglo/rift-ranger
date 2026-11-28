@@ -113,12 +113,12 @@ function flamePhase(round, now) {
 
 /** Advance battle rotation or return a controlled drill to its waiting state. */
 export function scheduleNextStrike(round, now, hp, maxHp) {
-  const previousSlot = moveSlot(round.bossMoves, round.strikeKind);
-  round.comboLaserAt = Infinity;
   if (round.lessonIndex !== null || round.training) {
-    round.strike = Infinity;
+    clearScheduledStrike(round);
     return;
   }
+  const previousSlot = moveSlot(round.bossMoves, round.strikeKind);
+  round.comboLaserAt = Infinity;
   const { regular, special, status } = round.bossMoves;
   if (round.strikeKind === status) {
     round.strikeKind = round.afterStatus;
@@ -142,9 +142,20 @@ export function scheduleNextStrike(round, now, hp, maxHp) {
   if (move.rollCombo) round.comboLaserAt = undefined;
 }
 
+/** Report whether a boss strike is scheduled, including time before its tell. */
+export function hasScheduledStrike(round) {
+  return round.strike !== Infinity;
+}
+
+/** Return both boss attack timers to their idle state. */
+export function clearScheduledStrike(round) {
+  round.strike = Infinity;
+  round.comboLaserAt = Infinity;
+}
+
 /** Start a manually queued move with its full tell and no optional combo. */
 export function scheduleTrainingStrike(round, kind, now) {
-  if (!round.training || round.strike !== Infinity || !Object.hasOwn(attacks, kind)) return;
+  if (!round.training || hasScheduledStrike(round) || !Object.hasOwn(attacks, kind)) return;
   round.strikeKind = kind;
   // Show the entire tell and leave the flame's optional eye shot out of the drill.
   round.warningStart = 0;
@@ -169,6 +180,15 @@ export function updateFlameCombo(round, now) {
   const opened = round.locks.filter(lock => lock.done === lock.total).length;
   round.comboLaserAt = Math.random() < round.pace.comboOdds[opened]
     ? round.strike - comboLaserLeadTime : Infinity;
+}
+
+/** Consume the optional combo shot once its deadline is reached. */
+export function takeDueComboLaser(round, now) {
+  if (now >= round.comboLaserAt) {
+    round.comboLaserAt = Infinity;
+    return true;
+  }
+  return false;
 }
 
 /** Apply Slash or Laser cooling and report a regressed or cancelled charge. */
