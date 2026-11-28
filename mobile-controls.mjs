@@ -6,14 +6,17 @@ const rangerKeys = {
   k: 'basic',
 };
 
-// Track each finger and physical key independently so simultaneous holds are safe.
+/** Map physical keys and pointer sources onto the same combat actions. */
 export function bindCombatInputs(panel, { active, press, release }, target = window, doc = document) {
   const held = new Map();
   const buttons = [...panel.querySelectorAll('[data-action]')];
+  /** Check whether any tracked input still holds the given action. */
   const holding = action => [...held.values()].includes(action);
+  /** Mirror the held state on the touch controls. */
   function paint() {
     for (const button of buttons) button.classList.toggle('is-held', holding(button.dataset.action));
   }
+  /** Record a new input source and deliver its press without repeating a shared hold. */
   function down(source, action, fromButton = false) {
     if (!active() || held.has(source)) return;
     const alreadyHeld = holding(action);
@@ -21,6 +24,7 @@ export function bindCombatInputs(panel, { active, press, release }, target = win
     paint();
     if (!alreadyHeld || (action !== 'guard' && action !== 'aura')) press(action, fromButton);
   }
+  /** Release a source and end the action only when no other source holds it. */
   function up(source) {
     const action = held.get(source);
     if (!action) return;
@@ -28,6 +32,7 @@ export function bindCombatInputs(panel, { active, press, release }, target = win
     if (!holding(action)) release(action);
     paint();
   }
+  /** Release tracked input when the session or its focus is lost. */
   function reset() {
     for (const source of [...held.keys()]) up(source);
   }

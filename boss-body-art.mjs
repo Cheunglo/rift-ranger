@@ -1,5 +1,4 @@
-// Center the shared 40 × 36 body space inside the canvas. Wider sprites can
-// extend beyond it while keeping their body and face on the same pixel grid.
+/** Paint ordered fills with the shared body art centered inside the sprite canvas. */
 function paintLayers(canvas, layers) {
   const ctx = canvas.getContext('2d');
   const scale = canvas.height / 36;
@@ -14,6 +13,7 @@ function paintLayers(canvas, layers) {
   ctx.restore();
 }
 
+/** Paint Barkjaw with low branch tips that leave room for raised-limb tells. */
 export function paintTree(canvas) {
   paintLayers(canvas, [
     ['#13221d',
@@ -35,6 +35,7 @@ export function paintTree(canvas) {
   ]);
 }
 
+/** Paint Iron Beetle with separate shell, eye, and forelimb shapes. */
 export function paintBeetle(canvas) {
   paintLayers(canvas, [
     ['#111c29',
@@ -56,6 +57,7 @@ export function paintBeetle(canvas) {
   ]);
 }
 
+/** Paint the Duelist in a centered stance with both arms readable. */
 export function paintHuman(canvas) {
   paintLayers(canvas, [
     ['#181325',
@@ -71,6 +73,7 @@ export function paintHuman(canvas) {
   ]);
 }
 
+/** Paint Rift Raccoon with separate forepaws and a low striped tail. */
 export function paintRaccoon(canvas) {
   paintLayers(canvas, [
     // The tail sits at ground level, below the separate forepaw silhouettes.
@@ -90,6 +93,7 @@ export function paintRaccoon(canvas) {
   ]);
 }
 
+/** Paint Coilfang with a raised head and a low coil. */
 export function paintSerpent(canvas) {
   paintLayers(canvas, [
     ['#161c24',
@@ -107,6 +111,7 @@ export function paintSerpent(canvas) {
   ]);
 }
 
+/** Paint Rift Slime with its face inside a broad translucent silhouette. */
 export function paintSlime(canvas) {
   paintLayers(canvas, [
     ['#202039',
@@ -122,6 +127,7 @@ export function paintSlime(canvas) {
   ]);
 }
 
+/** Paint Tidewhale with a front-facing mouth and distinct fins. */
 export function paintWhale(canvas) {
   paintLayers(canvas, [
     ['#141b30',
@@ -138,6 +144,7 @@ export function paintWhale(canvas) {
   ]);
 }
 
+/** Paint Moon Owl with the wings behind its body on a wider canvas. */
 export function paintOwl(canvas) {
   paintLayers(canvas, [
     // Wings sit behind the torso and leave open space on both sides of the belly.

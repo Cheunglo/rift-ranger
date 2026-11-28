@@ -1,7 +1,9 @@
 // Draws boss attack effects around the body's eye and mouth anchors.
 export const bossEffectDurations = { laser: 360, flame: 650, shout: 540, 'guard-break': 460 };
 
+/** Bind the canvas primitives used by the boss tells and impact effects. */
 export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
+  /** Draw air converging on the mouth during the shout wind-up. */
   function inhaleAir(scene, progress) {
     const [x, y] = scene.mouth;
     const reach = Math.max(38, scene.boss.width * .52);
@@ -20,6 +22,7 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
     }
   }
 
+  /** Expand the shout ring and mark a successful gold Aura absorption. */
   function shoutWave(scene, elapsed, absorbed) {
     const [x, y] = scene.mouth;
     const progress = reducedMotion.matches ? .7 : Math.min(1, elapsed / 420);
@@ -43,6 +46,7 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
     }
   }
 
+  /** Draw a paired eye shot ending at the shield or Ranger. */
   function lasers(scene, blocked) {
     const endY = blocked ? scene.boss.y + scene.boss.height : scene.floor - 62 * scene.scale;
     scene.eyes.forEach(([x, y], i) => {
@@ -53,6 +57,7 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
     });
   }
 
+  /** Scale the flame orb around the mouth using the active charge phase. */
   function fireball(scene, flame) {
     const [x, y] = scene.mouth;
     const radius = mix(6, 22, flame.charge) * scene.scale;
@@ -68,6 +73,7 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
     ctx.fill();
   }
 
+  /** Scatter fragments from the shield edge struck by a guard-breaking shot. */
   function shatteredShield(scene, elapsed) {
     const progress = reducedMotion.matches ? .35 : elapsed / bossEffectDurations['guard-break'];
     const { x, y, width, height } = scene.boss;
@@ -84,6 +90,7 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
     }
   }
 
+  /** Fan out a flame jet from the mouth to the shield or Ranger. */
   function flamethrower(scene, elapsed, blocked) {
     const [x, y] = scene.mouth;
     const endY = blocked ? scene.boss.y + scene.boss.height : scene.floor - 30 * scene.scale;
@@ -117,6 +124,7 @@ export function createBossEffects(ctx, reducedMotion, { line, polygon, mix }) {
     ctx.restore();
   }
 
+  /** Dispatch a timed boss impact effect from its recorded kind and outcome. */
   function drawEffect(scene, elapsed, { kind, strength }) {
     if (kind === 'shout') shoutWave(scene, elapsed, strength);
     else if (kind === 'flame') flamethrower(scene, elapsed, strength);

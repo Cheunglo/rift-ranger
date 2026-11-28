@@ -1,30 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bindCombatInputs } from '../mobile-controls.mjs';
+
+/** Build fake event targets and capture emitted combat actions. */
 function setup() {
   const target = new EventTarget();
   const doc = new EventTarget();
   const buttons = Object.fromEntries(['basic', 'guard', 'power', 'beam', 'aura'].map(action => {
     const button = new EventTarget();
     button.dataset = { action };
-    button.classList = { toggle() {} };
+    button.classList = {
+      /** Accept held-state styling updates without a DOM. */
+      toggle() {},
+    };
+    /** Allow production pointer handling on this synthetic event target. */
     button.setPointerCapture = () => {};
     return [action, button];
   }));
   const log = [];
-  const panel = { querySelectorAll: () => Object.values(buttons) };
+  const panel = {
+    /** Expose one synthetic button for each combat action. */
+    querySelectorAll: () => Object.values(buttons),
+  };
   const inputs = bindCombatInputs(panel, {
+    /** Keep combat active for the duration of the input test. */
     active: () => true,
+    /** Append the start of an action to the event log. */
     press: action => log.push('+' + action),
+    /** Append the end of an action to the event log. */
     release: action => log.push('-' + action),
   }, target, doc);
+  /** Dispatch one synthetic event with the supplied pointer or keyboard data. */
   const send = (element, type, props = {}) => {
     const event = new Event(type, { cancelable: true });
     Object.assign(event, props);
     element.dispatchEvent(event);
     return event;
   };
+  /** Begin a synthetic touch on a named action. */
   const down = (action, pointerId) => send(buttons[action], 'pointerdown', { button: 0, pointerId });
+  /** End or cancel a synthetic touch on a named action. */
   const up = (action, pointerId, type = 'pointerup') => send(buttons[action], type, { pointerId });
   return { target, doc, log, inputs, send, down, up };
 }

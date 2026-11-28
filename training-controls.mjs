@@ -2,6 +2,7 @@ import { trainingMoves } from './boss-attacks.mjs?v=71';
 
 const queueLimit = 3;
 
+/** Own the editable move queue and pass an independent snapshot to the round. */
 export function createTrainingControls(onRun) {
   const panel = document.getElementById('training-controls');
   const move = document.getElementById('training-move');
@@ -15,6 +16,7 @@ export function createTrainingControls(onRun) {
 
   for (const [id, name] of names) move.add(new Option(name, id));
 
+  /** Disable queue edits during playback and reflect the queue limit. */
   function updateButtons() {
     move.disabled = add.disabled = running || queue.length >= queueLimit;
     run.disabled = running || queue.length === 0;
@@ -22,6 +24,7 @@ export function createTrainingControls(onRun) {
     status.textContent = running ? 'Running queue…' : queue.length + ' / ' + queueLimit + ' moves';
   }
 
+  /** Rebuild the ordered list with a remove control for each queued move. */
   function renderQueue() {
     list.replaceChildren(...queue.map((id, index) => {
       const name = names.get(id);
@@ -54,11 +57,13 @@ export function createTrainingControls(onRun) {
   renderQueue();
 
   return {
+    /** Set panel visibility and return its buttons to the idle state. */
     show(visible) {
       panel.hidden = !visible;
       running = false;
       updateButtons();
     },
+    /** Refresh controls only when playback starts or ends. */
     setRunning(active) {
       if (active === running) return;
       running = active;

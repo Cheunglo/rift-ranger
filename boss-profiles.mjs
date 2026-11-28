@@ -15,10 +15,12 @@ export const bossProfiles = {
   O: { summary: 'Shorter recovery after Specials · longer after Regulars', after: { special: -550, regular: 450 } },
 };
 
+/** Combine a body's base timing offset with its previous and next move modifiers. */
 export function attackGapOffset(profile, previousSlot, nextSlot) {
   return (profile.gap ?? 0) + (profile.after?.[previousSlot] ?? 0) + (profile.before?.[nextSlot] ?? 0);
 }
 
+/** Apply body-specific damage scaling for the move category. */
 export function attackDamage(profile, damage, slot) {
   return Math.round(damage * (profile.damage ?? 1) * (profile.slotDamage?.[slot] ?? 1));
 }

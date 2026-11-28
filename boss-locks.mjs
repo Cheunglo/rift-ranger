@@ -8,6 +8,7 @@ export const lockMoves = {
   beam: ['laser credit', 'laser credits'],
 };
 
+/** Shuffle an array in place using the supplied random source. */
 function shuffle(items, random) {
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -16,11 +17,13 @@ function shuffle(items, random) {
   return items;
 }
 
+/** Generate a randomized order with one gate for each standard move type. */
 export function createBossLocks(random = Math.random) {
   // Every move gets one gate. The laser gate counts credits from any charge stage.
   return bossLocksForOrder(shuffle(Object.keys(lockMoves), random));
 }
 
+/** Build fresh gate state for a chosen lock order and body profile. */
 export function bossLocksForOrder(moves, { extraLock, lockThresholds = baseLockThresholds } = {}) {
   const offset = extraLock ? 1 : 0;
   const locks = lockThresholds.map((hp, i) => ({
@@ -31,10 +34,12 @@ export function bossLocksForOrder(moves, { extraLock, lockThresholds = baseLockT
   return locks;
 }
 
+/** Find the highest gate that still needs credits. */
 export function nextBossLock(locks) {
   return locks.find(lock => lock.done < lock.total);
 }
 
+/** Apply damage down to the next gate and spend credits on that gate alone. */
 export function bossHit(locks, hp, damage, move, auraStage) {
   const lock = nextBossLock(locks);
   const floor = lock?.hp ?? 0;
@@ -49,6 +54,7 @@ export function bossHit(locks, hp, damage, move, auraStage) {
   return { hp: next, dealt: hp - next, lock: lock?.engaged ? lock : null, credited };
 }
 
+/** Format the remaining credits using the gate's move and count. */
 export function lockRequirement(lock) {
   const remaining = lock.total - lock.done;
   return remaining + ' ' + lockMoves[lock.move][remaining === 1 ? 0 : 1];

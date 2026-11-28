@@ -13,6 +13,7 @@ const suits = {
   White:  { plate: '#fffaf4', helmet: '#fffdfc', arm: '#eee7e2', leg: '#bec2cb', light: '#e2e5ed', shade: '#818b9f' },
 };
 
+/** Bind the start-menu picker, remembered preference, and active armour palette. */
 export function createRangerColorPicker(select, swatch) {
   for (const color of Object.keys(suits)) select.add(new Option(color, color));
 
@@ -25,6 +26,7 @@ export function createRangerColorPicker(select, swatch) {
   }
 
   select.value = color;
+  /** Reflect the selected armour's main colour in the picker. */
   function paintSwatch() {
     swatch.style.backgroundColor = suits[color].plate;
   }
@@ -40,5 +42,6 @@ export function createRangerColorPicker(select, swatch) {
     }
   });
 
+  /** Read the current palette for the next combat frame. */
   return () => suits[color];
 }

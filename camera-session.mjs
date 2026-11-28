@@ -13,7 +13,9 @@ const audioHints = {
   humming: 'Charging Aura from mic.',
 };
 
+/** Own permission requests, local media streams, and the sampled input lifecycle. */
 export function createCameraSession({ onLost, onMicStopped }) {
+  /** Find a camera or microphone element in the game markup. */
   const byId = id => document.getElementById(id);
   const camera = byId('camera');
   const cameraFrame = byId('camera-frame');
@@ -41,12 +43,14 @@ export function createCameraSession({ onLost, onMicStopped }) {
   const videoInputOptions = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } };
   const audioInputOptions = { autoGainControl: false, noiseSuppression: false, echoCancellation: true };
   const micUnavailable = 'Microphone unavailable. Check browser permission, or use J and Space.';
+  /** Show tracking guidance and its current acceptance state. */
   function cameraStatus(message, state = '') {
     const text = 'Camera: ' + message;
     if (tracking.textContent !== text) tracking.textContent = text;
     if (tracking.dataset.state !== state) tracking.dataset.state = state;
   }
 
+  /** Draw the tracked joints in the preview coordinate space. */
   function drawTracking(points) {
     // The overlay shares the video dimensions; CSS mirrors both together.
     const { videoWidth: width, videoHeight: height } = camera;
@@ -59,6 +63,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     poseContext.lineWidth = width * .005;
     poseContext.strokeStyle = '#e8ff75';
     poseContext.fillStyle = '#e8ff75';
+    /** Use wrist-specific visibility rules for wrists and normal rules elsewhere. */
     const visibleJoint = (point, index) => index === 15 || index === 16 ? wristPoint(point) : posePoint(point);
     for (const [start, end] of armLines) {
       const from = points?.[start];
@@ -78,6 +83,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     }
   }
 
+  /** Invalidate pending device requests and release current media and tracking resources. */
   function stop() {
     requestId++;
     lastVideoTime = lastPosePoll = lastAudioPoll = -Infinity;
@@ -93,6 +99,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     tracker = null;
   }
 
+  /** Start microphone activation during a user gesture while permissions are pending. */
   function beginCameraMic() {
     if (micStream || pendingCameraMic) return null;
     const Audio = window.AudioContext || window.webkitAudioContext;
@@ -108,6 +115,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     }
   }
 
+  /** Release microphone resources still waiting for activation. */
   function cancelCameraMic() {
     if (!pendingCameraMic) return;
     const { audioContext, stream } = pendingCameraMic;
@@ -116,6 +124,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     void audioContext.close().catch(() => {});
   }
 
+  /** Attach an authorized microphone stream to the local input analyser. */
   function activateMic(stream, audioContext) {
     const read = listen(audioContext, stream);
     micStream = stream;
@@ -131,6 +140,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     micLevel.hidden = false;
   }
 
+  /** Release active and pending audio resources and clear the microphone HUD. */
   function stopMic() {
     stopTracks(micStream);
     micStream = null;
@@ -143,12 +153,14 @@ export function createCameraSession({ onLost, onMicStopped }) {
     micLevel.hidden = true;
   }
 
+  /** Show a microphone message without exposing a stale input level. */
   function setMicMessage(message) {
     if (micStatus.textContent !== message) micStatus.textContent = message;
     delete micStatus.dataset.state;
     micStatus.hidden = !message;
   }
 
+  /** Render the current microphone detector state and sample level. */
   function showMicInput(state, level) {
     const hint = audioHints[state];
     if (micStatus.textContent !== hint) micStatus.textContent = hint;
@@ -156,6 +168,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     micLevel.value = level;
   }
 
+  /** Request camera access, prepare tracking, and start the round once ready. */
   async function start(onReady) {
     const request = ++requestId;
     webcam.disabled = tutorialButton.disabled = true;
@@ -231,6 +244,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     }
   }
 
+  /** Read a fresh preview frame and return its landmarks when tracking is ready. */
   function readPose(now) {
     if (!tracker || camera.readyState < 2 || now - lastPosePoll < 55 || camera.currentTime === lastVideoTime) return null;
     lastVideoTime = camera.currentTime;
@@ -247,6 +261,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     return { points };
   }
 
+  /** Throttle microphone polling and return the sampled interval for Aura charging. */
   function readAudio(now, suppress) {
     const elapsed = now - lastAudioPoll;
     if (!audioInput || elapsed < 20) return null;
@@ -256,6 +271,7 @@ export function createCameraSession({ onLost, onMicStopped }) {
     return { ...result, elapsed };
   }
 
+  /** Show or hide feedback and supply initial guidance when tracking starts. */
   function setTrackingVisible(visible) {
     tracking.hidden = !visible;
     if (visible) cameraStatus('Waiting for tracking…', 'waiting');

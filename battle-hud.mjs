@@ -1,6 +1,7 @@
 // Paints DOM battle state. The game decides when that state changes.
 import { baseLockThresholds, lockRequirement, nextBossLock } from './boss-locks.mjs?v=64';
 
+/** Look up a required element in the static game markup. */
 export const byId = id => document.getElementById(id);
 export const arena = byId('arena');
 const overlay = byId('overlay');
@@ -35,12 +36,14 @@ const auraCaption = byId('aura-caption');
 const bossPanelHome = bossPanel.parentElement;
 const lockStatusHome = lockStatus.parentElement;
 
+/** Toggle warning content while retaining its reserved layout space. */
 function setWarningVisible(visible) {
   bossPanel.classList.toggle('warnings-hidden', !visible);
   warningToggle.setAttribute('aria-expanded', String(visible));
   warningToggle.textContent = visible ? 'Hide warning' : 'Show warning';
 }
 
+/** Move warnings and lock status to the layout slots for the active input mode. */
 export function setMobileHud(enabled) {
   mobileStatus.hidden = !enabled;
   setWarningVisible(true);
@@ -57,6 +60,7 @@ const lockInstructions = {
   beam: 'Stages 1–3 earn 1, 2, 4',
 };
 
+/** Update the warning live region only when its text changes. */
 export function showBattleWarning(message, incoming, hint, showGuardPose) {
   if (prompt.textContent !== message) prompt.textContent = message;
   const state = incoming ? 'danger' : '';
@@ -66,11 +70,13 @@ export function showBattleWarning(message, incoming, hint, showGuardPose) {
   if (incoming && warningHint.textContent !== hint) warningHint.textContent = hint;
 }
 
+/** Set the boss name on both the visible HUD and the accessible HP meter. */
 export function renderBossName(name) {
   byId('boss-name').textContent = name;
   enemy.setAttribute('aria-label', name + ' health');
 }
 
+/** Synchronize a fighter's native HP meter and numeric label with the round. */
 export function renderHealth(fighter, hp, maxHp) {
   const bar = healthBars[fighter];
   bar.max = maxHp;
@@ -78,6 +84,7 @@ export function renderHealth(fighter, hp, maxHp) {
   byId(bar.id + '-hp').textContent = hp + ' / ' + maxHp + ' HP';
 }
 
+/** Reset health and Aura and rebuild exactly the lock markers for this session. */
 export function resetHud(maxHp, gateHP = baseLockThresholds) {
   renderHealth('player', maxHp.player, maxHp.player);
   renderHealth('enemy', maxHp.enemy, maxHp.enemy);
@@ -95,7 +102,7 @@ export function resetHud(maxHp, gateHP = baseLockThresholds) {
   }));
 }
 
-// The HUD previews the next gate and keeps an engaged lock highlighted if the boss heals.
+/** Show the next unopened gate and retain its engaged state through boss healing. */
 export function renderBossLocks(locks) {
   const next = nextBossLock(locks);
   const active = Boolean(next?.engaged);
@@ -117,7 +124,7 @@ export function renderBossLocks(locks) {
   lockStatus.dataset.active = String(active);
 }
 
-// The character shows successful moves; only explain blocked moves in text.
+/** Show the recognized camera pose and surface feedback for rejected actions. */
 export function renderPose(cameraMode, move, label = '', state = '') {
   cameraPosePreview.hidden = !cameraMode;
   poseIcon.toggleAttribute('hidden', !move);
@@ -127,6 +134,7 @@ export function renderPose(cameraMode, move, label = '', state = '') {
   if (state === 'locked' && moveNotice.textContent !== label) moveNotice.textContent = label;
 }
 
+/** Open a menu or result message and clear the previous score breakdown. */
 export function showOverlay(title, copy) {
   battleResult.hidden = true;
   byId('overlay-title').textContent = title;
@@ -134,6 +142,7 @@ export function showOverlay(title, copy) {
   overlay.hidden = false;
 }
 
+/** Draw the same completed charge stage on the arena HUD and the touch button. */
 export function renderAura(ready) {
   const index = ready?.level ?? 0;
   arena.dataset.auraStage = mobileControls.dataset.auraStage = String(index);
@@ -143,23 +152,28 @@ export function renderAura(ready) {
   if (auraButtonCaption.textContent !== buttonCaption) auraButtonCaption.textContent = buttonCaption;
 }
 
+/** Show how many banked Powerwaves the Ranger can still spend. */
 export function renderPowerStock(charges) {
   powerStock.textContent = 'Powerwaves: ' + charges;
 }
 
+/** Update the warning panel title without rebuilding the live region. */
 export function renderBossLabel(label) {
   if (bossPanelLabel.textContent !== label) bossPanelLabel.textContent = label;
 }
 
+/** Return the arena to its unobstructed battle view. */
 export function hideOverlay() {
   overlay.hidden = true;
 }
 
+/** Show or hide the HUD elements that belong to a running round. */
 export function setBattleHudVisible(visible) {
   battleFeedback.hidden = auraStatus.hidden = bossPanel.hidden = warningToggle.hidden = !visible;
   if (!visible) cameraPosePreview.hidden = true;
 }
 
+/** Calculate and disclose the components of a scored victory. */
 export function showBattleResult(elapsed, damage, maxHealth, cameraBonusEligible, cameraBonusPercent) {
   const speedMax = 6000;
   const healthMax = 4000;
@@ -169,6 +183,7 @@ export function showBattleResult(elapsed, damage, maxHealth, cameraBonusEligible
   const baseScore = timeBonus + healthBonus;
   const cameraBonus = cameraBonusEligible ? Math.round(baseScore * cameraBonusPercent / 100) : 0;
   const seconds = Math.floor(elapsed);
+  /** Format a score component using the browser's number conventions. */
   const points = value => value.toLocaleString();
   byId('result-score').textContent = points(baseScore + cameraBonus);
   byId('result-time').textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');

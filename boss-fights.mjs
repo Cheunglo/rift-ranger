@@ -11,6 +11,7 @@ const lockCodes = { S: 'basic', P: 'power', L: 'beam' };
 const codesByMove = Object.fromEntries(Object.entries(lockCodes).map(([code, move]) => [move, code]));
 const lockLetters = Object.keys(lockCodes);
 
+/** Validate a shared fight ID and resolve its body, loadout, and ordered locks. */
 export function parseFightId(input) {
   const id = input.trim().toUpperCase();
   const match = /^RR1-([A-Z])-([A-Z]{3})-([SPL]{2,4})$/.exec(id);
@@ -24,6 +25,7 @@ export function parseFightId(input) {
   return { id, body: bossBodies[bodyCode], profile, moves: moveSets[moveCode], lockOrder: [...lockOrder].map(code => lockCodes[code]) };
 }
 
+/** Choose a body and valid shuffled locks, then resolve them through the shared parser. */
 export function rollFight(bodyCode = 'R', random = Math.random) {
   const bodies = Object.keys(bossBodies);
   const chosen = bodyCode === 'random' ? bodies[Math.floor(random() * bodies.length)] : bodyCode;

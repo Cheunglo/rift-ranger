@@ -11,6 +11,7 @@ let browser;
 before(async () => { browser = await firefox.launch(); });
 after(async () => { await browser?.close(); });
 
+/** Open an isolated page, route local assets, and check uncaught browser errors on teardown. */
 async function openGame(t, options) {
   const page = await browser.newPage(options);
   const errors = [];

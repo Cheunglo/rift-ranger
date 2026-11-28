@@ -91,20 +91,26 @@ paintBoss(bossCanvas, defaultFight.body);
 byId('camera-bonus-note').textContent =
   'Camera clears without keyboard combat earn a ' + cameraBonusPercent + '% Power Level bonus.';
 
+// Round state and HUD feedback
+
+/** Choose the default guard hint for the active input mode. */
 function showWarning(message, incoming = false, hint = round?.mobile ? 'Hold Block through the shot.' : 'Left hand up, or hold S.', showGuardPose = true) {
   showBattleWarning(message, incoming, hint, showGuardPose);
 }
 
+/** Render combat feedback and expose the silhouette in camera sessions. */
 function showPose(move, label, state) {
   renderPose(round?.mode === 'camera', move, label, state);
 }
 
+/** Clamp combat HP and update the corresponding HUD meter. */
 function setHealth(fighter, hp) {
   const maxHp = round.maxHp[fighter];
   round.hp[fighter] = Math.max(0, Math.min(hp, maxHp));
   renderHealth(fighter, round.hp[fighter], maxHp);
 }
 
+/** Resolve lock-aware damage and postpone passive recovery on a landed hit. */
 function damageBoss(damage, move, now, auraStage) {
   // The move drills use the real effects. Health gates only appear in the lock lessons.
   if (isTutorial() && !lesson().lock) return { dealt: Math.min(round.hp.enemy, damage), lock: null };
@@ -117,6 +123,7 @@ function damageBoss(damage, move, now, auraStage) {
   return hit;
 }
 
+/** Scale passive recovery with current boss HP and its body profile. */
 function healInterval() {
   // Each tick restores one HP. The interval grows with health, so the rate
   // falls as the boss heals. The minimum keeps low-HP recovery bounded.
@@ -125,6 +132,7 @@ function healInterval() {
   return base * (round.profile.healInterval ?? 1);
 }
 
+/** Apply a due passive healing tick in a normal battle. */
 function healBoss(now) {
   if (isTutorial() || round.training || now < round.nextHeal || round.hp.enemy <= 0 || round.hp.enemy >= round.maxHp.enemy) return;
   setHealth('enemy', round.hp.enemy + 1);
@@ -132,6 +140,7 @@ function healBoss(now) {
   renderBossLocks(round.locks);
 }
 
+/** Describe the gate credit or missing move after a lock intercepts a hit. */
 function lockImpact(hit) {
   if (hit.credited && hit.lock.done === hit.lock.total) return hit.lock.hp + ' HP lock opened';
   if (hit.credited) return lockRequirement(hit.lock) + ' left';
@@ -139,6 +148,7 @@ function lockImpact(hit) {
   return '';
 }
 
+/** Prioritize tracking, guard reset, and accepted pose guidance. */
 function updateCameraStatus(now) {
   const move = round.cameraMove;
   if (!move || now - round.lastPose > 400) return cameraSession.showTracking('Waiting for tracking…', 'waiting');
@@ -154,15 +164,20 @@ function updateCameraStatus(now) {
   cameraSession.showTracking(trackingHints[move.state], move.state === 'guard' ? 'accepted' : needsFraming ? 'waiting' : '');
 }
 
+/** Keep a brief camera message tied to the current action. */
 function cameraNotice(message, state, now) {
   round.cameraNotice = { message, state, until: now + 950 };
 }
 
+/** Publish and retain a successful action long enough to read it. */
 function confirmPose(move, label, now) {
   round.poseFeedback = { move, label, until: now + 850 };
   showPose(move, label, 'active');
 }
 
+// Menus, session lifecycle, and guided drills
+
+/** Configure the shared start controls for the selected session type. */
 function updateStartButtons() {
   webcam.disabled = tutorialButton.disabled = trainingButton.disabled = false;
   showFightOptions(session === 'battle');
@@ -177,6 +192,7 @@ function updateStartButtons() {
   trainingButton.textContent = session === 'training' ? 'Back to battle' : 'Training Mode';
 }
 
+/** Use the selected mode to show the relevant entry instructions. */
 function showStartMenu() {
   updateStartButtons();
   if (session === 'tutorial') {
@@ -200,6 +216,7 @@ trainingButton.addEventListener('click', () => {
   (session === 'training' ? trainingBoss : trainingButton).focus({ preventScroll: true });
 });
 
+/** Schedule the next requested move once the current one clears. */
 function advanceTrainingQueue(startAt) {
   if (round.strike === Infinity && round.training.pending.length && !round.finished) {
     scheduleTrainingStrike(round, round.training.pending.shift(), startAt);
@@ -207,6 +224,7 @@ function advanceTrainingQueue(startAt) {
   trainingControls.setRunning(round.strike !== Infinity || Boolean(round.finished));
 }
 
+/** Stop the frame loop, release devices and controls, and clear the battle HUD. */
 function resetRound() {
   // Cancel the frame loop and release both devices before showing the menu.
   cancelAnimationFrame(animation);
@@ -231,6 +249,7 @@ function resetRound() {
   device.textContent = defaultStatus;
 }
 
+/** Initialize the selected battle, tutorial, or training session and start its frame loop. */
 function startRound(mode, startingSession, mobileMode, fight) {
   const learning = startingSession === 'tutorial';
   const training = startingSession === 'training';
@@ -282,14 +301,17 @@ function startRound(mode, startingSession, mobileMode, fight) {
   if (mobileMode) arena.scrollIntoView({ block: 'start' });
 }
 
+/** Detect tutorial sessions from their active lesson index. */
 function isTutorial() {
   return round.lessonIndex !== null;
 }
 
+/** Read the current lesson's rules and instructions. */
 function lesson() {
   return lessons[round.lessonIndex];
 }
 
+/** Reset move-specific state and schedule the current tutorial drill. */
 function showLesson(now) {
   const current = lesson();
   if (current.id === 'heal') setHealth('player', 80);
@@ -318,6 +340,7 @@ function showLesson(now) {
   }
 }
 
+/** Start the next drill or wait for the final tutorial animation. */
 function advanceLesson(now) {
   if (round.lessonIndex + 1 === lessons.length) {
     round.finished = { tutorial: true, until: now + 650 };
@@ -327,6 +350,7 @@ function advanceLesson(now) {
   showLesson(now);
 }
 
+/** Tear down the lesson session and return to the normal start menu. */
 function completeTutorial() {
   session = 'battle';
   resetRound();
@@ -336,6 +360,7 @@ function completeTutorial() {
   webcam.focus({ preventScroll: true });
 }
 
+/** Remove score eligibility once a qualifying camera session switches input. */
 function forfeitCameraBonus(reason) {
   if (!round?.cameraBonusEligible || round.finished) return;
   round.cameraBonusEligible = false;
@@ -343,6 +368,7 @@ function forfeitCameraBonus(reason) {
   cameraBonusStatus.textContent = reason + ' · no camera bonus';
 }
 
+/** Finalize a battle or training session after its result animation. */
 function endRound(won) {
   // Use the frame that landed the final hit, excluding the victory animation.
   const elapsed = won ? Math.round(round.finished.at - round.startedAt) / 1000 : 0;
@@ -368,25 +394,32 @@ function endRound(won) {
   webcam.focus({ preventScroll: true });
 }
 
+// Actions, resources, and attack outcomes
+
+/** Check whether a banked Powerwave is available to spend. */
 function canPowerCounter() {
   return round.powerCharges > 0;
 }
 
+/** Synchronize the round's banked Powerwaves and their HUD count. */
 function updatePowerStock(charges = round.powerCharges) {
   round.powerCharges = charges;
   renderPowerStock(charges);
 }
 
+/** Earn a Powerwave and start the brief post-block damage bonus. */
 function bankPowerCounter(now, kind) {
   updatePowerStock(round.powerCharges + 1);
   round.blockBonusUntil = isTutorial() && kind === 'laser' ? Infinity : now + battleTiming.blockBonusWindow;
 }
 
+/** Reduce attack damage as boss HP falls, using the move's minimum multiplier. */
 function playerDamageScale(move) {
   const minimum = move === 'power' ? .16 : .55;
   return minimum + (1 - minimum) * round.hp.enemy / round.maxHp.enemy;
 }
 
+/** Absorb Shout with gold Aura or apply Shaken, then advance the boss turn. */
 function resolveShout(outcome, now) {
   const protectedByAura = readyAuraStage()?.level === 3;
   visuals.play(outcome.effect, now, protectedByAura);
@@ -405,6 +438,7 @@ function resolveShout(outcome, now) {
   scheduleNextStrike(round, now, round.hp.enemy, round.maxHp.enemy);
 }
 
+/** Resolve the optional eye shot and require a fresh guard if it shatters the shield. */
 function resolveComboLaser(now, guarded, cameraLeftHeld) {
   round.comboLaserAt = Infinity;
   visuals.play(guarded ? 'guard-break' : 'laser', now);
@@ -424,6 +458,7 @@ function resolveComboLaser(now, guarded, cameraLeftHeld) {
   }
 }
 
+/** Apply a successful cooling hit and advance a fully interrupted flame turn. */
 function hitFlameCharge(move, now, stage) {
   const result = coolFlame(round, move, now, stage);
   if (!result) return '';
@@ -435,6 +470,7 @@ function hitFlameCharge(move, now, stage) {
   return 'Flamethrower interrupted!';
 }
 
+/** Record actual damage for scoring and finish the round when HP reaches zero. */
 function hurtPlayer(amount, now) {
   const damage = Math.min(round.hp.player, amount);
   round.damageTaken += damage;
@@ -443,6 +479,7 @@ function hurtPlayer(amount, now) {
   return damage;
 }
 
+/** Resolve Slash or Powerwave and report whether to latch a camera gesture. */
 function attack(move, now, fromCamera = false) {
   if (!round || round.finished) return;
   if (round.shaken) return move === 'power' ? healPlayer(now, fromCamera) : false;
@@ -476,10 +513,12 @@ function attack(move, now, fromCamera = false) {
   return true;
 }
 
+/** Find the highest completed Aura stage available to spend. */
 function readyAuraStage() {
   return auraStages.findLast(stage => round.auraMs >= stage.chargeMs);
 }
 
+/** Explain why Heal is unavailable, or return an empty message when it can run. */
 function healBlockReason() {
   if (isTutorial() && lesson().id !== 'heal') return 'Follow the current lesson.';
   if (!round.shaken && round.hp.player >= round.maxHp.player && round.burnTickAt === Infinity) {
@@ -489,6 +528,7 @@ function healBlockReason() {
   return '';
 }
 
+/** Validate a standalone Heal and advance the corresponding tutorial drill. */
 function healPlayer(now, fromCamera = false) {
   if (!round || round.finished) return false;
   const blocked = healBlockReason();
@@ -507,6 +547,7 @@ function healPlayer(now, fromCamera = false) {
   return true;
 }
 
+/** Spend Aura to restore HP and clear Burn or Shaken, including at full HP. */
 function applyAuraHeal(now) {
   const restored = Math.min(round.maxHp.player - round.hp.player, readyAuraStage().multiplier * 5);
   const burned = round.burnTickAt !== Infinity;
@@ -524,6 +565,7 @@ function applyAuraHeal(now) {
     (burned ? ' · Burn cleared' : '');
 }
 
+/** Spend Aura on one Laser, resolve damage and cooling, and check the result. */
 function fireBeam(now) {
   if (!round || round.finished || round.shaken) return;
   const current = isTutorial() ? lesson().id : null;
@@ -555,6 +597,7 @@ function fireBeam(now) {
   }
 }
 
+/** Accumulate permitted charge and update the HUD at the completed stage. */
 function updateAura(now, chargeMs) {
   const current = isTutorial() ? lesson().id : null;
   if (chargeMs > 0 && (!current || current === 'hum' || current === 'heal' || current === 'beam' ||
@@ -565,6 +608,7 @@ function updateAura(now, chargeMs) {
   renderAura(readyAuraStage());
 }
 
+/** Build renderer inputs from the current poses, charge, boss cues, and effects. */
 function drawBattle(now, guard, flash = null, flame = null, inhale = null) {
   const tracked = round.mode === 'camera' && now - round.lastPose < 260 ? round.cameraMove : null;
   const attack = now < round.attackPose?.until ? round.attackPose.move : null;
@@ -578,6 +622,7 @@ function drawBattle(now, guard, flash = null, flame = null, inhale = null) {
   });
 }
 
+/** Resolve a block or a direct hit and apply the corresponding drill or status outcome. */
 function resolveGuardableStrike(outcome, now, guard, cameraGuard) {
   const kind = round.strikeKind;
   const guardDrill = isTutorial() && lesson().id === 'guard-break';
@@ -622,9 +667,12 @@ const strikeResolvers = {
   shout: resolveShout,
 };
 
+// Frame loop and device wiring
+
+/** Read input, resolve timed combat, and render one frame using the same clock. */
 function tick(now) {
-  // Sample devices at their own rates, resolve moves and the boss strike,
-  // then render. Keyboard input uses the same move and damage functions.
+  // Device sampling is throttled separately. Manual and camera inputs share
+  // move and damage resolvers so they apply the same combat rules.
   if (!round) return;
   if (round.finished) {
     if (round.training) trainingControls.setRunning(true);
@@ -723,16 +771,19 @@ function tick(now) {
 }
 
 const cameraSession = createCameraSession({
+  /** Fall back to keyboard when the active camera disconnects. */
   onLost(reason, message) {
     forfeitCameraBonus(reason);
     if (round) round.mode = 'keyboard';
     device.textContent = message;
   },
+  /** Clear the last sustained-sound state when audio input ends. */
   onMicStopped() {
     if (round) round.micHumming = false;
   },
 });
 
+/** Pick a normal fight, fixed tutorial opponent, or training body. */
 function fightForSession() {
   if (session === 'tutorial') return defaultFight;
   if (session !== 'training') return chooseFight();
@@ -752,6 +803,7 @@ webcam.addEventListener('click', async () => {
   }
 });
 
+/** Cancel any pending camera start and begin a keyboard or touch session. */
 function startManual(mobileMode) {
   const fight = fightForSession();
   if (!fight) return;
@@ -777,7 +829,9 @@ exit.addEventListener('click', () => {
 });
 
 const combatInputs = bindCombatInputs(mobileControls, {
+  /** Accept combat input only while a round can still resolve actions. */
   active: () => !!round && !round.finished,
+  /** Translate a named input into a held state or one immediate combat action. */
   press(action, touch) {
     forfeitCameraBonus(touch ? 'Touch controls used' : 'Keyboard used');
     if (action === 'guard') round.keyboardGuard = true;
@@ -785,6 +839,7 @@ const combatInputs = bindCombatInputs(mobileControls, {
     else if (action === 'beam') fireBeam(performance.now());
     else attack(action, performance.now());
   },
+  /** Clear held guard or Aura state when its last input is released. */
   release(action) {
     if (!round) return;
     if (action === 'guard') round.keyboardGuard = round.keyboardGuardBroken = false;

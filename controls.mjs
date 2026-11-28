@@ -2,6 +2,7 @@
 const visionPackage = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21';
 const poseModel = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 
+/** Load the pinned browser pose model for video-frame tracking. */
 export async function loadTracker() {
   const { FilesetResolver, PoseLandmarker } = await import(visionPackage + '/vision_bundle.mjs');
   const files = await FilesetResolver.forVisionTasks(visionPackage + '/wasm');
@@ -12,21 +13,23 @@ export async function loadTracker() {
   });
 }
 
+/** Release every track belonging to an optional media stream. */
 export function stopTracks(stream) {
   stream?.getTracks().forEach(track => track.stop());
 }
 
+/** Check that a landmark is confident and inside the tracking margins. */
 export function posePoint(point, minimumVisibility = .55, edge = .015) {
   return point && point.visibility >= minimumVisibility &&
     point.x > edge && point.x < 1 - edge && point.y > edge && point.y < 1 - edge;
 }
 
+/** Use wider frame tolerance for hands near the edge of the preview. */
 export function wristPoint(point) {
   return posePoint(point, .42, .005);
 }
 
-// Give each round its own pose history. Raised arms can animate immediately, but
-// guard and attack events have separate hold and rearm rules.
+/** Create a per-round pose reader with hold, occlusion, and rearm rules. */
 export function gestures() {
   const raised = [false, false];
   const lastSeen = [-Infinity, -Infinity];
@@ -39,6 +42,7 @@ export function gestures() {
   let powerResult = 'power-held';
   let guardActive = false;
 
+  /** Convert one frame into held poses and an optional action for the round to accept. */
   return (points, now) => {
     const result = { state: 'framing', guard: false, attack: null, left: false, right: false };
     // MediaPipe uses the player's anatomical left and right, before the preview is mirrored.
@@ -110,7 +114,7 @@ export function gestures() {
       result.state = powerSpent ? powerResult : 'power';
       if (!powerSpent && tracked.every(Boolean)) {
         result.attack = 'power';
-        // Both arms up can spend a counter or heal. Latch the accepted action.
+        /** Latch the accepted two-arm action until the pose resets. */
         result.consume = (state = 'power-held') => {
           basicSpent = powerSpent = true;
           powerResult = result.state = state;
@@ -128,6 +132,7 @@ export function gestures() {
     result.state = pose;
     if (held >= 130 && tracked[1]) {
       result.attack = 'basic';
+      /** Rearm the slash only after the player lowers the striking hand. */
       result.consume = () => {
         basicSpent = true;
         result.state = 'reset';
@@ -137,8 +142,7 @@ export function gestures() {
   };
 }
 
-// Look behind the latest frame for a click or clap. A qualifying peak must
-// stand out from the sound before it and fall away in the next short block.
+/** Find a brief peak that rises above room noise and drops in the next sample block. */
 function hasRecentClick(samples, sampleRate, roomLevel) {
   const blockSize = Math.round(sampleRate * .008);
   const lookback = Math.floor(sampleRate * .175 / blockSize) * blockSize;
@@ -166,7 +170,7 @@ function hasRecentClick(samples, sampleRate, roomLevel) {
   return false;
 }
 
-// The analyser reads the microphone without routing it to the speakers.
+/** Create a local mic reader for sustained Aura charge and transient Laser inputs. */
 export function listen(context, stream) {
   const analyser = context.createAnalyser();
   const chargeWindow = 2 ** Math.ceil(Math.log2(context.sampleRate * .064));
@@ -189,6 +193,7 @@ export function listen(context, stream) {
   let lastShot = -Infinity;
   let wasHumming = false;
 
+  /** Sample audio against the calibrated floor and emit charge or a single firing cue. */
   return (now, suppressHum = false) => {
     calibrationUntil ??= now + 400;
     const calibrating = now < calibrationUntil;

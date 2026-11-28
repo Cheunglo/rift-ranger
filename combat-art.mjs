@@ -1,6 +1,7 @@
 import { bossEffectDurations, createBossEffects } from './boss-effects.mjs?v=58';
 
 // Canvas coordinates are CSS pixels. The boss anchors follow its existing sprite.
+/** Create the arena renderer and its per-round animation state. */
 export function combatArt(canvas, beast, reducedMotion) {
   const ctx = canvas.getContext('2d');
   const effects = [];
@@ -11,8 +12,10 @@ export function combatArt(canvas, beast, reducedMotion) {
   const duration = { basic: 480, power: 780, heal: 850, ...bossEffectDurations };
   const auraColors = ['#b7adc8', '#68dfff', '#ce8cff', '#ffe477'];
   const eyeColors = { green: '#69ff77', yellow: '#ffe663', red: '#ff243c' };
+  /** Interpolate between two coordinates or pose values. */
   const mix = (from, to, amount) => from + (to - from) * amount;
 
+  /** Fill a closed shape in the active canvas coordinate space. */
   function polygon(color, points) {
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -21,6 +24,7 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.fill();
   }
 
+  /** Stroke a connected path with rounded joins and ends. */
   function line(points, color, width) {
     ctx.strokeStyle = color;
     ctx.lineWidth = width;
@@ -33,12 +37,14 @@ export function combatArt(canvas, beast, reducedMotion) {
 
   const bossEffects = createBossEffects(ctx, reducedMotion, { line, polygon, mix });
 
+  /** Compute shoulder, elbow, and hand coordinates for an arm lift. */
   function arm(side, lift) {
     // Side is -1 for the player's left and +1 for right on the rear-facing ranger.
     return [[side * 19, -62], [side * mix(28, 32, lift), mix(-44, -59, lift)],
       [side * mix(25, 38, lift), mix(-25, -88, lift)]];
   }
 
+  /** Draw the selected armour, Aura, and pose including a right-knee kneel. */
   function ranger(scene, aura, auraStage, { plate, helmet, arm: armColor, leg, light, shade }) {
     ctx.save();
     ctx.translate(scene.x, scene.floor);
@@ -98,6 +104,7 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.restore();
   }
 
+  /** Outline the guard at the position where incoming effects stop. */
   function shield(box) {
     const x = box.x - 6;
     const y = box.y - 4;
@@ -115,6 +122,7 @@ export function combatArt(canvas, beast, reducedMotion) {
     }
   }
 
+  /** Draw the Ranger's slash from the raised hand toward the boss anchor. */
   function slash(scene, elapsed) {
     const amount = reducedMotion.matches ? .65 : Math.min(1, elapsed / 350);
     const [handX, handY] = arm(1, rightLift)[2];
@@ -129,6 +137,7 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.restore();
   }
 
+  /** Draw the expanding Powerwave rings as they travel toward the boss. */
   function ripples(scene, elapsed) {
     const centerY = (scene.target.y + scene.floor - 60 * scene.scale) / 2;
     // Offset the start times so the three rings spread out in sequence.
@@ -147,6 +156,7 @@ export function combatArt(canvas, beast, reducedMotion) {
     }
   }
 
+  /** Draw a Laser using the colour and width of the spent Aura stage. */
   function beam(scene, strength, stage) {
     const origin = [scene.x, scene.floor - 78 * scene.scale];
     const target = [scene.target.x, scene.target.y];
@@ -157,6 +167,7 @@ export function combatArt(canvas, beast, reducedMotion) {
     line([origin, target], '#fff9f1', width * .28);
   }
 
+  /** Draw the healing sweep around the current Ranger pose. */
   function heal(scene, elapsed) {
     const still = reducedMotion.matches;
     const buildup = still ? 1 : Math.min(1, elapsed / 180);
@@ -207,6 +218,7 @@ export function combatArt(canvas, beast, reducedMotion) {
     ctx.restore();
   }
 
+  /** Draw persistent flame and embers around the Ranger's armour. */
   function burningRanger(scene, now) {
     const still = reducedMotion.matches;
     ctx.save();
@@ -248,15 +260,18 @@ export function combatArt(canvas, beast, reducedMotion) {
   }
 
   return {
+    /** Record a timed combat effect on the round clock. */
     play(kind, now, strength) {
       effects.push({ kind, now, strength });
     },
+    /** Clear queued animations and reset the pose for the next round. */
     clear() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       effects.length = 0;
       previousTime = undefined;
       leftLift = rightLift = kneel = 0;
     },
+    /** Composite the arena effects and Ranger for one animation frame. */
     render(now, { left, right, guard, aura, auraStage = 0, suit, flash, beamStrength, beamStage, flame, inhale, shaken, burning, anchors }) {
       // Draw at display pixel density while keeping layout and effect positions
       // in CSS pixels, including the boss anchors inside the scaled sprite.
@@ -276,6 +291,7 @@ export function combatArt(canvas, beast, reducedMotion) {
       // Extra wing space extends the sprite without widening the shield or flashes.
       const coreWidth = bounds.width * (anchors.coreWidth ?? 1);
       const boss = { x: spriteX + (bounds.width - coreWidth) / 2, y: spriteY, width: coreWidth, height: bounds.height };
+      /** Project a normalized boss anchor into the effects canvas. */
       const point = ([x, y]) => [spriteX + x * bounds.width, spriteY + y * bounds.height];
       const [targetX, targetY] = point(anchors.target);
       const scene = {

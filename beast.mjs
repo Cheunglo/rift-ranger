@@ -7,8 +7,10 @@ export const riftbeastAnchors = {
   target: [20 / 40, 20 / 36],
 };
 
+/** Paint the original Riftbeast in its native sprite coordinates. */
 export function paintBeast(canvas) {
   const context = canvas.getContext('2d');
+  /** Paint one colour layer from position and size tuples. */
   const pixels = (color, rects) => {
     context.fillStyle = color;
     rects.forEach(rect => context.fillRect(...rect));

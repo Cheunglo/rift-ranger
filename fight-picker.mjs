@@ -23,6 +23,7 @@ if (linkedId) {
   idInput.value = linkedId;
 }
 
+/** Show stats for the typed fight ID or the current body choice. */
 function showProfile() {
   const profile = idInput.value.trim() ? parseFightId(idInput.value)?.profile : bossProfiles[bodyChoice.value];
   stats.textContent = profile?.summary ?? (bodyChoice.value === 'random' && !idInput.value.trim() ? 'Roll a body and its stats.' : '');
@@ -39,15 +40,18 @@ bodyChoice.addEventListener('change', () => {
   showProfile();
 });
 
+/** Clear the inline fight ID error and its accessible invalid state. */
 function clearValidation() {
   idInput.removeAttribute('aria-invalid');
   inputMessage.textContent = '';
 }
 
+/** Expose the boss picker only in sessions that use fight IDs. */
 export function showFightOptions(visible) {
   options.hidden = !visible;
 }
 
+/** Resolve a typed fight ID or roll a fight for the selected boss. */
 export function chooseFight() {
   if (!idInput.value.trim()) return rollFight(bodyChoice.value);
   const fight = parseFightId(idInput.value);
@@ -62,6 +66,7 @@ export function chooseFight() {
   return null;
 }
 
+/** Expose the current shareable ID and clear stale clipboard feedback. */
 export function showFightId(id = '') {
   currentId.value = id;
   sharePanel.hidden = !id;

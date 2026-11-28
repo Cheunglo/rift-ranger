@@ -71,6 +71,8 @@ Gap modifiers never shorten a move's warning. Damage modifiers apply to direct h
 
 ## Reading the code
 
+The [architecture guide](ARCHITECTURE.md) maps the modules and explains the round lifecycle.
+
 - `index.html` defines the HUD, controls, and canvases. `style.css` lays them out and keeps the arena fixed during play.
 - `game.mjs` owns the round and resolves combat. Start with `startRound()` and `tick()`.
 - `boss-fights.mjs` encodes a fight configuration. `boss-bodies.mjs` defines the roster and effect attachment points. `boss-profiles.mjs` defines the stat tradeoffs. `boss-body-art.mjs` paints the modular sprites.

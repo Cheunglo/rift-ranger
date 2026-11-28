@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { attackTell, coolFlame, openingStrike, riftbeastMoves, scheduleNextStrike, warningDuration } from '../boss-attacks.mjs';
 import { attackDamage, bossProfiles } from '../boss-profiles.mjs';
 
+/** Create a deterministic battle state for boss timing tests. */
 function battle() {
   return { ...openingStrike('camera', false, 0), warningStart: 0, lessonIndex: null, shaken: false };
 }
@@ -64,6 +65,7 @@ test('damage modifiers apply to the intended bodies and slots', () => {
 
 test('Duelist shortens the pause before a Status while Owl shortens recovery from a Special', () => {
   for (const [body, laserToShout, flameToLaser] of [['H', 1120, 6600], ['O', 1820, 6050]]) {
+    /** Create a fresh round with the body profile under test. */
     const makeRound = () => ({
       ...openingStrike('camera', false, 0, riftbeastMoves, bossProfiles[body]), lessonIndex: null,
     });

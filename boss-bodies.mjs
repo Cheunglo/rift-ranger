@@ -7,8 +7,10 @@ import {
 // pixels as the eyes and mouth when editing a sprite.
 const bodyWidth = 40;
 const owlWidth = 56;
+/** Convert art-space attachment points to normalized sprite coordinates. */
 function anchors(eyes, mouth, target, width = bodyWidth) {
   const inset = (width - bodyWidth) / 2;
+  /** Account for horizontal padding around the shared body coordinate space. */
   const normalize = ([x, y]) => [(x + inset) / width, y / 36];
   return { eyes: eyes.map(normalize), mouth: normalize(mouth), target: normalize(target), coreWidth: bodyWidth / width };
 }
@@ -25,6 +27,7 @@ export const bossBodies = {
   O: { name: 'Moon Owl', paint: paintOwl, width: owlWidth, anchors: anchors([[14.5,16.5],[25.5,16.5]], [20,23.5], [20,17], owlWidth) },
 };
 
+/** Resize and paint the shared canvas for the selected body. */
 export function paintBoss(canvas, body) {
   const scale = body.pixelScale ?? 2;
   const width = body.width ?? bodyWidth;

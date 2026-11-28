@@ -3,7 +3,9 @@ import { attackGapOffset, bossProfiles } from './boss-profiles.mjs?v=64';
 // Owns boss attack timing, tells, and charge changes. The round applies hits and effects.
 const warningStep = 1000;
 const warningColors = ['green', 'yellow', 'red'];
+/** Pick the first eye flash while preserving red as the final cue. */
 export const randomWarningStart = () => Math.floor(Math.random() * warningColors.length);
+/** Count the eye warning steps still available before the shot. */
 const eyeWarningDuration = round => (warningColors.length - round.warningStart) * warningStep;
 // Each phase stores its exclusive end time and the warning shown during it.
 const flamePhases = [
@@ -31,7 +33,9 @@ const shoutGap = 450;
 const attacks = {
   laser: {
     name: 'Eye Lasers',
+    /** Read the opening eye-shot delay for the selected input pace. */
     firstDelay: pace => pace.firstLaser,
+    /** Interpolate eye-shot spacing between the full-health and low-health paces. */
     delay: ({ fastLaser, slowLaser }, hpRatio) => Math.round(fastLaser + (slowLaser - fastLaser) * hpRatio),
     warningDuration: eyeWarningDuration,
     tell: readLaserTell,
@@ -41,6 +45,7 @@ const attacks = {
     name: 'Flame Breath',
     firstDelay: flameDelay,
     delay: flameDelay,
+    /** Keep the full visible flame charge independent of recovery. */
     warningDuration: () => flameChargeTime,
     tell: readFlameTell,
     rollCombo: true,
@@ -48,9 +53,12 @@ const attacks = {
   },
   shout: {
     name: 'Shout',
+    /** Allow a short rest before starting the shout tell. */
     delay: () => shoutGap + shoutTell,
+    /** Reserve time for both the inhale and the pause before release. */
     warningDuration: () => shoutTell,
     tell: readShoutTell,
+    /** Skip a rotation shout while the Ranger is already Shaken. */
     canSchedule: round => !round.shaken,
     randomizeWarning: false,
     hit: { type: 'shout', effect: 'shout' },
@@ -59,18 +67,24 @@ const attacks = {
 
 export const trainingMoves = Object.entries(attacks).map(([id, { name }]) => ({ id, name }));
 
+/** Get the move definition for the current strike kind. */
 const currentAttack = round => attacks[round.strikeKind];
+/** Resolve a move's category in this fight's configured loadout. */
 export function moveSlot(moves, kind) {
   if (kind === moves.special) return 'special';
   return kind === moves.status ? 'status' : 'regular';
 }
+/** Add the mode-specific recovery to the full flame charge. */
 function flameDelay(pace) {
   return flameChargeTime + pace.flamePause;
 }
 
+/** Read the current move's visible warning window in milliseconds. */
 export const warningDuration = round => currentAttack(round).warningDuration(round);
+/** Return the current move's hit rules for the round resolver. */
 export const strikeOutcome = round => currentAttack(round).hit;
 
+/** Initialize attack pacing and choose an opening move or wait for a drill input. */
 export function openingStrike(mode, waitForInput, now, bossMoves = riftbeastMoves, profile = bossProfiles.R) {
   const pace = bossPace[mode];
   const openingSpecial = !waitForInput && pace.openingFlame > 0 && Math.random() < pace.openingFlame;
@@ -90,12 +104,14 @@ export function openingStrike(mode, waitForInput, now, bossMoves = riftbeastMove
   };
 }
 
+/** Find the active flame phase on the round clock, if one is charging. */
 function flamePhase(round, now) {
   if (round.strikeKind !== 'flame' || now >= round.strike) return;
   const elapsed = now - (round.strike - flameChargeTime);
   if (elapsed >= 0) return flamePhases.find(phase => elapsed < phase.until);
 }
 
+/** Advance battle rotation or return a controlled drill to its waiting state. */
 export function scheduleNextStrike(round, now, hp, maxHp) {
   const previousSlot = moveSlot(round.bossMoves, round.strikeKind);
   round.comboLaserAt = Infinity;
@@ -126,6 +142,7 @@ export function scheduleNextStrike(round, now, hp, maxHp) {
   if (move.rollCombo) round.comboLaserAt = undefined;
 }
 
+/** Start a manually queued move with its full tell and no optional combo. */
 export function scheduleTrainingStrike(round, kind, now) {
   if (!round.training || round.strike !== Infinity || !Object.hasOwn(attacks, kind)) return;
   round.strikeKind = kind;
@@ -135,6 +152,7 @@ export function scheduleTrainingStrike(round, kind, now) {
   round.strike = now + warningDuration(round);
 }
 
+/** Set up a repeatable flame drill with an optional guard-breaking eye shot. */
 export function scheduleTutorialFlame(round, now, pause, guardBreak) {
   round.warningStart = 0;
   round.strike = now + flameChargeTime + pause;
@@ -142,6 +160,7 @@ export function scheduleTutorialFlame(round, now, pause, guardBreak) {
   round.comboLaserAt = guardBreak ? round.strike - comboLaserLeadTime : Infinity;
 }
 
+/** Roll once at the start of a flame charge using the number of opened locks. */
 export function updateFlameCombo(round, now) {
   // undefined means the combo roll is pending. Infinity means there is no
   // pending shot (none was rolled, it fired, or the charge was cancelled).
@@ -152,6 +171,7 @@ export function updateFlameCombo(round, now) {
     ? round.strike - comboLaserLeadTime : Infinity;
 }
 
+/** Apply Slash or Laser cooling and report a regressed or cancelled charge. */
 export function coolFlame(round, move, now, stage) {
   const phase = flamePhase(round, now);
   if (!phase || phase.name === 'white') return null;
@@ -168,6 +188,7 @@ export function coolFlame(round, move, now, stage) {
   return { interrupted: true };
 }
 
+/** Map the time before release to the current eye warning and flash colour. */
 function readEyeFlashes(round, now, fireAt) {
   const elapsed = eyeWarningDuration(round) - (fireAt - now);
   const eyeWarning = elapsed >= 0;
@@ -175,6 +196,7 @@ function readEyeFlashes(round, now, fireAt) {
   return { eyeWarning, flash: eyeWarning && elapsed % warningStep < 235 ? warningColors[index] : null };
 }
 
+/** Describe the eye flash and optional HUD warning for a standalone laser. */
 function readLaserTell(round, now, timing) {
   return {
     ...readEyeFlashes(round, now, round.strike),
@@ -182,6 +204,7 @@ function readLaserTell(round, now, timing) {
   };
 }
 
+/** Combine the flame charge cue with any eye shot and guard-reset guidance. */
 function readFlameTell(round, now, timing, { guardBroken, guardBreakDrill }) {
   const flame = flamePhase(round, now);
   const eyes = readEyeFlashes(round, now, flame ? round.comboLaserAt : round.strike);
@@ -200,6 +223,7 @@ function readFlameTell(round, now, timing, { guardBroken, guardBreakDrill }) {
   };
 }
 
+/** Describe the inhale and warning while leaving the release pause visually clear. */
 function readShoutTell(round, now, { danger, elapsed }) {
   return {
     inhale: danger && elapsed < shoutInhale ? elapsed / shoutInhale : null,
@@ -209,6 +233,7 @@ function readShoutTell(round, now, { danger, elapsed }) {
   };
 }
 
+/** Build a single frame of boss cues from the active move and strike deadline. */
 export function attackTell(round, now, options = {}) {
   const duration = warningDuration(round);
   const elapsed = duration - (round.strike - now);
